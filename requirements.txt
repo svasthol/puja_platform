@@ -1,0 +1,226 @@
+# Locked production dependencies — regenerate after any pyproject.toml change:
+#   uv pip compile pyproject.toml -o requirements.txt
+# Install: pip install -r requirements.txt  (or: uv pip install -r requirements.txt)
+alembic==1.16.1
+    # via puja-platform (pyproject.toml)
+amqp==5.3.1
+    # via kombu
+annotated-doc==0.0.4
+    # via
+    #   fastapi
+    #   typer
+annotated-types==0.7.0
+    # via pydantic
+anyio==4.14.1
+    # via
+    #   httpx
+    #   starlette
+    #   watchfiles
+bcrypt==4.3.0
+    # via puja-platform (pyproject.toml)
+billiard==4.2.4
+    # via celery
+celery==5.6.3
+    # via puja-platform (pyproject.toml)
+certifi==2026.6.17
+    # via
+    #   httpcore
+    #   httpx
+    #   sentry-sdk
+click==8.4.2
+    # via
+    #   celery
+    #   click-didyoumean
+    #   click-plugins
+    #   click-repl
+    #   rich-toolkit
+    #   uvicorn
+click-didyoumean==0.3.1
+    # via celery
+click-plugins==1.1.1.2
+    # via celery
+click-repl==0.3.0
+    # via celery
+colorama==0.4.6
+    # via
+    #   click
+    #   typer
+    #   uvicorn
+detect-installer==0.1.0
+    # via fastapi-cloud-cli
+dnspython==2.8.0
+    # via email-validator
+email-validator==2.3.0
+    # via
+    #   fastapi
+    #   pydantic
+fastapi==0.139.0
+    # via puja-platform (pyproject.toml)
+fastapi-cli==0.0.28
+    # via fastapi
+fastapi-cloud-cli==0.22.1
+    # via fastapi-cli
+fastar==0.11.0
+    # via
+    #   fastapi
+    #   fastapi-cloud-cli
+greenlet==3.5.3
+    # via sqlalchemy
+h11==0.16.0
+    # via
+    #   httpcore
+    #   uvicorn
+httpcore==1.0.9
+    # via httpx
+httptools==0.8.0
+    # via uvicorn
+httpx==0.28.1
+    # via
+    #   puja-platform (pyproject.toml)
+    #   fastapi
+    #   fastapi-cloud-cli
+idna==3.18
+    # via
+    #   anyio
+    #   email-validator
+    #   httpx
+jinja2==3.1.6
+    # via fastapi
+kombu==5.6.1
+    # via
+    #   puja-platform (pyproject.toml)
+    #   celery
+mako==1.3.12
+    # via alembic
+markdown-it-py==4.2.0
+    # via rich
+markupsafe==3.0.3
+    # via
+    #   jinja2
+    #   mako
+mdurl==0.1.2
+    # via markdown-it-py
+orjson==3.10.18
+    # via puja-platform (pyproject.toml)
+packaging==26.2
+    # via kombu
+prompt-toolkit==3.0.52
+    # via click-repl
+psycopg==3.2.9
+    # via puja-platform (pyproject.toml)
+psycopg-binary==3.2.9
+    # via psycopg
+psycopg-pool==3.3.1
+    # via psycopg
+pydantic==2.11.5
+    # via
+    #   puja-platform (pyproject.toml)
+    #   fastapi
+    #   fastapi-cloud-cli
+    #   pydantic-extra-types
+    #   pydantic-settings
+pydantic-core==2.33.2
+    # via pydantic
+pydantic-extra-types==2.11.1
+    # via fastapi
+pydantic-settings==2.9.1
+    # via
+    #   puja-platform (pyproject.toml)
+    #   fastapi
+pygments==2.20.0
+    # via rich
+pyjwt==2.10.1
+    # via
+    #   puja-platform (pyproject.toml)
+    #   redis
+python-dateutil==2.9.0.post0
+    # via celery
+python-dotenv==1.2.2
+    # via
+    #   pydantic-settings
+    #   uvicorn
+python-multipart==0.0.20
+    # via
+    #   puja-platform (pyproject.toml)
+    #   fastapi
+python-ulid==3.0.0
+    # via puja-platform (pyproject.toml)
+pyyaml==6.0.3
+    # via uvicorn
+redis==5.3.1
+    # via
+    #   puja-platform (pyproject.toml)
+    #   kombu
+rich==15.0.0
+    # via
+    #   rich-toolkit
+    #   typer
+rich-toolkit==0.20.1
+    # via
+    #   fastapi-cli
+    #   fastapi-cloud-cli
+rignore==0.7.6
+    # via fastapi-cloud-cli
+sentry-sdk==2.64.0
+    # via fastapi-cloud-cli
+shellingham==1.5.4
+    # via typer
+six==1.17.0
+    # via python-dateutil
+sqlalchemy==2.0.44
+    # via
+    #   puja-platform (pyproject.toml)
+    #   alembic
+starlette==1.3.1
+    # via fastapi
+structlog==25.4.0
+    # via puja-platform (pyproject.toml)
+typer==0.26.8
+    # via
+    #   fastapi-cli
+    #   fastapi-cloud-cli
+typing-extensions==4.16.0
+    # via
+    #   alembic
+    #   anyio
+    #   fastapi
+    #   psycopg
+    #   psycopg-pool
+    #   pydantic
+    #   pydantic-core
+    #   pydantic-extra-types
+    #   rich-toolkit
+    #   sqlalchemy
+    #   starlette
+    #   typing-inspection
+typing-inspection==0.4.2
+    # via
+    #   fastapi
+    #   pydantic
+    #   pydantic-settings
+tzdata==2026.2
+    # via
+    #   kombu
+    #   psycopg
+    #   tzlocal
+tzlocal==5.4.4
+    # via celery
+urllib3==2.7.0
+    # via sentry-sdk
+uvicorn==0.34.0
+    # via
+    #   puja-platform (pyproject.toml)
+    #   fastapi
+    #   fastapi-cli
+    #   fastapi-cloud-cli
+vine==5.1.0
+    # via
+    #   amqp
+    #   celery
+    #   kombu
+watchfiles==1.2.0
+    # via uvicorn
+wcwidth==0.8.2
+    # via prompt-toolkit
+websockets==16.0
+    # via uvicorn

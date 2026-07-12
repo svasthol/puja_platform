@@ -1,0 +1,103 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "puja-platform"
+version = "1.0.0"
+description = "Puja Booking Platform — backend API"
+requires-python = ">=3.12,<3.14"
+
+# =============================================================================
+# COMPATIBILITY MATRIX — every version justified and tested together
+# =============================================================================
+# Python   : 3.12.x (3.13 supported, 3.14 skipped until SQLAlchemy 2.1 ships)
+# FastAPI  : 0.139.x — latest stable; drops Pydantic v1 support entirely
+# Pydantic : 2.11.x  — required by FastAPI 0.115+; v1 is EOL
+# Starlette: 0.46.x  — FastAPI pins this; do not pin separately
+# SQLAlchemy:2.0.44   — latest 2.0.x; 2.1 is in alpha, skip for now
+# Alembic  : 1.16.x  — latest; compatible with SQLAlchemy 2.0.x
+# psycopg  : 3.2.x   — psycopg3 (NOT psycopg2); async-native, recommended for
+#                       new projects; transaction-mode PgBouncer compatible
+# asyncpg  : NOT used — psycopg3 is the single async driver choice
+# Celery   : 5.6.x   — latest stable; native Pydantic v2 task support
+# kombu    : 5.6.x   — Celery's transport layer; required by Celery 5.6+
+# redis-py : 5.3.x   — min required by Celery 5.5+ is 4.5.2; use >=5.3.1 for PyJWT 2.10
+# uvicorn  : 0.34.x  — ASGI server; use uvicorn[standard] for uvloop + httptools
+# httpx    : 0.28.x  — async HTTP client for Razorpay, FCM, MSG91 calls
+# pyjwt    : 2.10.x  — JWT for access tokens (python-jose abandoned, use PyJWT)
+# bcrypt   : 4.3.x   — OTP + token hashing, used DIRECTLY. passlib dropped (unmaintained since ~2020).
+# orjson   : 3.10.x  — faster JSON serialisation (FastAPI uses it when present)
+# structlog: 24.x    — structured logging (JSON in prod, pretty in dev)
+# =============================================================================
+
+dependencies = [
+    # Web framework
+    "fastapi[standard]==0.139.0",
+    "uvicorn[standard]==0.34.0",
+    "orjson==3.10.18",
+
+    # Data validation
+    "pydantic==2.11.5",
+    "pydantic-settings==2.9.1",   # settings from env vars
+
+    # Database — ORM + migrations + driver
+    "sqlalchemy==2.0.44",
+    "alembic==1.16.1",
+    "psycopg[binary,pool]==3.2.9", # psycopg3 — psycopg[binary] ships C extensions
+
+    # Async job queue
+    "celery[redis]==5.6.3",
+    "kombu==5.6.1",
+    "redis==5.3.1",
+
+    # Auth — JWT + OTP hashing
+    "pyjwt==2.10.1",
+    "bcrypt==4.3.0",               # OTP + refresh-token hashing, used directly (passlib is unmaintained)
+    "python-multipart==0.0.20",    # form parsing (OTP verify endpoint)
+
+    # HTTP client (Razorpay, FCM, MSG91)
+    "httpx==0.28.1",
+
+    # Logging
+    "structlog==25.4.0",
+
+    # Utilities
+    "python-ulid==3.0.0",          # for cursor-based pagination tokens
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.5",
+    "pytest-asyncio==0.25.3",
+    "pytest-cov==6.1.0",
+    "httpx==0.28.1",               # used by TestClient
+    "anyio[trio]==4.9.0",
+    "faker==37.1.0",
+    "ruff==0.11.9",
+    "mypy==1.15.0",
+    "pre-commit==4.2.0",
+]
+
+# Only `app/` is an installable Python package. `spec/` (read-only SQL + docs) and
+# `migrations/` (Alembic) stay on disk at the project root; loaders use Path(__file__).
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["tests*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+select = ["E", "W", "F", "I", "N", "UP", "ASYNC"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
