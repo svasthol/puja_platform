@@ -1,0 +1,55 @@
+# Render Blueprint — DEV/staging (puja_platform repo root).
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Dashboard alternative: set Root Directory blank (repo root = puja_platform),
+# PYTHON_VERSION=3.12.9, build/start commands below.
+
+services:
+  - type: web
+    name: puja-api-dev
+    runtime: python
+    plan: starter  # free tier cold-starts; use starter for reliable Razorpay webhooks
+    branch: main
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt && pip install --no-deps .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.9"
+      - key: APP_ENV
+        value: development
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+  - type: worker
+    name: puja-celery-dev
+    runtime: python
+    plan: starter
+    branch: main
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt && pip install --no-deps .
+    startCommand: celery -A app.workers.celery_app worker --loglevel=info -Q dispatch,sweep,refund,notifications
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.9"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
