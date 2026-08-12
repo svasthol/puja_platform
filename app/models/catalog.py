@@ -18,10 +18,19 @@ class Puja(Base):
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("puja_categories.id"))
     name: Mapped[str] = mapped_column(String(150))
+    slug: Mapped[str | None] = mapped_column(String(150), unique=True)
+    tagline: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
     duration_minutes: Mapped[int | None] = mapped_column()
     default_price: Mapped[float] = mapped_column(Numeric(10, 2))
+    price_max: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    display_order: Mapped[int] = mapped_column(SmallInteger, default=0)
+    hero_media_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("puja_media.id"), nullable=True
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PujaAddon(Base):
@@ -29,8 +38,36 @@ class PujaAddon(Base):
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
     puja_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pujas.id"))
     name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str | None] = mapped_column(Text)
     price: Mapped[float] = mapped_column(Numeric(10, 2))
+    display_order: Mapped[int] = mapped_column(SmallInteger, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class PujaContentItem(Base):
+    __tablename__ = "puja_content_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    puja_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pujas.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(20))
+    position: Mapped[int] = mapped_column(SmallInteger, default=0)
+    text: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class PujaMedia(Base):
+    __tablename__ = "puja_media"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(20))
+    entity_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True))
+    s3_key: Mapped[str] = mapped_column(String(500))
+    alt_text: Mapped[str | None] = mapped_column(String(200))
+    position: Mapped[int] = mapped_column(SmallInteger, default=0)
+    upload_status: Mapped[str] = mapped_column(String(20), default="pending")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Pujari(Base):
@@ -45,6 +82,19 @@ class Pujari(Base):
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PujariDocument(Base):
+    __tablename__ = "pujari_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    pujari_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pujaris.id", ondelete="CASCADE"))
+    doc_type: Mapped[str] = mapped_column(String(30))
+    file_url: Mapped[str] = mapped_column(String(500))
+    version: Mapped[int] = mapped_column(SmallInteger, default=1)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    uploaded_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PujariAvailability(Base):

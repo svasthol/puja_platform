@@ -18,6 +18,7 @@ from app.db.engine import get_db, get_db_txn
 from app.models.identity import Address
 from app.schemas.address import AddressCreate, AddressOut, AddressPage, AddressUpdate
 from app.schemas.common import decode_cursor, encode_cursor
+from app.services.service_area_guard import require_active_service_area
 
 router = APIRouter(prefix="/addresses", tags=["addresses"])
 
@@ -32,6 +33,7 @@ def _out(a: Address) -> AddressOut:
         pincode=a.pincode,
         latitude=a.latitude,
         longitude=a.longitude,
+        service_area_id=a.service_area_id,
         is_default=a.is_default,
         created_at=a.created_at,
     )
@@ -82,6 +84,7 @@ async def create_address(
 ):
     if payload.is_default:
         await _clear_default(db, p.user_id)
+    await require_active_service_area(db, payload.service_area_id)
     addr = Address(
         id=uuid.uuid4(),
         user_id=p.user_id,
@@ -92,6 +95,7 @@ async def create_address(
         pincode=payload.pincode,
         latitude=payload.latitude,
         longitude=payload.longitude,
+        service_area_id=payload.service_area_id,
         is_default=payload.is_default,
         created_at=dt.datetime.now(dt.UTC),
     )
@@ -120,6 +124,8 @@ async def update_address(
     changes = payload.model_dump(exclude_unset=True)
     if changes.get("is_default") is True and not addr.is_default:
         await _clear_default(db, p.user_id)
+    if "service_area_id" in changes and changes["service_area_id"] is not None:
+        await require_active_service_area(db, changes["service_area_id"])
     for field, value in changes.items():
         setattr(addr, field, value)
     await db.flush()  # trigger recomputes geom when lat/lng changed

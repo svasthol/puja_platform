@@ -55,6 +55,11 @@ class Booking(Base):
     balance_collection_method: Mapped[str | None] = mapped_column(String(20))
     # migration 004 — set at checkout; returned on idempotent duplicate submit
     razorpay_order_id: Mapped[str | None] = mapped_column(String(100))
+    # migration 014 — frozen at POST /v1/bookings; no column default
+    booking_class: Mapped[str] = mapped_column(String(10))
+    relationship_manager_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("relationship_managers.id")
+    )
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
 

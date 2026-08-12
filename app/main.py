@@ -23,6 +23,9 @@ from app.core.redis_client import (
     redis_ping,
 )
 from app.db.engine import engine
+from app.monitoring.middleware import MonitoringMiddleware
+from app.monitoring.metrics import get_metrics_content_type, render_metrics
+from app.monitoring.sentry_bridge import init_sentry
 
 settings = get_settings()
 configure_logging(debug=settings.DEBUG)
@@ -32,6 +35,7 @@ log = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("startup", env=settings.APP_ENV)
+    init_sentry(settings.SENTRY_DSN, environment=settings.APP_ENV)
     await init_redis()
     app.state.redis_ready = True
     yield
@@ -52,6 +56,8 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(RequestIDMiddleware)
+    if settings.METRICS_ENABLED:
+        app.add_middleware(MonitoringMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.ALLOWED_ORIGINS,
@@ -81,6 +87,15 @@ def create_app() -> FastAPI:
             status_code=200 if status == "ok" else 503,
             content={"status": status, "db": db_ok, "redis": redis_ok, "env": settings.APP_ENV},
         )
+
+    if settings.METRICS_ENABLED:
+
+        @app.get("/metrics")
+        async def metrics():
+            """Prometheus / OpenMetrics scrape endpoint."""
+            from starlette.responses import Response
+
+            return Response(content=render_metrics(), media_type=get_metrics_content_type())
 
     return app
 

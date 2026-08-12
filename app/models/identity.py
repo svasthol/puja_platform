@@ -22,6 +22,16 @@ class User(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
 
 
+class Device(Base):
+    __tablename__ = "devices"
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    device_token: Mapped[str] = mapped_column(String(255), unique=True)
+    platform: Mapped[str | None] = mapped_column(String(20))
+    last_seen_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Address(Base):
     __tablename__ = "addresses"
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
@@ -33,6 +43,9 @@ class Address(Base):
     pincode: Mapped[str | None] = mapped_column(String(10))
     latitude: Mapped[float | None] = mapped_column(Numeric(9, 6))
     longitude: Mapped[float | None] = mapped_column(Numeric(9, 6))
+    service_area_id: Mapped[int] = mapped_column(
+        SmallInteger, ForeignKey("service_areas.id")
+    )
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
 
@@ -44,10 +57,21 @@ class AuthSession(Base):
     device_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
     app_context: Mapped[str] = mapped_column(String(10))
     refresh_token_hash: Mapped[str] = mapped_column(String(255), unique=True)
+    # Session lookup key (migration 009). refresh/logout resolve the session by
+    # the JWT jti, then verify the presented token against refresh_token_hash —
+    # bcrypt hashes are salted, so equality lookup on the hash can never work.
+    refresh_jti: Mapped[str | None] = mapped_column(String(64), unique=True)
     issued_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_reason: Mapped[str | None] = mapped_column(String(100))
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), primary_key=True)
+    assigned_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
 
 
 class OtpVerification(Base):

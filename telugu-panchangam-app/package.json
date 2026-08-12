@@ -1,0 +1,52 @@
+{
+  "name": "telugu-panchangam-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:engine": "jest src/engine/",
+    "test:validation": "jest validation/",
+    "test:e2e": "playwright test",
+    "test:e2e:mobile": "playwright test --project='Mobile Chrome (375px)' --project='Mobile Chrome (390px)'",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:screenshots": "playwright test --grep='Screenshots'",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:preview": "npm run pages:build && npx wrangler pages dev .vercel/output/static",
+    "pages:deploy": "npm run pages:build && npx wrangler pages deploy .vercel/output/static",
+    "cf-typegen": "npx wrangler types"
+  },
+  "dependencies": {
+    "@ishubhamx/panchangam-js": "^2.2.6",
+    "@react-email/render": "^2.0.4",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "next": "14.2.35",
+    "react": "^18",
+    "react-dom": "^18",
+    "resend": "^6.9.4",
+    "suncalc": "^1.9.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
+    "@playwright/test": "^1.59.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/suncalc": "^1.9.2",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
+    "jest": "^30.3.0",
+    "postcss": "^8",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^3.4.1",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5"
+  }
+}

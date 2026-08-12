@@ -2,67 +2,95 @@
 
 Tasks trace to `spec/API_CONTRACTS.md` §Pujari app unless marked SPEC_AMENDMENTS.
 
+> **Status lives in `STATUS.md` — the single source of truth for implementation progress.**
+> Track files define scope only: Spec / Files / Acceptance / Depends-on. Never add a
+> `Status:` field here; it will drift.
+
+**Launch policy:** `spec/plans/LAUNCH_POLICY.md`, `SPEC_AMENDMENTS.md` §21.
+
+> **Flutter client:** `P-FLUTTER-PARTNER` / `C-LAUNCH-UX` — **IN_PROGRESS** in `STATUS.md`
+> (not started; separate repo). This file tracks **backend APIs only**; launch §21 partner
+> endpoints (`B-OFFERS`, `B-BOOKINGS`, `B-HEARTBEAT`, etc.) are **COMPLETED** in this repo.
+
 ---
 
 ## Phase 0.5 — Supply onboarding (parallel with dispatch)
 
 ### B-REGISTER — Pujari profile bootstrap
 - **Spec:** SPEC_AMENDMENTS.md §5; API_CONTRACTS.md
-- **Status:** TODO
 - **Files:** `app/api/v1/endpoints/pujaris.py` or `partner_onboarding.py`
 - **Acceptance:** `POST /v1/pujari/register` creates `pujaris` row `verification_status='pending'`
 - **Verify:** Cannot receive offers until `verified` (admin KYC)
 
 ### B-KYC — Document upload
 - **Spec:** API_CONTRACTS.md admin KYC; ARCHITECTURE.md S3 private bucket
-- **Status:** TODO
 - **Acceptance:** Signed upload URL → `pujari_documents` row; admin approves via A-KYC
-- **Depends on:** A-KYC
+- **Depends on:** B-REGISTER (pujari row exists); S3 bucket configured (`S3_BUCKET_KYC`)
+- **Note:** A-KYC is the **downstream reviewer** of uploads from this task — not a
+  prerequisite. Do not list A-KYC as a dependency (that created a spec deadlock with
+  `ADMIN.md` A-KYC → B-KYC).
 
 ### B-DEVICE — FCM device token
-- **Spec:** SPEC_AMENDMENTS.md; ARCHITECTURE.md FCM
-- **Status:** TODO
-- **Acceptance:** `POST /v1/me/devices` {device_token, platform} → `devices` table
+- **Spec:** SPEC_AMENDMENTS.md; ARCHITECTURE.md FCM; API_CONTRACTS.md §Devices
+- **Files:** `app/api/v1/endpoints/devices.py`
+- **Acceptance:** `POST /v1/me/devices` {device_token, platform} → `devices` table; `DELETE` owner-only; upsert on conflict
 
 ---
 
 ## Go online
 
-### B-HEARTBEAT — Presence + location
-- **Spec:** API_CONTRACTS.md, DISPATCH_FLOW.md §Presence
-- **Status:** DONE
+### B-HEARTBEAT — Presence (launch: no GPS required)
+- **Spec:** API_CONTRACTS.md, DISPATCH_FLOW.md §Presence, §21.2
 - **Files:** `app/api/v1/endpoints/pujaris.py`
-- **Note:** `geom` set correctly on heartbeat; poll `GET /v1/offers` every 3–5s while on duty
+- **Launch:** `PUT /heartbeat` sets Redis presence; `{lat,lng}` **optional**. Partner may
+  go online without OS location permission. Poll `GET /v1/offers` every 3–5s while on duty.
+- **Phase 2:** optional lat/lng on heartbeat for geo dispatch
 
 ### B-AVAIL — Weekly availability
 - **Spec:** API_CONTRACTS.md `PUT /v1/me/availability`
-- **Status:** TODO
 - **Files:** `app/api/v1/endpoints/pujaris.py`
 - **Acceptance:** CRUD `pujari_availability` windows
 
 ### B-UNAVAIL — Date blocks
 - **Spec:** API_CONTRACTS.md `PUT /v1/me/unavailability`
-- **Status:** TODO
 - **Acceptance:** CRUD `pujari_unavailability`; dispatch excludes those dates
 
 ---
 
-## Offer inbox (Rapido-style)
+## Offer inbox + bookings (launch UX)
 
 ### B-OFFERS — List live offers
 - **Spec:** API_CONTRACTS.md
-- **Status:** DONE
-- **Product:** Poll every 3–5s during active dispatch; FCM is additive
+- **Launch:** Each offer shows puja, date/time, money, **area_label only** — no customer
+  address or phone. FCM additive; poll on Offers tab.
+- **Dual UX (Dispatch v2, §21.6.E):** each offer carries a computed `urgency` (`instant` | `advance`)
+  and `urgency_escalated` flag. Render a **Rapido-style accept/reject modal** when
+  `urgency == 'instant'` OR `urgency_escalated == true`; otherwise show the offer as an **inbox row**
+  in the Offers tab. Never assume a modal is always push-triggered — an advance booking that crossed
+  the instant threshold surfaces its modal on the next **poll** (the flip FCM only reaches pujaris who
+  already held the offer).
+- **FCM types (§21.6.H):** `offer_instant` (high priority → modal), `offer_advance` (normal → inbox),
+  `accept_ack` (advance only, on accept: "Added to your Bookings — we'll confirm ~24h before").
+- **Accept-contention (§21.6.G):** advance offers are broadcast to the whole eligible pool and live up
+  to 24h, so an offer someone else already took will 409 on accept — expected launch behaviour, not a bug.
+  Show live "still available?" state on inbox rows and handle 409 gracefully. Once one pujari accepts, the
+  other offers are **superseded** and disappear from the inbox (§21.6.B). Live advance offers per pujari
+  are capped (`max_live_advance_offers_per_pujari`, default 15).
+
+### B-BOOKINGS — Assigned booking list + detail
+- **Spec:** API_CONTRACTS.md `GET /v1/pujari/bookings`, `GET /v1/pujari/bookings/{id}`
+- **Launch:** Bookings tab — list confirmed/upcoming/past. Detail after confirm: full address,
+  static map link, RM contact — **no customer phone**. Calendar UI Phase 2.
 
 ### B-ACCEPT — Accept race
 - **Spec:** API_CONTRACTS.md, DISPATCH_FLOW.md accept
-- **Status:** DONE
+- **Launch:** Soft travel-buffer check at accept (§21.5) — 409 with distinct copy
 - **UX:** Handle 409/410 without retry loops
 
 ### B-REJECT — Reject offer
 - **Spec:** API_CONTRACTS.md, DISPATCH_FLOW.md fast path
-- **Status:** PARTIAL
 - **Depends on:** P-REJECT-FAST
+- **Note:** Rejectors are **never** re-offered same booking (§21.6)
 
 ---
 
@@ -70,20 +98,17 @@ Tasks trace to `spec/API_CONTRACTS.md` §Pujari app unless marked SPEC_AMENDMENT
 
 ### B-START — Start service
 - **Spec:** API_CONTRACTS.md transition matrix
-- **Status:** DONE
-- **Window:** ±60 min of `scheduled_time` Asia/Kolkata
+- **Window:** ±60 min of `scheduled_time` Asia/Kolkata (stricter for `is_muhurat_bound` — Phase 2 UX)
 
 ### B-BALANCE — Offline balance acknowledgement
 - **Spec:** API_CONTRACTS.md, DISPATCH_FLOW.md advance_balance
-- **Status:** DONE
 
 ### B-COMPLETE — Complete service
 - **Spec:** API_CONTRACTS.md
-- **Status:** DONE
 
 ### B-EARNINGS — Earnings screen
 - **Spec:** API_CONTRACTS.md `GET /v1/me/earnings`
-- **Status:** BLOCKED on P-SPLITS
+- **Blocked-by:** P-SPLITS (Phase 3)
 - **Acceptance:** `platform_payout` from `payment_splits` + `direct_collection` from `amount_due_offline` where `balance_collected_at` set
 
 ---
@@ -92,15 +117,41 @@ Tasks trace to `spec/API_CONTRACTS.md` §Pujari app unless marked SPEC_AMENDMENT
 
 ### B-CANCEL — Pujari cancel assigned booking
 - **Spec:** SPEC_AMENDMENTS.md §3; API_CONTRACTS.md
-- **Status:** TODO
 - **Acceptance:** Assigned pujari can cancel `confirmed` booking; triggers customer refund per policy + reliability signal; enqueue re-dispatch or admin alert
-- **Launch:** Required for bookings scheduled &gt;24h ahead; optional for same-day-only MVP
+- **Launch:** Required for advance scheduling + mandatory reconfirmation (§21.7).
+  **Reconfirm screen "No":** routes here — confirm dialog before call.
+- **Flutter (`P-FLUTTER-PUJARI-CANCEL` — COMPLETED 2026-08-09):** Detail + reconfirm card
+  → `POST /v1/bookings/{id}/pujari-cancel` → pop detail → **Requests tab** + `refreshFromPush()`
+  on offers. Files: `partner_booking_detail_screen.dart`, `partner_cancel_eligibility.dart`,
+  `partner_shell_intent.dart`.
+
+### B-OFFERS-LIST — Partner inbox excludes cancelled bookings
+- **Spec:** DISPATCH_FLOW.md §Cancellation; API_CONTRACTS.md `GET /v1/offers`
+- **Files:** `app/api/v1/endpoints/offers.py`, `app/services/cancellation_service.py`
+- **Acceptance:** After customer cancel, `GET /v1/offers` returns no rows for that booking;
+  accept on stale assignment → 410. Test: `tests/test_launch_slice.py::test_list_offers_excludes_customer_cancelled_booking`.
+- **Flutter:** 410 accept → `refreshFromPush()` (`offers_controller.dart`). **IN_PROGRESS:**
+  `P-FCM-CUSTOMER-CANCEL` — push-driven instant removal without waiting for 20s poll.
+
+### B-RECONFIRM — Partner attendance ack (§23)
+- **Spec:** API_CONTRACTS.md `POST /v1/pujari/bookings/{id}/reconfirm`
+- **Acceptance:** Idempotent `pujari_confirmed_at`; only after ping sent; 409 when not eligible
+- **Depends on:** P-RECONFIRM (worker ping), P-RECONFIRM-API (endpoint)
 
 ---
 
 ## Partner track exit gate
 
-- [ ] Register → KYC approved → set availability → heartbeat
-- [ ] Receive offer (push + poll) → accept → start → complete
-- [ ] Earnings row visible after P-SPLITS
-- [ ] Reject triggers instant rebroadcast (P-REJECT-FAST)
+**Backend (this repo):** API items above marked COMPLETED in `STATUS.md` meet launch §21.
+
+**Flutter (`P-FLUTTER-PARTNER` — IN_PROGRESS):**
+
+- [x] OTP login, go online (heartbeat, no GPS), Offers + Bookings tabs, l10n EN/TE
+- [x] Receive offer (**FCM-primary** for `offer_instant`; 20s poll safety net) — inbox + modal
+- [x] Accept / reject → 409/410 UX; **410 → refresh inbox** (customer-cancel stale card)
+- [x] Bookings list + detail + lifecycle + reconfirm + **pujari-cancel** → Requests tab
+- [x] FCM handlers (`offer_instant`, `offer_advance`, `reconfirm_*`, `accept_ack`); sound device QA pending (`P-FLUTTER-FCM-SOUND`)
+- [ ] **IN_PROGRESS:** `P-FCM-CUSTOMER-CANCEL` — partner push when customer cancels (instant offer removal)
+- [ ] Register → KYC approved → set availability (HOLD — `P-FLUTTER-REGISTER` / `P-FLUTTER-KYC`)
+- [ ] Earnings row visible after P-SPLITS (`P-FLUTTER-EARNINGS-UI` HOLD)
+- [x] Reject triggers rebroadcast per §21.6 (backend + client refresh)

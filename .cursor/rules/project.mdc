@@ -12,8 +12,46 @@ alwaysApply: true
 4. `spec/API_CONTRACTS.md`  — endpoint surface + DB-error → HTTP mapping
 5. `spec/STACK_VERSIONS.md` — pinned versions + compatibility rules
 6. `spec/plans/MASTER.md`   — dev sequence (read before starting a track)
-7. `spec/plans/STATUS.md`   — task completion tracker (update when finishing tasks)
-8. `spec/plans/SPEC_AMENDMENTS.md` — v3.2 approved spec additions
+7. `spec/plans/LAUNCH_POLICY.md` — Puja MVP launch vs Phase 2 (read before dispatch work)
+8. `spec/plans/STATUS.md`   — task completion tracker; **the ONLY place task status lives**
+   (track files PLATFORM/CUSTOMER/PARTNER/ADMIN.md carry no `Status:` fields — never add one)
+9. `spec/plans/SPEC_AMENDMENTS.md` — v3.2 approved spec additions (§17–§21, incl. §21.6.A–H Dispatch v2)
+10. `spec/MOBILE_FIREBASE.md` — Firebase project + Android package names (`com.managuruji.customer` / `.partner`); **read before any Flutter or FCM mobile work**
+11. `spec/MOBILE_FLUTTER.md` — Flutter implementation contract (mobile repo: `mana_guruji_mobile`)
+12. `spec/plans/CATALOG_SYNC.md` — catalogue visibility matrix (admin ↔ `GET /v1/pujas` ↔ customer UI); read before catalog Flutter or admin catalogue work
+
+## Puja MVP launch policy (SPEC_AMENDMENTS §21) — normative
+
+Read `spec/plans/LAUNCH_POLICY.md` before any dispatch, heartbeat, or booking-flow change.
+
+| Rule | Requirement |
+|------|-------------|
+| **Broadcast only** | Never create `dispatch_mode='direct'` at checkout. Do not expose `dispatch-choice`. |
+| **Keep DB nets** | **Never drop** `intended_pujari_id`, trigger 3, `ex_bookings_intended_no_overlap`, or `ex_bookings_pujari_no_overlap`. Disabling direct is API/UI only. |
+| **No pujari GPS at launch** | `PUT /heartbeat` — lat/lng optional. Dispatch must not `JOIN pujari_live_location` or use `ST_DWithin`. Ship both changes together. |
+| **Customer geom** | `addresses.geom` still required at checkout. |
+| **Area** | `service_area_id` required on address; display-only on offers — citywide dispatch. |
+| **RM** | No customer↔pujari direct phone at launch. Both sides get RM after confirm. |
+| **Soft buffer** | `dispatch_buffer_minutes` in eligibility + accept — **not** in exclusion constraint. |
+| **Payments** | Keep `full_online` / `advance_balance` — no Razorpay auth/capture-on-accept. |
+
+Implementation tasks: `plans/STATUS.md` §Puja MVP launch. Migration **012** when implementing schema.
+
+## Dispatch v2 (SPEC_AMENDMENTS §21.6.A–H) — normative
+
+Read `SPEC_AMENDMENTS.md` §21.6.A–H + `DISPATCH_FLOW.md` §Dispatch windows / §Dispatch v2 beat tasks
+before any dispatch, booking-gate, offer-TTL, or reconfirmation change. Migration **014**; task
+`P-LAUNCH-DISPATCH-V2`.
+
+| Rule | Requirement |
+|------|-------------|
+| **Frozen class vs live urgency** | `bookings.booking_class` (`instant`/`advance`) is frozen at `POST /v1/bookings` and drives night gate, offer TTL, RM rules, failure cutoff. Partner-app `urgency` is computed **live** at `GET /v1/offers` (modal vs inbox) — never persisted, never used for policy. Do not conflate them. |
+| **Authoritative gate** | `POST /v1/bookings` freezes `booking_class` and applies the night gate (422 `INSTANT_NIGHT_BLOCKED` / `NIGHT_BOOKINGS_DISABLED`) **before** the Razorpay order. `slot-holds` is advisory only. |
+| **No recompute at payment** | The webhook reads the frozen class; it does **not** reclassify. It sets `paid_at` + enqueues only — it does **not** compute dispatch windows or write `booking_dispatch_state` (delete that block; the **worker** owns the row + windows). |
+| **Class-aware deadline** | Keep `compute_dispatch_windows()` deadlines class-aware (instant `now()+30m`; advance `slot−3h`). Only advance `dispatch_starts_at` moves to `now()` under `immediate_dispatch_on_payment`. Never set a uniform `slot−3h` deadline. |
+| **Sibling supersede on accept** | Losing offers are resolved by **trigger 3** (`superseded` + `responded_at`) in the same accept transaction — never an app-layer loop. |
+| **Beat tasks off the sweep** | `refresh_advance_offers` (5m), `escalate_urgency_on_threshold` (2m), `rm_escalation_scan` (15m) are separate beat tasks with their own locks. Never add them to the 30s `sweep_task`. Advance-offer refresh is an **in-place `UPDATE expires_at`** (never re-INSERT). |
+| **Duration gate** | Do not re-add duration CHECKs (already in migration 006). Rely on trigger 5 + CI assertions; `duration_minutes > 0` is what keeps `ex_bookings_pujari_no_overlap` live. |
 
 ## Non-negotiable coding rules
 
@@ -57,6 +95,53 @@ alwaysApply: true
 - `app_context` is checked on **every authenticated request** in the auth dependency.
   A customer-app token calling a pujari endpoint → 403.
 - WS auth uses **single-use Redis tickets** (`GETDEL`). Bearer tokens never appear in URLs.
+- **`P-ADMIN-ROLE` (SHIPPED — Sprint 4-0):** `get_principal` loads `user_roles` and 403s an
+  admin token whose roles were revoked after issuance. **Scope the role lookup to
+  `app_context=='admin'` only** — customers/pujaris have no `user_roles` rows; a global check
+  would 403 every existing user (and add a needless join to every request). Admin-only writes
+  use `require_admin_role` (`require_roles('admin')`); `support` is read-mostly.
+- **`P-ADMIN-AUTH-FIX`:** `app_context` on `OtpVerify` is a **body field**, never a query param.
+  SMS OTP path accepts `customer` | `pujari` only; admin uses TOTP (`P-ADMIN-AUTH`).
+- **`P-AUTH-FIX`:** Refresh/logout lookup by JWT `jti` + `verify_secret` — never
+  `hash_secret(token)` equality (bcrypt salts differ per call). OTP failure counter must
+  persist outside the verify transaction (rollback currently discards `attempts`).
+- **`P-ADMIN-AUTH` (SHIPPED — Sprint 4-0):** Admin login is TOTP only (`POST /v1/admin/auth/login`),
+  never SMS OTP (DLT-blocked). This is the **only** issuance path for an admin token.
+  - TOTP is **stdlib RFC 6238** (`app/core/totp.py`, validated against the RFC vectors) — do
+    not add `pyotp`. `verify()` returns the matched time-step; persist it (`last_used_step`)
+    and require strictly-increasing to block same-code replay.
+  - TOTP secrets **cannot be hashed** — store Fernet ciphertext via `app/core/crypto.py`,
+    keyed by `TOTP_ENC_KEYS` (comma-separated for rotation; `key_version` on the row). Never
+    plaintext, never `SECRET_KEY`.
+  - Provisioning is **admin-vouched, not phone-only self-enrol**: `bootstrap_admin.py` for the
+    first admin; `POST /v1/admin/users/{id}/credential` (existing admin) for the rest. First
+    successful login activates (`activated_at`). No self-enrol endpoint (closes the enrol race).
+  - **Per-`app_context` token TTL** via `security.access_ttl_minutes` / `refresh_ttl_days`:
+    admin access 30 min / refresh 1 day; customer/pujari keep 30 days. `_issue_token_pair`
+    derives the session `expires_at` from the same resolver so token and row never disagree.
+- **Admin mutations are audited in-transaction** via `app/services/audit.record_admin_action`
+  (append-only `admin_audit_log`). A failed mutation's audit row rolls back with it; log
+  rejected attempts to structlog only. Never log secrets/plaintext TOTP.
+- **Append-only tables** (`admin_audit_log`, `booking_status_history`) require explicit
+  `REVOKE UPDATE, DELETE FROM puja_app` — the default grant includes UPDATE (migration 009).
+- **Manual reassign** flips the old accepted assignment to `('assignment','revoked')` —
+  never `rejected` (reliability scoring), never leave two `accepted` rows. See DISPATCH_FLOW.md.
+- `POST /v1/auth/otp/request` and transactional SMS in workers must call
+  **`app/services/sms_router.py`** — never import `msg91_client` or `fast2sms_client`
+  directly from route handlers or Celery tasks.
+- **DLT gate (India):** SMS vendors require TRAI DLT registration **even for test sends**.
+  Missing DLT → messages may not deliver despite API calls succeeding. Use `DEBUG=true`
+  + `otp_dev_only` for dev auth until DLT is approved. Do not debug this as a routing bug.
+  See SPEC_AMENDMENTS §17–§18.
+- **FCM gate:** Live push E2E is verified **after Flutter** registers `device_token` via
+  `POST /v1/me/devices`. Backend FCM worker is complete; poll remains safety net.
+- **`P-CANCEL-OFFERS-SYNC` (SHIPPED — 2026-08-09):** `GET /v1/offers` must include
+  `bookings.cancelled_at IS NULL`. Customer cancel (`cancellation_service`) must expire
+  pending assignments in the same transaction (`expired` + `responded_at`) — history stays;
+  never DELETE assignment rows. Partner Flutter refreshes inbox on 410 accept.
+- **`P-FCM-CUSTOMER-CANCEL` (IN_PROGRESS):** Push partner when customer cancels so the
+  offer disappears without waiting for poll. Planned `data.type = offer_withdrawn`; poll +
+  410 refresh are interim safety nets only.
 
 ### Migrations
 - **Migration 001**: `op.execute(open("spec/db/schema.sql").read())` then triggers then seed.
@@ -65,6 +150,21 @@ alwaysApply: true
 - **Migration 004**: `op.execute(open("spec/db/migration_004.sql").read())`.
 - **Migration 005**: `op.execute(open("spec/db/migration_005.sql").read())`.
 - **Migration 006**: `op.execute(open("spec/db/migration_006.sql").read())`.
+- **Migration 009**: `op.execute(open("spec/db/migration_009.sql").read())` — chains after 006;
+  007 (tax) / 008 (PLL-GEOM) are reserved labels that chain after 009 when implemented.
+  **012** (launch policy §21) chains after 011 — see `DATABASE.md`.
+  No colon-prefixed text anywhere in migration SQL files (Alembic treats `:name` as a bind param).
+- **Migration 013**: `op.execute(open("spec/db/migration_013.sql").read())` — advance reconfirmation
+  (§21.7); chains after 012. SHIPPED.
+- **Migration 014**: `op.execute(open("spec/db/migration_014.sql").read())` — Dispatch v2 (§21.6.A–H);
+  chains after 013. Adds `bookings.booking_class`, `booking_dispatch_state.urgency_escalated_at` +
+  `rm_escalated_*`, `status_types('assignment','superseded')`, `CREATE OR REPLACE trg_set_booking_pujari_on_accept`
+  (sibling supersede), and dispatch/night/quiet-hours settings. **Must NOT** re-add the duration CHECKs
+  (already in 006) or add `accepts_muhurat_night`.
+- **Migration 017**: `op.execute(open("spec/db/migration_017.sql").read())` — server-cached panchangam
+  (§23.6); chains after 016. Adds `panchangam_daily` + unique index on `(city, panchang_date, locale, panchang_system)`.
+- **Migration 018**: `op.execute(open("spec/db/migration_018.sql").read())` — panchangam home-ribbon
+  fields (§23.6); chains after 017. Adds `vaaram`, `yama_gandam`, `sunrise`, `sunset` on `panchangam_daily`.
 - **Never let `alembic revision --autogenerate` produce the first migration.**
 - Review every autogenerated migration for attempted DROPs of: exclusion constraints,
   partial unique indexes, triggers, PostGIS geography columns. If found: migration is wrong.
@@ -79,6 +179,16 @@ alwaysApply: true
   name is its full import path (`app.workers.sweep.sweep_task`) so name == path.
 - The sweep task acquires a Redis `sweep_lock` (NX EX 25) before running; an
   overlapping beat tick must skip, not stack.
+
+### Panchangam worker (§23.6.1)
+- Panchangam fetch uses `panchangam_cities` for `lat/lng/tz` — never pass `city` to vendor URL.
+- `refresh_panchangam_cache_task` stays separate from `sweep_task`; acquires
+  `panchangam_refresh_lock` NX EX before fetch; idempotent upsert only.
+- Engine ayanamsa pinned to Lahiri (Chitrapaksha); adapter passes explicit IST
+  (`timezoneOffset=330` or `tz=Asia/Kolkata`).
+- Do not add panchangam logic to route handlers or booking services.
+- When any `P-PANCHANGAM-*` or `C-PANCHANGAM-*` row changes in `spec/plans/STATUS.md`,
+  update `spec/plans/PANCHANGAM_STATUS_SNAPSHOT.md` in the same change (see snapshot §When to update).
 
 ### Flutter WebSocket client
 - Use **`web_socket_channel`** (native WS), NEVER `socket_io_client`. The server
@@ -113,6 +223,7 @@ app/
   workers/            — Celery tasks (sweep.py already exists)
 spec/                 — read-only source of truth; never auto-edited
 spec/plans/           — dev sequence + STATUS tracker (update STATUS when completing tasks)
+admin_ui/             — Next.js ops console (Sprint 4A+); separate package.json, NOT part of app/
 migrations/           — Alembic env.py + versions/
 tests/                — mirrors app/ structure
 ```

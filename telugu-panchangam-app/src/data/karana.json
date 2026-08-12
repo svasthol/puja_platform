@@ -1,0 +1,17 @@
+{
+  "movable": [
+    { "number": 1, "en": "Bava", "te": "బవ" },
+    { "number": 2, "en": "Balava", "te": "బాలవ" },
+    { "number": 3, "en": "Kaulava", "te": "కౌలవ" },
+    { "number": 4, "en": "Taitila", "te": "తైతిల" },
+    { "number": 5, "en": "Garija", "te": "గరజ" },
+    { "number": 6, "en": "Vanija", "te": "వణిజ" },
+    { "number": 7, "en": "Vishti", "te": "విష్టి" }
+  ],
+  "fixed": [
+    { "number": 8, "en": "Shakuni", "te": "శకుని" },
+    { "number": 9, "en": "Chatushpada", "te": "చతుష్పాద" },
+    { "number": 10, "en": "Naga", "te": "నాగ" },
+    { "number": 11, "en": "Kimstughna", "te": "కింస్తుఘ్న" }
+  ]
+}

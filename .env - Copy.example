@@ -5,6 +5,11 @@ APP_ENV=development
 DEBUG=true
 SECRET_KEY=change-me-to-at-least-32-random-chars-openssl-rand-hex-32
 
+# CORS — include the Next.js admin UI origin (Sprint 4A, default :3000)
+# JSON list format for pydantic-settings:
+# localhost and 127.0.0.1 are different browser origins — include both for local dev.
+ALLOWED_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
+
 # ---- Database (your local Postgres) ------------------------------------
 # Format: postgresql+psycopg://USER:PASSWORD@HOST:PORT/DBNAME
 # psycopg3 driver — do NOT use postgresql+psycopg2://
@@ -19,22 +24,49 @@ REDIS_URL=redis://localhost:6379/0
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=30
 
+# ---- Admin auth (Phase 4 — TOTP, no SMS) --------------------------------
+# Short-lived admin tokens (an account that overrides refunds must not carry
+# a 30-day refresh). customer/pujari keep the values above.
+ADMIN_ACCESS_TOKEN_EXPIRE_MINUTES=30
+ADMIN_REFRESH_TOKEN_EXPIRE_DAYS=1
+TOTP_ISSUER=Mana Guruji
+# Fernet key(s) that encrypt admin TOTP secrets at rest. REQUIRED before any
+# admin can be provisioned. Generate one with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Comma-separate for rotation (first key encrypts; all keys decrypt).
+TOTP_ENC_KEYS=
+
 # ---- Payments (get from Razorpay dashboard) ----------------------------
 RAZORPAY_KEY_ID=rzp_test_xxxx
 RAZORPAY_KEY_SECRET=your_secret
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
 
 # ---- SMS (MSG91) --------------------------------------------------------
+# Our API uses SendOTP (server-driven): POST /v1/auth/otp/request + /verify
+#
+# MSG91_AUTH_KEY  = API authkey from dashboard → OTP → Server-Side Integration
+#                   (same key used in verifyAccessToken curl — NOT widget tokenAuth)
+# MSG91_TEMPLATE_ID = OTP → Templates → template with ##OTP## (NOT widgetId)
+#
+# OTP Widget embed (widgetId + tokenAuth) is browser-only; server uses verifyAccessToken
+# with authkey + JWT — we do not use that flow yet (Flutter will use SendOTP API).
 MSG91_AUTH_KEY=
 MSG91_TEMPLATE_ID=
 MSG91_SENDER_ID=PUJAPL
 
 # ---- Firebase (FCM) -----------------------------------------------------
+# HTTP v1: download service-account JSON from Firebase Console → Project settings
+# → Service accounts → Generate new private key. No FCM_SERVER_KEY required.
 FCM_SERVICE_ACCOUNT_PATH=secrets/firebase-service-account.json
+# FCM_SERVER_KEY=   # optional legacy fallback only; leave unset for manapujari
 
 # ---- Storage ------------------------------------------------------------
 S3_ENDPOINT_URL=https://your-r2-or-minio-endpoint
 S3_BUCKET_KYC=puja-kyc-docs
+S3_BUCKET_CATALOG=puja-catalog
+S3_CATALOG_PUBLIC_URL=https://cdn.example.com
+S3_CATALOG_URL_EXPIRE_SECONDS=600
+S3_CATALOG_MAX_BYTES=5242880
 S3_ACCESS_KEY=
 S3_SECRET_KEY=
 S3_REGION=ap-south-1

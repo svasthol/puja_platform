@@ -140,8 +140,8 @@ async def auth_token(client, phone: str, app_context: str = "customer") -> str:
         r = await client.post("/v1/auth/otp/request", json={"phone": phone})
         assert r.status_code == 202, r.text
     r = await client.post(
-        f"/v1/auth/otp/verify?app_context={app_context}",
-        json={"phone": phone, "otp": f"{DEV_OTP:06d}"},
+        "/v1/auth/otp/verify",
+        json={"phone": phone, "otp": f"{DEV_OTP:06d}", "app_context": app_context},
     )
     assert r.status_code == 200, r.text
     return r.json()["access_token"]

@@ -15,11 +15,19 @@ class SlotHoldRequest(BaseModel):
     time: dt.time
 
 
+class GateWarning(BaseModel):
+    code: str
+    message: str
+
+
 class SlotHoldResponse(BaseModel):
     hold_id: uuid.UUID
     expires_at: dt.datetime
     pujari_id: uuid.UUID | None = None
     server_time: dt.datetime
+    # Advisory only — POST /v1/bookings is authoritative (§21.6.A).
+    advisory_booking_class: Literal["instant", "advance"] | None = None
+    gate_warnings: list[GateWarning] = Field(default_factory=list)
 
 
 class QuotePaymentOption(BaseModel):
@@ -47,6 +55,7 @@ class BookingCreate(BaseModel):
 
 class BookingCreateResponse(BaseModel):
     booking_id: uuid.UUID
+    booking_class: Literal["instant", "advance"]
     razorpay_order_id: str | None = None  # None only for rows created before migration 004
     amount_due_online: Decimal
     amount_due_offline: Decimal
@@ -61,6 +70,11 @@ class CancelResponse(BaseModel):
     status: str
     refund_amount: Decimal
     refund_eta: str
+
+
+class PujariCancelResponse(BaseModel):
+    booking_id: uuid.UUID
+    status: str
 
 
 class DispatchChoice(BaseModel):

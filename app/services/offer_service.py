@@ -2,8 +2,8 @@
 Offer accept / reject (spec API_CONTRACTS pujari app, DISPATCH_FLOW step 6).
 
 ACCEPT: ONE UPDATE setting status_id=(assignment, accepted) AND responded_at=now.
-Trigger 3 does EVERYTHING else atomically (assigns booking, flips to confirmed,
-writes history, arms exclusion constraints). The app layer adds NO further writes.
+Trigger 3 assigns the booking and flips to confirmed. Then assign RM (§21.4) in the
+same transaction — the only app-layer write after accept.
 DB errors surface to the shared handler (409/410 per API_CONTRACTS).
 
 REJECT: ONE UPDATE to rejected + responded_at; then inline fast-path — if the
@@ -20,7 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import BookingAssignment
 from app.models.catalog import Pujari
+from app.services import booking_events
+from app.services.relationship_manager import assign_rm_on_confirm
 from app.services.status import status_id
+from app.services.travel_buffer import assert_accept_travel_buffer_ok
 
 log = structlog.get_logger()
 
@@ -48,6 +51,9 @@ async def accept_offer(
 ) -> dict:
     assignment = await _assignment_owned_by(db, assignment_id, user_id)
     accepted_id = await status_id(db, "assignment", "accepted")
+    await assert_accept_travel_buffer_ok(
+        db, pujari_id=assignment.pujari_id, booking_id=assignment.booking_id
+    )
     # ONE UPDATE. Trigger 3 fires on this UPDATE and does the rest (or raises,
     # which the shared handler maps to 409/410).
     await db.execute(
@@ -57,7 +63,24 @@ async def accept_offer(
         ),
         {"sid": accepted_id, "aid": str(assignment_id)},
     )
+    await assign_rm_on_confirm(db, assignment.booking_id)
+    booking_class = (
+        await db.execute(
+            text("SELECT booking_class FROM bookings WHERE id = :bid"),
+            {"bid": str(assignment.booking_id)},
+        )
+    ).scalar_one_or_none()
+    if booking_class == "advance":
+        from app.workers.celery_app import celery_app
+
+        celery_app.send_task(
+            "app.workers.notifications.notify_accept_ack",
+            args=[str(assignment.booking_id), str(user_id)],
+        )
     log.info("offer_accepted", assignment_id=str(assignment_id), booking_id=str(assignment.booking_id))
+    await booking_events.publish_booking_event(
+        str(assignment.booking_id), "status_changed", status="confirmed"
+    )
     return {"status": "accepted", "booking_id": str(assignment.booking_id)}
 
 

@@ -1,0 +1,99 @@
+{
+  "description": "Validation data for Telugu Panchangam engine, cross-referenced with Venkatrama & Co. 2026 calendar (Eluru, Andhra Pradesh). Sunrise tithi is the tithi prevailing at local sunrise per Vedic convention.",
+  "locations": {
+    "hyderabad": { "lat": 17.385, "lng": 78.486, "tz": "Asia/Kolkata" },
+    "melbourne": { "lat": -37.814, "lng": 144.9633, "tz": "Australia/Melbourne" }
+  },
+  "testCases": [
+    {
+      "id": "ugadi-2026",
+      "description": "Ugadi 2026 — Chaitra Shukla Pratipada starts after sunrise. Sunrise tithi is Amavasya, but Pratipada begins during this day. New Samvatsaram Parabhava starts with Pratipada.",
+      "date": "2026-03-19",
+      "location": "hyderabad",
+      "expected": {
+        "vara": "Thursday",
+        "sunriseTithi": "Amavasya",
+        "sunriseTithiNumber": 30,
+        "paksha": "krishna",
+        "masaAtSunrise": "Phalguna",
+        "samvatsaramAtSunrise": "Vishvavasu",
+        "festivalNames": ["Ugadi"]
+      }
+    },
+    {
+      "id": "day-after-ugadi",
+      "description": "Day after Ugadi — Chaitra Shukla Dwitiya. Pratipada was a kshaya tithi (contained within one sunrise-to-sunrise period).",
+      "date": "2026-03-20",
+      "location": "hyderabad",
+      "expected": {
+        "vara": "Friday",
+        "sunriseTithi": "Dwitiya",
+        "sunriseTithiNumber": 2,
+        "paksha": "shukla",
+        "masa": "Chaitra",
+        "samvatsaram": "Parabhava"
+      }
+    },
+    {
+      "id": "maha-sivaratri-2026",
+      "description": "Maha Sivaratri — Magha Krishna Chaturdashi. The library detects this on Feb 15 when Krishna Trayodashi prevails at sunrise but Chaturdashi begins during the day.",
+      "date": "2026-02-15",
+      "location": "hyderabad",
+      "expected": {
+        "vara": "Sunday",
+        "sunriseTithi": "Trayodashi",
+        "sunriseTithiNumber": 28,
+        "paksha": "krishna",
+        "masa": "Magha"
+      }
+    },
+    {
+      "id": "sri-rama-navami-2026",
+      "description": "Sri Rama Navami — Chaitra Shukla Navami at sunrise.",
+      "date": "2026-03-27",
+      "location": "hyderabad",
+      "expected": {
+        "vara": "Friday",
+        "sunriseTithi": "Navami",
+        "sunriseTithiNumber": 9,
+        "paksha": "shukla",
+        "masa": "Chaitra",
+        "samvatsaram": "Parabhava"
+      }
+    },
+    {
+      "id": "phalguna-amavasya",
+      "description": "Phalguna Krishna Amavasya — last day before Chaitra begins.",
+      "date": "2026-03-19",
+      "location": "hyderabad",
+      "expected": {
+        "sunriseTithi": "Amavasya",
+        "sunriseTithiNumber": 30,
+        "masaAtSunrise": "Phalguna"
+      }
+    },
+    {
+      "id": "melbourne-monday-rahukalam",
+      "description": "Monday in Melbourne — Rahukalam is 2nd slot (sunrise-anchored). Sunrise ~07:26 AEDT, slot duration ~90 min.",
+      "date": "2026-03-23",
+      "location": "melbourne",
+      "expected": {
+        "vara": "Monday",
+        "rahukalamSlot": 2,
+        "sunriseHourApprox": 7,
+        "paksha": "shukla",
+        "sunriseTithi": "Panchami",
+        "masa": "Chaitra"
+      }
+    },
+    {
+      "id": "chaitra-purnima-2026",
+      "description": "Chaitra Purnima — check for Purnima tithi",
+      "date": "2026-04-02",
+      "location": "hyderabad",
+      "expected": {
+        "paksha": "shukla"
+      }
+    }
+  ]
+}

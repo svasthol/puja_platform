@@ -44,7 +44,7 @@ dependencies = [
     # Database — ORM + migrations + driver
     "sqlalchemy==2.0.44",
     "alembic==1.16.1",
-    "psycopg[binary,pool]==3.2.9", # psycopg3 — psycopg[binary] ships C extensions
+    "psycopg[binary,pool]==3.2.13", # psycopg3 — 3.2.9 has no wheels on Py3.14; pin 3.2.13 for Render
 
     # Async job queue
     "celery[redis]==5.6.3",
@@ -55,12 +55,18 @@ dependencies = [
     "pyjwt==2.10.1",
     "bcrypt==4.3.0",               # OTP + refresh-token hashing, used directly (passlib is unmaintained)
     "python-multipart==0.0.20",    # form parsing (OTP verify endpoint)
+    "cryptography==44.0.0",        # Fernet — encrypts admin TOTP secrets at rest (SPEC_AMENDMENTS §19).
+                                   #   TOTP itself is stdlib RFC 6238 (app/core/totp.py); no pyotp dep.
 
     # HTTP client (Razorpay, FCM, MSG91)
     "httpx==0.28.1",
 
+    # Object storage (S3 / R2 / MinIO — catalogue presign + KYC future)
+    "boto3==1.38.36",
+
     # Logging
     "structlog==25.4.0",
+    "prometheus-client==0.21.1",
 
     # Utilities
     "python-ulid==3.0.0",          # for cursor-based pagination tokens
@@ -77,6 +83,10 @@ dev = [
     "ruff==0.11.9",
     "mypy==1.15.0",
     "pre-commit==4.2.0",
+]
+
+monitoring = [
+    "sentry-sdk==2.19.2",
 ]
 
 # Only `app/` is an installable Python package. `spec/` (read-only SQL + docs) and

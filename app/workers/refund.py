@@ -90,6 +90,22 @@ def process_refunds(batch: int = 20) -> dict:
                             (str(exc)[:500], refund_id),
                         )
                         log.error("refund_failed_permanent", refund_id=str(refund_id), error=str(exc))
+                        from app.monitoring.emit import AlertCandidate, record_ops_alert_sync
+                        from app.monitoring.registry import AlertType
+
+                        record_ops_alert_sync(
+                            conn,
+                            AlertCandidate(
+                                alert_type=AlertType.REFUND_FAILED_PERMANENT,
+                                subject_id=str(refund_id),
+                                payload={
+                                    "refund_id": str(refund_id),
+                                    "booking_id": str(booking_id),
+                                    "attempt_count": attempt,
+                                    "error": str(exc)[:200],
+                                },
+                            ),
+                        )
                         celery_app.send_task(
                             "app.workers.notifications.alert_refund_failed",
                             args=[str(refund_id)],

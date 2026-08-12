@@ -106,8 +106,9 @@ CREATE TABLE specializations (
 );
 
 CREATE TABLE puja_categories (
-    id    SMALLSERIAL PRIMARY KEY,
-    name  VARCHAR(100) NOT NULL UNIQUE
+    id         SMALLSERIAL PRIMARY KEY,
+    name       VARCHAR(100) NOT NULL UNIQUE,
+    is_active  BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE pujas (

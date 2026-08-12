@@ -410,10 +410,13 @@ platform cannot refund money it never collected.
   `advance_balance` (advance from `platform_settings.advance_booking_amount`
   online + rest offline). Advance amount is **admin-dynamic**; ₹250 is seed
   default only. Chosen at checkout, immutable after insert.
-- Geo: `GEOGRAPHY(POINT, 4326)` for anything distance-queried; plain
-  lat/lon DECIMAL columns remain for display/API payloads. **`addresses.geom`
-  MUST be populated** on every write (migration 005 trigger or app). Checkout
-  rejects `geom IS NULL` with 422.
+- Geo: `GEOGRAPHY(POINT, 4326)` for distance queries (**Phase 2** pujari dispatch).
+  **`addresses.geom` MUST be populated** on every write (migration 005). Checkout
+  rejects `geom IS NULL` with 422. **`addresses.service_area_id`** (migration 012)
+  is required for launch — display label only; not a dispatch filter at launch.
+- **`intended_pujari_id` / `ex_bookings_intended_no_overlap`:** retained even when
+  direct booking is disabled at API (§21). Trigger 3 writes `intended_pujari_id` on
+  every accept. **Do not drop** these when removing direct-booking UI.
 - **Commission base (intentional):** `payment_splits`, platform fee, and GST are
   computed on `payments.amount` (= `amount_due_online` only). The offline
   balance in `advance_balance` mode is never platform revenue and never enters
@@ -433,8 +436,100 @@ psql -v ON_ERROR_STOP=1 -d puja_platform \
   -f db/schema.sql -f db/triggers.sql -f db/seed.sql \
   -f db/migration_002.sql -f db/migration_003.sql \
   -f db/migration_004.sql -f db/migration_005.sql -f db/migration_006.sql
+  -f db/migration_007.sql   # after CA memo supplies advisor_signoff_ref (§16)
+  -f db/migration_012.sql   # launch policy §21 — or: python scripts/apply_migration_012.py
+  -f db/migration_013.sql   # advance reconfirmation §21.7 (SHIPPED)
+  -f db/migration_014.sql   # dispatch v2 §21.6.A–H (booking_class, superseded, settings)
+  -f db/migration_017.sql   # server-cached panchangam §23.6 — or: python scripts/apply_migration_017.py
+  -f db/migration_018.sql   # panchangam home-ribbon columns §23.6 — or: python scripts/apply_migration_018.py
 ```
+
+### Migration 007 — tax config (SPEC_AMENDMENTS §16)
+
+**Source:** `GST_Withholding_Tax_Model_v1.2.pdf` §5; ordering in `spec/plans/A-TAX-CONFIG.md`.
+
+- `tax_statutory_config` — statutory/legal; **`puja_migrate` INSERT only**; `advisor_signoff_ref NOT NULL`
+- `tax_commercial_config` — commercial prices; app **INSERT only** (no UPDATE/DELETE)
+- `v_tax_config_current` view — resolves active row per table (`effective_from` latest-wins)
+- Snapshot on `slot_holds`: `tax_*_config_id`, `platform_fee_gross`, `total_charged_online`, `billing_state_code`
+- `bookings` inherits from hold; `ck_total_online` via NOT VALID → backfill → VALIDATE
+- Extended `payment_splits`, `pujari_tax_year`, `invoices`, PAN fields on `pujaris`
+- **`puja_app` grant:** `REVOKE INSERT ON tax_statutory_config FROM puja_app`
+
+**Do not apply v1.1 DDL.** Use E1–E6 patterns (nullable → backfill → SET NOT NULL).
+
+```bash
+# After 006:
+  -f db/migration_007.sql
+```
+
+### Migration 012 — Puja MVP launch policy (SPEC_AMENDMENTS §21)
+
+Planned Alembic migration after 011. **Does not drop** any constraint, trigger, or
+column from migrations 002–009.
+
+| Change | Purpose |
+|--------|---------|
+| `addresses.service_area_id SMALLINT NOT NULL REFERENCES service_areas(id)` | Mandatory area dropdown |
+| `booking_dispatch_state.dispatch_starts_at TIMESTAMPTZ` | Deferred broadcast start |
+| `booking_dispatch_state.dispatch_deadline TIMESTAMPTZ` | Time-based fail + refund |
+| `relationship_managers` table | RM mediator (name, phone, city, is_active) |
+| `bookings.relationship_manager_id UUID REFERENCES relationship_managers(id)` | Per-booking RM assign |
+| `pujas.is_muhurat_bound BOOLEAN NOT NULL DEFAULT false` | Hard-start flag (admin) |
+| `platform_settings` keys | `dispatch_buffer_minutes`, `instant_lead_hours`, `instant_dispatch_minutes`, `advance_dispatch_start_hours`, `advance_dispatch_fail_hours`, `reoffer_cooldown_minutes`, `default_relationship_manager_id` |
+
+**Soft buffer** is app-layer only — **not** added to `ex_bookings_pujari_no_overlap`.
 
 Zero errors expected. If `btree_gist` or `postgis` fails to create, install
 `postgresql-16-contrib` / `postgresql-16-postgis` — both exclusion constraints
 and the radius queries are not optional.
+
+### Migration 013 — advance reconfirmation (SPEC_AMENDMENTS §21.7) — SHIPPED
+
+Canonical file: **`db/migration_013.sql`** (chains after 012). Idempotent.
+
+| Change | Purpose |
+|--------|---------|
+| `booking_reconfirmations` table (`ping_sent_at`, `pujari_confirmed_at`, `rm_alert_sent_at`) | Track T−24h ping + escalation state |
+| `ix_booking_reconfirmations_escalation` (partial) | Escalation scan |
+| settings `reconfirm_lead_hours=24`, `reconfirm_ping_hours_before_slot=24`, `reconfirm_escalation_hours=4` | Reconfirmation timing |
+
+### Migration 014 — Dispatch v2 (SPEC_AMENDMENTS §21.6.A–H)
+
+Planned Alembic migration after 013. **Does not drop** any constraint, trigger, or column.
+Full manifest: `SPEC_AMENDMENTS.md` §21.6 v2.
+
+| Change | Purpose |
+|--------|---------|
+| `bookings.booking_class VARCHAR(10) NOT NULL` + `ck_bookings_class CHECK (IN ('instant','advance'))` | Frozen policy class (§21.6.A); backfill `'advance'` before SET NOT NULL |
+| `booking_dispatch_state.urgency_escalated_at TIMESTAMPTZ` | Idempotent advance→instant flip (§21.6.E) |
+| `booking_dispatch_state.rm_escalated_no_accept_at` / `.rm_escalated_t24_at TIMESTAMPTZ` | Idempotent RM escalation markers (§21.6.F) |
+| `status_types('assignment','superseded')` seed | Sibling-offer resolution on accept (§21.6.B) |
+| `CREATE OR REPLACE trg_set_booking_pujari_on_accept()` | Adds sibling supersede UPDATE inside the first-accept block (§21.6.B) |
+| `platform_settings` keys | `night_bookings_enabled=false`, `immediate_dispatch_on_payment=true`, `advance_offer_ttl_hours=24`, `instant_offer_ttl_seconds=120`, `rm_escalation_hours_no_accept=24`, `rm_escalation_t24_hours=24`, `max_live_advance_offers_per_pujari=15`, `reconfirm_quiet_hours_start="22:00"`, `reconfirm_quiet_hours_end="08:00"` |
+
+**Does NOT re-add** `ck_pujas_duration_pos` / `ck_bookings_duration_pos` — already VALIDATED in
+migration 006 (re-adding throws `constraint already exists`). The `duration_minutes > 0` invariant is
+covered by trigger 5 + a CI assertion (§21.6.H). **No** `accepts_muhurat_night` column (night deferred
+to §22 Phase 2). No new tables.
+
+### Migration 017 — server-cached panchangam (SPEC_AMENDMENTS §23.6)
+
+Canonical file: **`db/migration_017.sql`** (chains after 016). Idempotent.
+
+| Change | Purpose |
+|--------|---------|
+| `panchangam_daily` table | Server cache for daily panchangam per city+date+locale+system |
+| `ux_panchangam_daily_key` | Unique on `(city, panchang_date, locale, panchang_system)` |
+| `ix_panchangam_daily_date_city` | Date/city lookup for month markers |
+
+### Migration 018 — panchangam home-ribbon fields (SPEC_AMENDMENTS §23.6)
+
+Canonical file: **`db/migration_018.sql`** (chains after 017). Idempotent.
+
+| Change | Purpose |
+|--------|---------|
+| `panchangam_daily.vaaram TEXT` | Weekday name in locale (వారం) |
+| `panchangam_daily.yama_gandam JSONB` | Yamagandam window `{start, end}` |
+| `panchangam_daily.sunrise TEXT` | Sunrise ISO 8601 local datetime |
+| `panchangam_daily.sunset TEXT` | Sunset ISO 8601 local datetime |

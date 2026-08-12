@@ -1,0 +1,56 @@
+name: Daily reminders
+
+# Fires the cron worker on the live deployment once a day.
+#
+# Cloudflare Pages does not natively support cron triggers (Workers
+# feature only), so we use GitHub Actions as the scheduler. The
+# workflow simply POSTs to /api/cron/send-reminders with a Bearer
+# token whose value lives in the GitHub Actions secret CRON_SECRET.
+#
+# Setup checklist (one-time):
+#   1. Generate the secret value (must equal the production CF Pages secret):
+#        npx wrangler pages secret list --project-name=telugu-panchangam-app
+#      and copy CRON_SECRET out of .env.local (or run skill 23 to push a fresh
+#      value to BOTH places at once).
+#   2. GitHub repo → Settings → Secrets and variables → Actions → New secret
+#        Name:  CRON_SECRET
+#        Value: <the same value that is in CF Pages production>
+#   3. Done. The workflow will fire daily at the schedule below.
+#
+# To trigger manually from the GitHub UI: Actions → Daily reminders → Run workflow.
+
+on:
+  schedule:
+    # 00:30 UTC every day = ~06:00 IST = ~10:30 / 11:30 AEST/AEDT
+    # Picked so that for an India user the email arrives in their morning,
+    # and for a Melbourne user it arrives by late morning local time.
+    # GitHub cron is best-effort with up to ~15 min jitter — that's fine
+    # because the route is idempotent within a calendar day.
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  fire:
+    name: POST /api/cron/send-reminders
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit cron route on production
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET is not set in GitHub Actions secrets"
+            exit 1
+          fi
+          RESPONSE=$(curl -sS \
+            -X POST https://telugupanchangam.app/api/cron/send-reminders \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -w "\n__HTTP__%{http_code}")
+          BODY=$(echo "$RESPONSE" | sed '/^__HTTP__/d')
+          STATUS=$(echo "$RESPONSE" | grep "^__HTTP__" | sed 's/__HTTP__//')
+          echo "HTTP $STATUS"
+          echo "$BODY"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Cron route returned HTTP $STATUS"
+            exit 1
+          fi

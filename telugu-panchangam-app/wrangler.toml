@@ -1,0 +1,13 @@
+name = "telugu-panchangam-app"
+pages_build_output_dir = ".vercel/output/static"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat_v2"]
+
+[[kv_namespaces]]
+binding = "PANCHANGAM_CACHE"
+id = "c1d960acba07460e82be31a6ebde3bfd"
+
+[[d1_databases]]
+binding = "PANCHANGAM_DB"
+database_name = "telugu-panchangam-db"
+database_id = "2dc00a53-ceb5-4477-b8ac-6002b03ab7c4"

@@ -25,13 +25,20 @@ def test_cursor_roundtrip():
 @pytest.mark.asyncio
 async def test_address_insert_trigger_sets_geom(session, seed, uniq):
     """C-ADDR invariant: writing lat/lng populates geom via trg_addresses_geom_sync."""
+    area_id = (
+        await session.execute(
+            text(
+                "SELECT id FROM service_areas WHERE city='Hyderabad' AND zone_name='Test Zone'"
+            )
+        )
+    ).scalar_one()
     aid = uniq.id()
     await session.execute(
         text(
-            "INSERT INTO addresses (id, user_id, line1, city, latitude, longitude) "
-            "VALUES (:id, :uid, 'L1', 'Hyd', 17.40, 78.40)"
+            "INSERT INTO addresses (id, user_id, line1, city, latitude, longitude, service_area_id) "
+            "VALUES (:id, :uid, 'L1', 'Hyd', 17.40, 78.40, :aid)"
         ),
-        {"id": aid, "uid": CUSTOMER},
+        {"id": aid, "uid": CUSTOMER, "aid": area_id},
     )
     await session.commit()
     has_geom = (

@@ -101,12 +101,19 @@ def map_db_error(pg_exc: BaseException, path: str) -> Response:
             log.info("duplicate_offer_skipped", constraint=constraint)
             return _json(200, "offer_already_live")
         if constraint == "ux_refunds_one_active_per_payment":
+            if "/admin/" in path:
+                return _json(409, "A refund is already in progress for this payment.")
             return _json(200, "refund_already_active")
         return _json(409, "Duplicate record.")
 
     # ---- Exclusion violations (SQLSTATE 23P01) -----------------------------
     if isinstance(pg_exc, ExclusionViolation):
         if constraint == "ex_bookings_pujari_no_overlap":
+            if "/admin/" in path:
+                return _json(
+                    409,
+                    "Target pujari has an overlapping booking in that window.",
+                )
             return _json(409, "This overlaps another booking of yours.")
         if constraint == "ex_bookings_intended_no_overlap":
             # Webhook context is handled INSIDE the webhook service (record +
@@ -137,6 +144,8 @@ def map_db_error(pg_exc: BaseException, path: str) -> Response:
         if "negative pujari payout refused" in msg_l:
             log.error("negative_payout_config_error", message=message)
             return _json(500, "Payment configuration error. Operations alerted.")
+        if "total refunded" in msg_l and "exceeds payment amount" in msg_l:
+            return _json(409, "Refund would exceed captured payment amount.")
         log.error("unhandled_trigger_exception", message=message)
         return _json(500, "An internal error occurred.")
 

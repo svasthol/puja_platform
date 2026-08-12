@@ -111,6 +111,19 @@ async def cancel_booking(
         {"bid": str(booking_id), "sid": cancelled_id, "uid": str(user_id)},
     )
 
+    # Pending offers must not linger in partner inbox after customer cancel.
+    expired_assignment_id = await status_id(db, "assignment", "expired")
+    await db.execute(
+        text(
+            """
+            UPDATE booking_assignments
+            SET status_id = :expired_id, responded_at = :now
+            WHERE booking_id = :bid AND responded_at IS NULL
+            """
+        ),
+        {"expired_id": expired_assignment_id, "now": now, "bid": str(booking_id)},
+    )
+
     # refund row only if money was captured and refund > 0
     if refund_amount > 0:
         payment = (

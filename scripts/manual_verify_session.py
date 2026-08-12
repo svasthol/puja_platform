@@ -295,6 +295,26 @@ async def bootstrap_fixtures(cfg: SessionConfig) -> None:
             """),
             {"pj": cfg.pujari_id, "lat": cfg.lat, "lon": cfg.lon},
         )
+        await conn.execute(
+            text("""
+                INSERT INTO pujari_pricing (id, pujari_id, puja_id, base_price)
+                VALUES (gen_random_uuid(), :pj, :puja, :price)
+                ON CONFLICT (pujari_id, puja_id) DO UPDATE SET base_price = EXCLUDED.base_price
+            """),
+            {"pj": cfg.pujari_id, "puja": cfg.puja_id, "price": cfg.puja_price},
+        )
+        for dow in range(7):
+            await conn.execute(
+                text("""
+                    INSERT INTO pujari_availability (id, pujari_id, day_of_week, start_time, end_time)
+                    SELECT gen_random_uuid(), :pj, :dow, '06:00', '23:59'
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM pujari_availability pa
+                        WHERE pa.pujari_id = :pj AND pa.day_of_week = :dow
+                    )
+                """),
+                {"pj": cfg.pujari_id, "dow": dow},
+            )
     await engine.dispose()
 
 
@@ -316,6 +336,12 @@ async def ensure_customer_address(cfg: SessionConfig, user_id: str) -> str:
 
     engine = create_async_engine(str(get_settings().DATABASE_URL))
     async with engine.begin() as conn:
+        sa_id = (
+            await conn.execute(
+                text("SELECT id FROM service_areas WHERE city=:city AND zone_name=:zone"),
+                {"city": cfg.city, "zone": cfg.zone_name},
+            )
+        ).scalar_one()
         existing = (
             await conn.execute(
                 text(
@@ -326,6 +352,13 @@ async def ensure_customer_address(cfg: SessionConfig, user_id: str) -> str:
             )
         ).scalar_one_or_none()
         if existing:
+            await conn.execute(
+                text(
+                    "UPDATE addresses SET service_area_id = :sa, updated_at = now() "
+                    "WHERE id = :aid AND service_area_id IS NULL"
+                ),
+                {"sa": sa_id, "aid": str(existing)},
+            )
             await engine.dispose()
             return str(existing)
 
@@ -333,9 +366,14 @@ async def ensure_customer_address(cfg: SessionConfig, user_id: str) -> str:
         line1 = prompt("Customer address line1", "Home")
         await conn.execute(
             text("""
-                INSERT INTO addresses (id, user_id, line1, city, latitude, longitude, geom)
-                VALUES (:aid, :uid, :line1, :city, :lat, :lon,
-                        ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography)
+                INSERT INTO addresses (
+                    id, user_id, line1, city, latitude, longitude,
+                    service_area_id, geom
+                )
+                VALUES (
+                    :aid, :uid, :line1, :city, :lat, :lon, :sa,
+                    ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+                )
             """),
             {
                 "aid": new_id,
@@ -344,6 +382,7 @@ async def ensure_customer_address(cfg: SessionConfig, user_id: str) -> str:
                 "city": cfg.city,
                 "lat": cfg.lat,
                 "lon": cfg.lon,
+                "sa": sa_id,
             },
         )
     await engine.dispose()
@@ -547,6 +586,7 @@ async def run(base_url: str, *, use_celery: bool, do_clean: bool) -> int:
           • Puja catalog entry
           • Pujari user + pujaris row (verification_status='verified' — no documents)
           • Service area + live location (for dispatch radius)
+          • pujari_pricing + weekly availability (required for dispatch eligibility)
         Real app: pujari would upload KYC docs; admin verifies. We skip that here.
     """))
     await bootstrap_fixtures(cfg)
@@ -709,8 +749,8 @@ async def run(base_url: str, *, use_celery: bool, do_clean: bool) -> int:
         show("pujari otp/request", r.status_code)
         pujari_otp = input("Pujari OTP from uvicorn log: ").strip()
         r = await client.post(
-            "/v1/auth/otp/verify?app_context=pujari",
-            json={"phone": cfg.pujari_phone, "otp": pujari_otp},
+            "/v1/auth/otp/verify",
+            json={"phone": cfg.pujari_phone, "otp": pujari_otp, "app_context": "pujari"},
         )
         if r.status_code != 200:
             show("pujari verify failed", r.text)

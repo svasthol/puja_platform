@@ -6,6 +6,7 @@ ONE transaction:
   b. SELECT booking FOR UPDATE.
   c. payment_pending -> set paid_at, status 'requested', history row,
      convert hold (released_at = converted_at = now), enqueue broadcast.
+     Does NOT write booking_dispatch_state — the worker owns that row (§21.6.C).
   d. abandoned / late / double-paid -> record payment + INSERT refunds row
      (reason='late_payment'), notify, and STILL return 200 to Razorpay.
 
@@ -26,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking, SlotHold
 from app.models.payment import Payment, Refund
+from app.services import booking_events
 from app.services.status import status_id
 
 log = structlog.get_logger()
@@ -130,6 +132,12 @@ async def handle_payment_captured(
             hold.converted_at = now
 
     log.info("webhook_payment_confirmed", booking_id=str(booking_id), dispatch_mode=booking.dispatch_mode)
+    await booking_events.publish_booking_event(
+        str(booking_id), "status_changed", status="requested", dispatch_mode=booking.dispatch_mode
+    )
     if booking.dispatch_mode == "direct":
-        return {"status": "confirmed", "enqueue_direct": str(booking_id)}
+        log.warning(
+            "webhook_direct_mode_coerced_to_broadcast",
+            booking_id=str(booking_id),
+        )
     return {"status": "confirmed", "enqueue_broadcast": str(booking_id)}

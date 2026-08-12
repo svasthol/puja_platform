@@ -1,4 +1,4 @@
-﻿"""
+"""
 Pytest fixtures for launch-gate tests.
 
 Requires a live PostgreSQL 16 + PostGIS built from spec/db/*.sql and reachable
@@ -9,7 +9,11 @@ would prove nothing. Run:
     createdb Mana_Guruji
     psql -d Mana_Guruji -f spec/db/schema.sql -f spec/db/triggers.sql \
          -f spec/db/seed.sql -f spec/db/migration_002.sql -f spec/db/migration_003.sql \
-         -f spec/db/migration_004.sql -f spec/db/migration_005.sql -f spec/db/migration_006.sql
+         -f spec/db/migration_004.sql -f spec/db/migration_005.sql -f spec/db/migration_006.sql \
+         -f spec/db/migration_009.sql -f spec/db/migration_010.sql -f spec/db/migration_011.sql \
+         -f spec/db/migration_012.sql -f spec/db/migration_013.sql -f spec/db/migration_014.sql \
+         -f spec/db/migration_015.sql -f spec/db/migration_016.sql -f spec/db/migration_017.sql \
+         -f spec/db/migration_018.sql
     export DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji
     pytest -q
 """
@@ -87,11 +91,18 @@ async def seed(engine):
             ]:
                 await s.execute(text(
                     "INSERT INTO pujaris (id, user_id, verification_status) "
-                    "VALUES (:pj,:u,'verified') ON CONFLICT (id) DO NOTHING"), {"pj": pj, "u": u})
+                    "VALUES (:pj,:u,'verified') ON CONFLICT (user_id) DO NOTHING"), {"pj": pj, "u": u})
             await s.execute(text("""
-                INSERT INTO addresses (id, user_id, line1, city, latitude, longitude, geom)
+                INSERT INTO service_areas (city, zone_name, is_active)
+                VALUES ('Hyderabad', 'Test Zone', true)
+                ON CONFLICT (city, zone_name) DO NOTHING;
+            """))
+            await s.execute(text("""
+                INSERT INTO addresses (id, user_id, line1, city, latitude, longitude,
+                    service_area_id, geom)
                 VALUES ('dddddddd-0000-0000-0000-000000000001',
                         'aaaaaaaa-0000-0000-0000-000000000001','L1','Hyd',17.4,78.4,
+                        (SELECT id FROM service_areas WHERE city='Hyderabad' AND zone_name='Test Zone'),
                         ST_SetSRID(ST_MakePoint(78.4,17.4),4326)::geography)
                 ON CONFLICT (id) DO NOTHING;
             """))
