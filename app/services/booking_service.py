@@ -32,6 +32,8 @@ from app.models.catalog import Puja, PujaAddon
 from app.models.lookups import CancellationPolicy, PlatformSetting
 from app.schemas.booking import BookingCreate, BookingCreateResponse
 from app.services import razorpay_client
+from app.services.booking_gate import assert_booking_gate, load_booking_gate_settings
+from app.services.dispatch_supply import assert_dispatch_supply
 from app.services.status import status_id
 
 log = structlog.get_logger()
@@ -51,10 +53,19 @@ async def _advance_amount(db: AsyncSession) -> Decimal:
 
 
 async def compute_amounts(
-    db: AsyncSession, puja: Puja, addon_prices: list[Decimal], promo_pct: int, payment_mode: str
+    db: AsyncSession,
+    *,
+    puja_id: uuid.UUID,
+    pujari_id: uuid.UUID | None,
+    addon_prices: list[Decimal],
+    promo_pct: int,
+    payment_mode: str,
 ) -> tuple[Decimal, Decimal, Decimal]:
     """Returns (total_amount, amount_due_online, amount_due_offline)."""
-    subtotal = Decimal(str(puja.default_price)) + sum(addon_prices, Decimal("0"))
+    from app.services.pricing_resolver import resolve_puja_unit_price
+
+    unit = await resolve_puja_unit_price(db, puja_id, pujari_id)
+    subtotal = unit + sum(addon_prices, Decimal("0"))
     if promo_pct:
         subtotal = (subtotal * (Decimal(100 - promo_pct) / Decimal(100))).quantize(Decimal("0.01"))
     total = subtotal
@@ -163,6 +174,7 @@ async def _lookup_duplicate_response(
 
     return BookingCreateResponse(
         booking_id=existing.id,
+        booking_class=existing.booking_class,  # type: ignore[arg-type]
         razorpay_order_id=existing.razorpay_order_id,
         amount_due_online=Decimal(str(existing.amount_due_online)),
         amount_due_offline=Decimal(str(existing.amount_due_offline)),
@@ -193,7 +205,6 @@ async def create_booking(
     slot_date = hold.slot_date
     slot_time = hold.slot_time
     puja_id = payload.puja_id
-    intended_pujari_id = hold.pujari_id
     hold_id = hold.id
 
     # address must have coordinates (422 otherwise)
@@ -239,7 +250,23 @@ async def create_booking(
         )
 
     total, online, offline = await compute_amounts(
-        db, puja, addon_prices, promo_pct, payload.payment_mode
+        db,
+        puja_id=puja_id,
+        pujari_id=None,
+        addon_prices=addon_prices,
+        promo_pct=promo_pct,
+        payment_mode=payload.payment_mode,
+    )
+
+    gate_settings = await load_booking_gate_settings(db)
+    gate = assert_booking_gate(slot_date, slot_time, gate_settings, now=now)
+
+    await assert_dispatch_supply(
+        db,
+        puja_id=puja_id,
+        scheduled_date=slot_date,
+        scheduled_time=slot_time,
+        duration_minutes=puja.duration_minutes,
     )
 
     # default cancellation policy (first active)
@@ -250,7 +277,6 @@ async def create_booking(
         raise RuntimeError("Seed data missing: cancellation_policies")
 
     pending_id = await status_id(db, "booking", "payment_pending")
-    dispatch_mode = "direct" if intended_pujari_id is not None else "broadcast"
 
     booking_id = uuid.uuid4()
     insert_stmt = (
@@ -268,10 +294,11 @@ async def create_booking(
             duration_minutes=0,
             cancelled_at=None,
             total_amount=total,
-            intended_pujari_id=intended_pujari_id,
+            intended_pujari_id=None,
             hold_id=hold_id,
             paid_at=None,
-            dispatch_mode=dispatch_mode,
+            dispatch_mode="broadcast",
+            booking_class=gate.booking_class,
             payment_mode=payload.payment_mode,
             amount_due_online=online,
             amount_due_offline=offline,
@@ -346,6 +373,7 @@ async def create_booking(
     log.info("booking_created", booking_id=str(booking_id), payment_mode=payload.payment_mode)
     return BookingCreateResponse(
         booking_id=booking_id,
+        booking_class=gate.booking_class,
         razorpay_order_id=order_id,
         amount_due_online=online,
         amount_due_offline=offline,

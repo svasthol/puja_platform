@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 
-from sqlalchemy import Boolean, DateTime, SmallInteger, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Boolean, DateTime, ForeignKey, SmallInteger, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -47,6 +48,13 @@ class PujaCategory(Base):
     __tablename__ = "puja_categories"
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    slug: Mapped[str | None] = mapped_column(String(120), unique=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    display_order: Mapped[int] = mapped_column(SmallInteger, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    image_media_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("puja_media.id"), nullable=True
+    )
 
 
 class PlatformSetting(Base):

@@ -1,0 +1,14 @@
+[
+  { "number": 1, "en": "Chaitra", "te": "చైత్రం", "approxGregorian": "Mar-Apr" },
+  { "number": 2, "en": "Vaisakha", "te": "వైశాఖం", "approxGregorian": "Apr-May" },
+  { "number": 3, "en": "Jyeshtha", "te": "జ్యేష్ఠం", "approxGregorian": "May-Jun" },
+  { "number": 4, "en": "Ashadha", "te": "ఆషాఢం", "approxGregorian": "Jun-Jul" },
+  { "number": 5, "en": "Shravana", "te": "శ్రావణం", "approxGregorian": "Jul-Aug" },
+  { "number": 6, "en": "Bhadrapada", "te": "భాద్రపదం", "approxGregorian": "Aug-Sep" },
+  { "number": 7, "en": "Ashvina", "te": "ఆశ్వీయుజం", "approxGregorian": "Sep-Oct" },
+  { "number": 8, "en": "Kartika", "te": "కార్తీకం", "approxGregorian": "Oct-Nov" },
+  { "number": 9, "en": "Margashirsha", "te": "మార్గశిరం", "approxGregorian": "Nov-Dec" },
+  { "number": 10, "en": "Pushya", "te": "పుష్యం", "approxGregorian": "Dec-Jan" },
+  { "number": 11, "en": "Magha", "te": "మాఘం", "approxGregorian": "Jan-Feb" },
+  { "number": 12, "en": "Phalguna", "te": "ఫాల్గుణం", "approxGregorian": "Feb-Mar" }
+]

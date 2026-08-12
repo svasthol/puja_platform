@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-surface text-ink antialiased;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(232, 163, 23, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(88, 28, 135, 0.08), transparent);
+  min-height: 100vh;
+}
+
+@layer components {
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface;
+  }
+}

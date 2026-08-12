@@ -43,6 +43,21 @@ def verify_secret(secret: str, hashed: str) -> bool:
         return False
 
 
+# ---- Per-app_context token TTL (P-ADMIN-AUTH) ------------------------------
+def access_ttl_minutes(app_context: str) -> int:
+    """Admin access tokens are short-lived; customer/pujari keep the default."""
+    if app_context == "admin":
+        return settings.ADMIN_ACCESS_TOKEN_EXPIRE_MINUTES
+    return settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+
+def refresh_ttl_days(app_context: str) -> int:
+    """Admin refresh ≤ 1 day; customer/pujari keep 30. See SPEC_AMENDMENTS §19."""
+    if app_context == "admin":
+        return settings.ADMIN_REFRESH_TOKEN_EXPIRE_DAYS
+    return settings.REFRESH_TOKEN_EXPIRE_DAYS
+
+
 # ---- JWT (PyJWT) -----------------------------------------------------------
 def create_access_token(*, subject: str, app_context: str, extra: dict | None = None) -> str:
     now = datetime.now(UTC)
@@ -51,30 +66,46 @@ def create_access_token(*, subject: str, app_context: str, extra: dict | None = 
         "app_context": app_context,  # 'customer' | 'pujari' | 'admin'
         "type": "access",
         "iat": now,
-        "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": now + timedelta(minutes=access_ttl_minutes(app_context)),
     }
     if extra:
         payload.update(extra)
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
-def create_refresh_token(*, subject: str, app_context: str) -> str:
-    """Opaque high-entropy refresh token (stored hashed, UNIQUE in DB)."""
+def create_refresh_token(*, subject: str, app_context: str, jti: str) -> str:
+    """Refresh token whose `jti` is the session lookup key (P-AUTH-FIX).
+
+    The caller generates the jti (uuid4().hex) and stores it on the
+    auth_sessions row: sessions are found by jti, then the presented token is
+    verified against the stored bcrypt hash with verify_secret(). Equality
+    lookup on hash_secret(token) can never match — bcrypt salts differ per call.
+    """
     now = datetime.now(UTC)
     payload = {
         "sub": subject,
         "app_context": app_context,
         "type": "refresh",
-        "jti": base64.urlsafe_b64encode(hashlib.sha256(f"{subject}{now.timestamp()}".encode()).digest()).decode(),
+        "jti": jti,
         "iat": now,
-        "exp": now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        "exp": now + timedelta(days=refresh_ttl_days(app_context)),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
-def decode_token(token: str) -> dict:
-    """Raises jwt.PyJWTError subclasses on invalid/expired tokens."""
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+def decode_token(token: str, *, verify_exp: bool = True) -> dict:
+    """Raises jwt.PyJWTError subclasses on invalid/expired tokens.
+
+    verify_exp=False is for logout only: revoking a session with an expired
+    refresh token is harmless and keeps logout idempotent. Signature is
+    ALWAYS verified.
+    """
+    return jwt.decode(
+        token,
+        settings.SECRET_KEY,
+        algorithms=["HS256"],
+        options={"verify_exp": verify_exp},
+    )
 
 
 # ---- Razorpay webhook signature (constant-time compare) --------------------

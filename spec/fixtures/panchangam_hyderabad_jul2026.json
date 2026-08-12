@@ -1,0 +1,2799 @@
+{
+  "meta": {
+    "city": "Hyderabad",
+    "lat": 17.385,
+    "lng": 78.486,
+    "tz": "Asia/Kolkata",
+    "vendor_url": "http://127.0.0.1:3001/api/panchangam",
+    "recorded_at": "2026-08-03T17:50:01.317393+00:00",
+    "reference_csv": "spec\\plans\\panchangam_reference_hyderabad.csv"
+  },
+  "dates": {
+    "2026-07-01": {
+      "date": "2026-07-01",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "పాడ్యమి",
+        "en": "Pratipada",
+        "number": 16,
+        "endsAt": "2026-07-01T07:38:33+05:30",
+        "nextTithi": {
+          "te": "విదియ",
+          "en": "Dwitiya",
+          "number": 17
+        }
+      },
+      "nakshatra": {
+        "te": "పూర్వాషాఢ",
+        "en": "Purva Ashadha",
+        "number": 20,
+        "pada": 4,
+        "endsAt": "2026-07-01T06:51:15+05:30"
+      },
+      "yoga": {
+        "te": "ఐంద్ర",
+        "en": "Aindra",
+        "number": 26,
+        "isAuspicious": true,
+        "endsAt": "2026-07-01T16:04:02+05:30"
+      },
+      "karana": {
+        "te": "కౌలవ",
+        "en": "Kaulava",
+        "number": 3,
+        "endsAt": "2026-07-01T07:38:33+05:30"
+      },
+      "vara": {
+        "te": "బుధవారం",
+        "en": "Wednesday",
+        "number": 3
+      },
+      "sunrise": "2026-07-01T05:46:23+05:30",
+      "sunset": "2026-07-01T18:55:33+05:30",
+      "moonrise": "2026-07-01T20:07:28+05:30",
+      "moonset": "2026-07-01T06:38:34+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ గిబ్బస్",
+        "en": "Waning Gibbous",
+        "illuminationPercent": 98.5,
+        "phase": 0.539
+      },
+      "rahukalam": {
+        "start": "2026-07-01T12:20:58+05:30",
+        "end": "2026-07-01T13:59:36+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-01T15:38:15+05:30",
+        "end": "2026-07-01T17:16:54+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-01T09:03:40+05:30",
+        "end": "2026-07-01T10:42:19+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-02": {
+      "date": "2026-07-02",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "విదియ",
+        "en": "Dwitiya",
+        "number": 17,
+        "endsAt": "2026-07-02T09:38:16+05:30",
+        "nextTithi": {
+          "te": "తదియ",
+          "en": "Tritiya",
+          "number": 18
+        }
+      },
+      "nakshatra": {
+        "te": "ఉత్తరాషాఢ",
+        "en": "Uttara Ashadha",
+        "number": 21,
+        "pada": 4,
+        "endsAt": "2026-07-02T09:27:14+05:30"
+      },
+      "yoga": {
+        "te": "వైధృతి",
+        "en": "Vaidhriti",
+        "number": 27,
+        "isAuspicious": false,
+        "endsAt": "2026-07-02T16:38:56+05:30"
+      },
+      "karana": {
+        "te": "గరజ",
+        "en": "Garija",
+        "number": 5,
+        "endsAt": "2026-07-02T09:38:16+05:30"
+      },
+      "vara": {
+        "te": "గురువారం",
+        "en": "Thursday",
+        "number": 4
+      },
+      "sunrise": "2026-07-02T05:46:40+05:30",
+      "sunset": "2026-07-02T18:55:37+05:30",
+      "moonrise": "2026-07-02T20:49:23+05:30",
+      "moonset": "2026-07-02T07:31:48+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ గిబ్బస్",
+        "en": "Waning Gibbous",
+        "illuminationPercent": 95.3,
+        "phase": 0.569
+      },
+      "rahukalam": {
+        "start": "2026-07-02T13:59:46+05:30",
+        "end": "2026-07-02T15:38:23+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-02T12:21:09+05:30",
+        "end": "2026-07-02T13:59:46+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-02T07:25:17+05:30",
+        "end": "2026-07-02T09:03:54+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-03": {
+      "date": "2026-07-03",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "తదియ",
+        "en": "Tritiya",
+        "number": 18,
+        "endsAt": "2026-07-03T11:20:44+05:30",
+        "nextTithi": {
+          "te": "చవితి",
+          "en": "Chaturthi",
+          "number": 19
+        }
+      },
+      "nakshatra": {
+        "te": "శ్రవణ",
+        "en": "Shravana",
+        "number": 22,
+        "pada": 4,
+        "endsAt": "2026-07-03T11:46:35+05:30"
+      },
+      "yoga": {
+        "te": "విష్కంభ",
+        "en": "Vishkambha",
+        "number": 1,
+        "isAuspicious": false,
+        "endsAt": "2026-07-03T16:59:26+05:30"
+      },
+      "karana": {
+        "te": "విష్టి",
+        "en": "Vishti",
+        "number": 7,
+        "endsAt": "2026-07-03T11:20:44+05:30"
+      },
+      "vara": {
+        "te": "శుక్రవారం",
+        "en": "Friday",
+        "number": 5
+      },
+      "sunrise": "2026-07-03T05:46:57+05:30",
+      "sunset": "2026-07-03T18:55:41+05:30",
+      "moonrise": "2026-07-03T21:27:58+05:30",
+      "moonset": "2026-07-03T08:25:04+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ గిబ్బస్",
+        "en": "Waning Gibbous",
+        "illuminationPercent": 90.3,
+        "phase": 0.601
+      },
+      "rahukalam": {
+        "start": "2026-07-03T09:04:08+05:30",
+        "end": "2026-07-03T10:42:44+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-03T10:42:44+05:30",
+        "end": "2026-07-03T12:21:19+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-03T13:59:55+05:30",
+        "end": "2026-07-03T15:38:30+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-04": {
+      "date": "2026-07-04",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "చవితి",
+        "en": "Chaturthi",
+        "number": 19,
+        "endsAt": "2026-07-04T12:40:20+05:30",
+        "nextTithi": {
+          "te": "పంచమి",
+          "en": "Panchami",
+          "number": 20
+        }
+      },
+      "nakshatra": {
+        "te": "ధనిష్ఠ",
+        "en": "Dhanishtha",
+        "number": 23,
+        "pada": 4,
+        "endsAt": "2026-07-04T13:43:42+05:30"
+      },
+      "yoga": {
+        "te": "ప్రీతి",
+        "en": "Priti",
+        "number": 2,
+        "isAuspicious": true,
+        "endsAt": "2026-07-04T17:01:13+05:30"
+      },
+      "karana": {
+        "te": "బాలవ",
+        "en": "Balava",
+        "number": 2,
+        "endsAt": "2026-07-04T12:40:20+05:30"
+      },
+      "vara": {
+        "te": "శనివారం",
+        "en": "Saturday",
+        "number": 6
+      },
+      "sunrise": "2026-07-04T05:47:15+05:30",
+      "sunset": "2026-07-04T18:55:44+05:30",
+      "moonrise": "2026-07-04T22:04:34+05:30",
+      "moonset": "2026-07-04T09:17:22+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ గిబ్బస్",
+        "en": "Waning Gibbous",
+        "illuminationPercent": 83.5,
+        "phase": 0.633
+      },
+      "rahukalam": {
+        "start": "2026-07-04T05:47:15+05:30",
+        "end": "2026-07-04T07:25:49+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-04T07:25:49+05:30",
+        "end": "2026-07-04T09:04:22+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-04T15:38:37+05:30",
+        "end": "2026-07-04T17:17:10+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-05": {
+      "date": "2026-07-05",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "పంచమి",
+        "en": "Panchami",
+        "number": 20,
+        "endsAt": "2026-07-05T13:31:08+05:30",
+        "nextTithi": {
+          "te": "షష్టి",
+          "en": "Shashthi",
+          "number": 21
+        }
+      },
+      "nakshatra": {
+        "te": "శతభిష",
+        "en": "Shatabhisha",
+        "number": 24,
+        "pada": 4,
+        "endsAt": "2026-07-05T15:12:35+05:30"
+      },
+      "yoga": {
+        "te": "ఆయుష్మాన్",
+        "en": "Ayushman",
+        "number": 3,
+        "isAuspicious": true,
+        "endsAt": "2026-07-05T16:39:43+05:30"
+      },
+      "karana": {
+        "te": "తైతిల",
+        "en": "Taitila",
+        "number": 4,
+        "endsAt": "2026-07-05T13:31:08+05:30"
+      },
+      "vara": {
+        "te": "ఆదివారం",
+        "en": "Sunday",
+        "number": 0
+      },
+      "sunrise": "2026-07-05T05:47:33+05:30",
+      "sunset": "2026-07-05T18:55:46+05:30",
+      "moonrise": "2026-07-05T22:41:37+05:30",
+      "moonset": "2026-07-05T10:09:53+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ గిబ్బస్",
+        "en": "Waning Gibbous",
+        "illuminationPercent": 75,
+        "phase": 0.666
+      },
+      "rahukalam": {
+        "start": "2026-07-05T17:17:15+05:30",
+        "end": "2026-07-05T18:55:46+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-05T09:04:37+05:30",
+        "end": "2026-07-05T10:43:08+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-05T05:47:33+05:30",
+        "end": "2026-07-05T07:26:05+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-06": {
+      "date": "2026-07-06",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "షష్టి",
+        "en": "Shashthi",
+        "number": 21,
+        "endsAt": "2026-07-06T13:47:33+05:30",
+        "nextTithi": {
+          "te": "సప్తమి",
+          "en": "Saptami",
+          "number": 22
+        }
+      },
+      "nakshatra": {
+        "te": "పూర్వభాద్ర",
+        "en": "Purva Bhadrapada",
+        "number": 25,
+        "pada": 4,
+        "endsAt": "2026-07-06T16:07:32+05:30"
+      },
+      "yoga": {
+        "te": "సౌభాగ్య",
+        "en": "Saubhagya",
+        "number": 4,
+        "isAuspicious": true,
+        "endsAt": "2026-07-06T15:50:40+05:30"
+      },
+      "karana": {
+        "te": "వణిజ",
+        "en": "Vanija",
+        "number": 6,
+        "endsAt": "2026-07-06T13:47:33+05:30"
+      },
+      "vara": {
+        "te": "సోమవారం",
+        "en": "Monday",
+        "number": 1
+      },
+      "sunrise": "2026-07-06T05:47:52+05:30",
+      "sunset": "2026-07-06T18:55:47+05:30",
+      "moonrise": "2026-07-06T23:17:47+05:30",
+      "moonset": "2026-07-06T11:03:13+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ గిబ్బస్",
+        "en": "Waning Gibbous",
+        "illuminationPercent": 65.2,
+        "phase": 0.701
+      },
+      "rahukalam": {
+        "start": "2026-07-06T07:26:21+05:30",
+        "end": "2026-07-06T09:04:51+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-06T05:47:52+05:30",
+        "end": "2026-07-06T07:26:21+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-06T12:21:50+05:30",
+        "end": "2026-07-06T14:00:19+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-07": {
+      "date": "2026-07-07",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "సప్తమి",
+        "en": "Saptami",
+        "number": 22,
+        "endsAt": "2026-07-07T13:25:17+05:30",
+        "nextTithi": {
+          "te": "అష్టమి",
+          "en": "Ashtami",
+          "number": 23
+        }
+      },
+      "nakshatra": {
+        "te": "ఉత్తరభాద్ర",
+        "en": "Uttara Bhadrapada",
+        "number": 26,
+        "pada": 4,
+        "endsAt": "2026-07-07T16:24:08+05:30"
+      },
+      "yoga": {
+        "te": "శోభన",
+        "en": "Shobhana",
+        "number": 5,
+        "isAuspicious": true,
+        "endsAt": "2026-07-07T14:30:36+05:30"
+      },
+      "karana": {
+        "te": "బవ",
+        "en": "Bava",
+        "number": 1,
+        "endsAt": "2026-07-07T13:25:17+05:30"
+      },
+      "vara": {
+        "te": "మంగళవారం",
+        "en": "Tuesday",
+        "number": 2
+      },
+      "sunrise": "2026-07-07T05:48:11+05:30",
+      "sunset": "2026-07-07T18:55:48+05:30",
+      "moonrise": "2026-07-07T23:56:20+05:30",
+      "moonset": "2026-07-07T11:57:40+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ అష్టమి",
+        "en": "Last Quarter",
+        "illuminationPercent": 54.5,
+        "phase": 0.736
+      },
+      "rahukalam": {
+        "start": "2026-07-07T15:38:53+05:30",
+        "end": "2026-07-07T17:17:21+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-07T14:00:26+05:30",
+        "end": "2026-07-07T15:38:53+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-07T10:43:32+05:30",
+        "end": "2026-07-07T12:21:59+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-08": {
+      "date": "2026-07-08",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "అష్టమి",
+        "en": "Ashtami",
+        "number": 23,
+        "endsAt": "2026-07-08T12:22:03+05:30",
+        "nextTithi": {
+          "te": "నవమి",
+          "en": "Navami",
+          "number": 24
+        }
+      },
+      "nakshatra": {
+        "te": "రేవతి",
+        "en": "Revati",
+        "number": 27,
+        "pada": 4,
+        "endsAt": "2026-07-08T16:00:09+05:30"
+      },
+      "yoga": {
+        "te": "అతిగండ",
+        "en": "Atiganda",
+        "number": 6,
+        "isAuspicious": false,
+        "endsAt": "2026-07-08T12:37:34+05:30"
+      },
+      "karana": {
+        "te": "కౌలవ",
+        "en": "Kaulava",
+        "number": 3,
+        "endsAt": "2026-07-08T12:22:03+05:30"
+      },
+      "vara": {
+        "te": "బుధవారం",
+        "en": "Wednesday",
+        "number": 3
+      },
+      "sunrise": "2026-07-08T05:48:30+05:30",
+      "sunset": "2026-07-08T18:55:47+05:30",
+      "moonrise": "",
+      "moonset": "2026-07-08T12:54:35+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ అష్టమి",
+        "en": "Last Quarter",
+        "illuminationPercent": 43.2,
+        "phase": 0.772
+      },
+      "rahukalam": {
+        "start": "2026-07-08T12:22:08+05:30",
+        "end": "2026-07-08T14:00:33+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-08T15:38:58+05:30",
+        "end": "2026-07-08T17:17:22+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-08T09:05:19+05:30",
+        "end": "2026-07-08T10:43:44+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-09": {
+      "date": "2026-07-09",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "నవమి",
+        "en": "Navami",
+        "number": 24,
+        "endsAt": "2026-07-09T10:38:12+05:30",
+        "nextTithi": {
+          "te": "దశమి",
+          "en": "Dashami",
+          "number": 25
+        }
+      },
+      "nakshatra": {
+        "te": "అశ్వని",
+        "en": "Ashwini",
+        "number": 1,
+        "pada": 4,
+        "endsAt": "2026-07-09T14:56:02+05:30"
+      },
+      "yoga": {
+        "te": "సుకర్మ",
+        "en": "Sukarma",
+        "number": 7,
+        "isAuspicious": true,
+        "endsAt": "2026-07-09T10:11:31+05:30"
+      },
+      "karana": {
+        "te": "గరజ",
+        "en": "Garija",
+        "number": 5,
+        "endsAt": "2026-07-09T10:38:12+05:30"
+      },
+      "vara": {
+        "te": "గురువారం",
+        "en": "Thursday",
+        "number": 4
+      },
+      "sunrise": "2026-07-09T05:48:49+05:30",
+      "sunset": "2026-07-09T18:55:46+05:30",
+      "moonrise": "2026-07-09T00:38:51+05:30",
+      "moonset": "2026-07-09T13:54:47+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ వంక",
+        "en": "Waning Crescent",
+        "illuminationPercent": 32.1,
+        "phase": 0.808
+      },
+      "rahukalam": {
+        "start": "2026-07-09T14:00:39+05:30",
+        "end": "2026-07-09T15:39:01+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-09T12:22:17+05:30",
+        "end": "2026-07-09T14:00:39+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-09T07:27:11+05:30",
+        "end": "2026-07-09T09:05:33+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-10": {
+      "date": "2026-07-10",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "దశమి",
+        "en": "Dashami",
+        "number": 25,
+        "endsAt": "2026-07-10T08:16:43+05:30",
+        "nextTithi": {
+          "te": "ఏకాదశి",
+          "en": "Ekadashi",
+          "number": 26
+        }
+      },
+      "nakshatra": {
+        "te": "భరణి",
+        "en": "Bharani",
+        "number": 2,
+        "pada": 4,
+        "endsAt": "2026-07-10T13:15:09+05:30"
+      },
+      "yoga": {
+        "te": "ధ్రుతి",
+        "en": "Dhriti",
+        "number": 8,
+        "isAuspicious": true,
+        "endsAt": "2026-07-10T07:14:27+05:30"
+      },
+      "karana": {
+        "te": "విష్టి",
+        "en": "Vishti",
+        "number": 7,
+        "endsAt": "2026-07-10T08:16:43+05:30"
+      },
+      "vara": {
+        "te": "శుక్రవారం",
+        "en": "Friday",
+        "number": 5
+      },
+      "sunrise": "2026-07-10T05:49:08+05:30",
+      "sunset": "2026-07-10T18:55:43+05:30",
+      "moonrise": "2026-07-10T01:25:02+05:30",
+      "moonset": "2026-07-10T14:58:50+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ వంక",
+        "en": "Waning Crescent",
+        "illuminationPercent": 21.8,
+        "phase": 0.845
+      },
+      "rahukalam": {
+        "start": "2026-07-10T09:05:47+05:30",
+        "end": "2026-07-10T10:44:06+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-10T10:44:06+05:30",
+        "end": "2026-07-10T12:22:26+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-10T14:00:45+05:30",
+        "end": "2026-07-10T15:39:05+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-11": {
+      "date": "2026-07-11",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "ద్వాదశి",
+        "en": "Dwadashi",
+        "number": 27,
+        "endsAt": "2026-07-12T02:04:38+05:30",
+        "nextTithi": {
+          "te": "త్రయోదశి",
+          "en": "Trayodashi",
+          "number": 28
+        }
+      },
+      "nakshatra": {
+        "te": "కృత్తిక",
+        "en": "Krittika",
+        "number": 3,
+        "pada": 4,
+        "endsAt": "2026-07-11T11:03:27+05:30"
+      },
+      "yoga": {
+        "te": "గండ",
+        "en": "Ganda",
+        "number": 10,
+        "isAuspicious": false,
+        "endsAt": "2026-07-12T00:05:09+05:30"
+      },
+      "karana": {
+        "te": "కౌలవ",
+        "en": "Kaulava",
+        "number": 3,
+        "endsAt": "2026-07-11T15:46:24+05:30"
+      },
+      "vara": {
+        "te": "శనివారం",
+        "en": "Saturday",
+        "number": 6
+      },
+      "sunrise": "2026-07-11T05:49:28+05:30",
+      "sunset": "2026-07-11T18:55:40+05:30",
+      "moonrise": "2026-07-11T02:17:45+05:30",
+      "moonset": "2026-07-11T16:04:46+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ వంక",
+        "en": "Waning Crescent",
+        "illuminationPercent": 13,
+        "phase": 0.883
+      },
+      "rahukalam": {
+        "start": "2026-07-11T05:49:28+05:30",
+        "end": "2026-07-11T07:27:44+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-11T07:27:44+05:30",
+        "end": "2026-07-11T09:06:01+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-11T15:39:07+05:30",
+        "end": "2026-07-11T17:17:24+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-12": {
+      "date": "2026-07-12",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "త్రయోదశి",
+        "en": "Trayodashi",
+        "number": 28,
+        "endsAt": "2026-07-12T22:30:19+05:30",
+        "nextTithi": {
+          "te": "చతుర్దశి",
+          "en": "Chaturdashi",
+          "number": 29
+        }
+      },
+      "nakshatra": {
+        "te": "రోహిణి",
+        "en": "Rohini",
+        "number": 4,
+        "pada": 4,
+        "endsAt": "2026-07-12T08:29:03+05:30"
+      },
+      "yoga": {
+        "te": "వృద్ధి",
+        "en": "Vriddhi",
+        "number": 11,
+        "isAuspicious": true,
+        "endsAt": "2026-07-12T20:05:44+05:30"
+      },
+      "karana": {
+        "te": "గరజ",
+        "en": "Garija",
+        "number": 5,
+        "endsAt": "2026-07-12T12:18:52+05:30"
+      },
+      "vara": {
+        "te": "ఆదివారం",
+        "en": "Sunday",
+        "number": 0
+      },
+      "sunrise": "2026-07-12T05:49:48+05:30",
+      "sunset": "2026-07-12T18:55:36+05:30",
+      "moonrise": "2026-07-12T03:16:28+05:30",
+      "moonset": "2026-07-12T17:10:44+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ వంక",
+        "en": "Waning Crescent",
+        "illuminationPercent": 6.1,
+        "phase": 0.92
+      },
+      "rahukalam": {
+        "start": "2026-07-12T17:17:22+05:30",
+        "end": "2026-07-12T18:55:36+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-12T09:06:15+05:30",
+        "end": "2026-07-12T10:44:28+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-12T05:49:48+05:30",
+        "end": "2026-07-12T07:28:01+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-13": {
+      "date": "2026-07-13",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "చతుర్దశి",
+        "en": "Chaturdashi",
+        "number": 29,
+        "endsAt": "2026-07-13T18:49:52+05:30",
+        "nextTithi": {
+          "te": "అమావాస్య",
+          "en": "Amavasya",
+          "number": 30
+        }
+      },
+      "nakshatra": {
+        "te": "ఆర్ద్ర",
+        "en": "Ardra",
+        "number": 6,
+        "pada": 2,
+        "endsAt": "2026-07-14T02:51:28+05:30"
+      },
+      "yoga": {
+        "te": "ధ్రువ",
+        "en": "Dhruva",
+        "number": 12,
+        "isAuspicious": true,
+        "endsAt": "2026-07-13T16:00:09+05:30"
+      },
+      "karana": {
+        "te": "విష్టి",
+        "en": "Vishti",
+        "number": 7,
+        "endsAt": "2026-07-13T08:40:14+05:30"
+      },
+      "vara": {
+        "te": "సోమవారం",
+        "en": "Monday",
+        "number": 1
+      },
+      "sunrise": "2026-07-13T05:50:08+05:30",
+      "sunset": "2026-07-13T18:55:31+05:30",
+      "moonrise": "2026-07-13T04:21:02+05:30",
+      "moonset": "2026-07-13T18:13:43+05:30",
+      "moonPhase": {
+        "te": "కృష్ణ వంక",
+        "en": "Waning Crescent",
+        "illuminationPercent": 1.8,
+        "phase": 0.958
+      },
+      "rahukalam": {
+        "start": "2026-07-13T07:28:18+05:30",
+        "end": "2026-07-13T09:06:28+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-13T05:50:08+05:30",
+        "end": "2026-07-13T07:28:18+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-13T12:22:49+05:30",
+        "end": "2026-07-13T14:01:00+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-14": {
+      "date": "2026-07-14",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "జ్యేష్ఠం",
+        "en": "Jyeshtha",
+        "number": 3,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "అమావాస్య",
+        "en": "Amavasya",
+        "number": 30,
+        "endsAt": "2026-07-14T15:13:29+05:30",
+        "nextTithi": {
+          "te": "పాడ్యమి",
+          "en": "Pratipada",
+          "number": 1
+        }
+      },
+      "nakshatra": {
+        "te": "పునర్వసు",
+        "en": "Punarvasu",
+        "number": 7,
+        "pada": 2,
+        "endsAt": "2026-07-15T00:09:37+05:30"
+      },
+      "yoga": {
+        "te": "వ్యాఘాత",
+        "en": "Vyaghata",
+        "number": 13,
+        "isAuspicious": false,
+        "endsAt": "2026-07-14T11:56:46+05:30"
+      },
+      "karana": {
+        "te": "నాగ",
+        "en": "Naga",
+        "number": 10,
+        "endsAt": "2026-07-15T05:49:51+05:30"
+      },
+      "vara": {
+        "te": "మంగళవారం",
+        "en": "Tuesday",
+        "number": 2
+      },
+      "sunrise": "2026-07-14T05:50:28+05:30",
+      "sunset": "2026-07-14T18:55:25+05:30",
+      "moonrise": "2026-07-14T05:27:35+05:30",
+      "moonset": "2026-07-14T19:11:10+05:30",
+      "moonPhase": {
+        "te": "అమావాస్య",
+        "en": "New Moon",
+        "illuminationPercent": 0.1,
+        "phase": 0.99
+      },
+      "rahukalam": {
+        "start": "2026-07-14T15:39:10+05:30",
+        "end": "2026-07-14T17:17:17+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-14T14:01:03+05:30",
+        "end": "2026-07-14T15:39:10+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-14T10:44:49+05:30",
+        "end": "2026-07-14T12:22:56+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": [
+        {
+          "te": "అమావాస్య",
+          "en": "Amavasya",
+          "type": "tithi",
+          "tier": 1
+        }
+      ]
+    },
+    "2026-07-15": {
+      "date": "2026-07-15",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "పాడ్యమి",
+        "en": "Pratipada",
+        "number": 1,
+        "endsAt": "2026-07-15T11:51:23+05:30",
+        "nextTithi": {
+          "te": "విదియ",
+          "en": "Dwitiya",
+          "number": 2
+        }
+      },
+      "nakshatra": {
+        "te": "పుష్యమి",
+        "en": "Pushya",
+        "number": 8,
+        "pada": 3,
+        "endsAt": "2026-07-15T21:46:35+05:30"
+      },
+      "yoga": {
+        "te": "హర్షణ",
+        "en": "Harshana",
+        "number": 14,
+        "isAuspicious": true,
+        "endsAt": "2026-07-15T08:04:02+05:30"
+      },
+      "karana": {
+        "te": "బవ",
+        "en": "Bava",
+        "number": 1,
+        "endsAt": "2026-07-15T11:51:23+05:30"
+      },
+      "vara": {
+        "te": "బుధవారం",
+        "en": "Wednesday",
+        "number": 3
+      },
+      "sunrise": "2026-07-15T05:50:48+05:30",
+      "sunset": "2026-07-15T18:55:17+05:30",
+      "moonrise": "2026-07-15T06:33:48+05:30",
+      "moonset": "2026-07-15T20:02:39+05:30",
+      "moonPhase": {
+        "te": "శుక్ల వంక",
+        "en": "Waxing Crescent",
+        "illuminationPercent": 1.2,
+        "phase": 0.035
+      },
+      "rahukalam": {
+        "start": "2026-07-15T12:23:03+05:30",
+        "end": "2026-07-15T14:01:06+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-15T15:39:10+05:30",
+        "end": "2026-07-15T17:17:14+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-15T09:06:55+05:30",
+        "end": "2026-07-15T10:44:59+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-16": {
+      "date": "2026-07-16",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "విదియ",
+        "en": "Dwitiya",
+        "number": 2,
+        "endsAt": "2026-07-16T08:53:20+05:30",
+        "nextTithi": {
+          "te": "తదియ",
+          "en": "Tritiya",
+          "number": 3
+        }
+      },
+      "nakshatra": {
+        "te": "ఆశ్లేష",
+        "en": "Ashlesha",
+        "number": 9,
+        "pada": 3,
+        "endsAt": "2026-07-16T19:52:09+05:30"
+      },
+      "yoga": {
+        "te": "సిద్ధి",
+        "en": "Siddhi",
+        "number": 16,
+        "isAuspicious": true,
+        "endsAt": "2026-07-17T01:21:56+05:30"
+      },
+      "karana": {
+        "te": "కౌలవ",
+        "en": "Kaulava",
+        "number": 3,
+        "endsAt": "2026-07-16T08:53:20+05:30"
+      },
+      "vara": {
+        "te": "గురువారం",
+        "en": "Thursday",
+        "number": 4
+      },
+      "sunrise": "2026-07-16T05:51:08+05:30",
+      "sunset": "2026-07-16T18:55:09+05:30",
+      "moonrise": "2026-07-16T07:36:30+05:30",
+      "moonset": "2026-07-16T20:47:31+05:30",
+      "moonPhase": {
+        "te": "శుక్ల వంక",
+        "en": "Waxing Crescent",
+        "illuminationPercent": 5,
+        "phase": 0.072
+      },
+      "rahukalam": {
+        "start": "2026-07-16T14:01:09+05:30",
+        "end": "2026-07-16T15:39:09+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-16T12:23:09+05:30",
+        "end": "2026-07-16T14:01:09+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-16T07:29:08+05:30",
+        "end": "2026-07-16T09:07:09+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-17": {
+      "date": "2026-07-17",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "తదియ",
+        "en": "Tritiya",
+        "number": 3,
+        "endsAt": "2026-07-17T06:28:10+05:30",
+        "nextTithi": {
+          "te": "చవితి",
+          "en": "Chaturthi",
+          "number": 4
+        }
+      },
+      "nakshatra": {
+        "te": "మఖ",
+        "en": "Magha",
+        "number": 10,
+        "pada": 3,
+        "endsAt": "2026-07-17T18:34:39+05:30"
+      },
+      "yoga": {
+        "te": "వ్యతీపాత",
+        "en": "Vyatipata",
+        "number": 17,
+        "isAuspicious": false,
+        "endsAt": "2026-07-17T22:45:38+05:30"
+      },
+      "karana": {
+        "te": "గరజ",
+        "en": "Garija",
+        "number": 5,
+        "endsAt": "2026-07-17T06:28:10+05:30"
+      },
+      "vara": {
+        "te": "శుక్రవారం",
+        "en": "Friday",
+        "number": 5
+      },
+      "sunrise": "2026-07-17T05:51:28+05:30",
+      "sunset": "2026-07-17T18:55:00+05:30",
+      "moonrise": "2026-07-17T08:35:50+05:30",
+      "moonset": "2026-07-17T21:27:12+05:30",
+      "moonPhase": {
+        "te": "శుక్ల వంక",
+        "en": "Waxing Crescent",
+        "illuminationPercent": 11,
+        "phase": 0.108
+      },
+      "rahukalam": {
+        "start": "2026-07-17T09:07:21+05:30",
+        "end": "2026-07-17T10:45:18+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-17T10:45:18+05:30",
+        "end": "2026-07-17T12:23:14+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-17T14:01:11+05:30",
+        "end": "2026-07-17T15:39:07+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-18": {
+      "date": "2026-07-18",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "పంచమి",
+        "en": "Panchami",
+        "number": 5,
+        "endsAt": "2026-07-19T03:43:07+05:30",
+        "nextTithi": {
+          "te": "షష్టి",
+          "en": "Shashthi",
+          "number": 6
+        }
+      },
+      "nakshatra": {
+        "te": "పూర్వఫల్గుణి",
+        "en": "Purva Phalguni",
+        "number": 11,
+        "pada": 3,
+        "endsAt": "2026-07-18T18:00:10+05:30"
+      },
+      "yoga": {
+        "te": "వరీయాన్",
+        "en": "Variyana",
+        "number": 18,
+        "isAuspicious": true,
+        "endsAt": "2026-07-18T20:45:12+05:30"
+      },
+      "karana": {
+        "te": "బవ",
+        "en": "Bava",
+        "number": 1,
+        "endsAt": "2026-07-18T16:07:16+05:30"
+      },
+      "vara": {
+        "te": "శనివారం",
+        "en": "Saturday",
+        "number": 6
+      },
+      "sunrise": "2026-07-18T05:51:49+05:30",
+      "sunset": "2026-07-18T18:54:51+05:30",
+      "moonrise": "2026-07-18T09:31:15+05:30",
+      "moonset": "2026-07-18T22:05:04+05:30",
+      "moonPhase": {
+        "te": "శుక్ల వంక",
+        "en": "Waxing Crescent",
+        "illuminationPercent": 18.9,
+        "phase": 0.143
+      },
+      "rahukalam": {
+        "start": "2026-07-18T05:51:49+05:30",
+        "end": "2026-07-18T07:29:42+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-18T07:29:42+05:30",
+        "end": "2026-07-18T09:07:34+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-18T15:39:05+05:30",
+        "end": "2026-07-18T17:16:58+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-19": {
+      "date": "2026-07-19",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "షష్టి",
+        "en": "Shashthi",
+        "number": 6,
+        "endsAt": "2026-07-20T03:30:17+05:30",
+        "nextTithi": {
+          "te": "సప్తమి",
+          "en": "Saptami",
+          "number": 7
+        }
+      },
+      "nakshatra": {
+        "te": "ఉత్తరఫల్గుణి",
+        "en": "Uttara Phalguni",
+        "number": 12,
+        "pada": 3,
+        "endsAt": "2026-07-19T18:11:51+05:30"
+      },
+      "yoga": {
+        "te": "పరిఘ",
+        "en": "Parigha",
+        "number": 19,
+        "isAuspicious": false,
+        "endsAt": "2026-07-19T19:22:29+05:30"
+      },
+      "karana": {
+        "te": "కౌలవ",
+        "en": "Kaulava",
+        "number": 3,
+        "endsAt": "2026-07-19T15:30:48+05:30"
+      },
+      "vara": {
+        "te": "ఆదివారం",
+        "en": "Sunday",
+        "number": 0
+      },
+      "sunrise": "2026-07-19T05:52:09+05:30",
+      "sunset": "2026-07-19T18:54:40+05:30",
+      "moonrise": "2026-07-19T10:24:40+05:30",
+      "moonset": "2026-07-19T22:40:56+05:30",
+      "moonPhase": {
+        "te": "శుక్ల వంక",
+        "en": "Waxing Crescent",
+        "illuminationPercent": 28,
+        "phase": 0.177
+      },
+      "rahukalam": {
+        "start": "2026-07-19T17:16:51+05:30",
+        "end": "2026-07-19T18:54:40+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-19T09:07:47+05:30",
+        "end": "2026-07-19T10:45:36+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-19T05:52:09+05:30",
+        "end": "2026-07-19T07:29:58+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-20": {
+      "date": "2026-07-20",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "సప్తమి",
+        "en": "Saptami",
+        "number": 7,
+        "endsAt": "2026-07-21T04:03:14+05:30",
+        "nextTithi": {
+          "te": "అష్టమి",
+          "en": "Ashtami",
+          "number": 8
+        }
+      },
+      "nakshatra": {
+        "te": "హస్త",
+        "en": "Hasta",
+        "number": 13,
+        "pada": 3,
+        "endsAt": "2026-07-20T19:09:26+05:30"
+      },
+      "yoga": {
+        "te": "శివ",
+        "en": "Shiva",
+        "number": 20,
+        "isAuspicious": true,
+        "endsAt": "2026-07-20T18:36:49+05:30"
+      },
+      "karana": {
+        "te": "గరజ",
+        "en": "Garija",
+        "number": 5,
+        "endsAt": "2026-07-20T15:41:15+05:30"
+      },
+      "vara": {
+        "te": "సోమవారం",
+        "en": "Monday",
+        "number": 1
+      },
+      "sunrise": "2026-07-20T05:52:29+05:30",
+      "sunset": "2026-07-20T18:54:28+05:30",
+      "moonrise": "2026-07-20T11:16:03+05:30",
+      "moonset": "2026-07-20T23:15:56+05:30",
+      "moonPhase": {
+        "te": "శుక్ల వంక",
+        "en": "Waxing Crescent",
+        "illuminationPercent": 37.9,
+        "phase": 0.211
+      },
+      "rahukalam": {
+        "start": "2026-07-20T07:30:14+05:30",
+        "end": "2026-07-20T09:07:59+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-20T05:52:29+05:30",
+        "end": "2026-07-20T07:30:14+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-20T12:23:29+05:30",
+        "end": "2026-07-20T14:01:13+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-21": {
+      "date": "2026-07-21",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "అష్టమి",
+        "en": "Ashtami",
+        "number": 8,
+        "endsAt": "2026-07-22T05:17:03+05:30",
+        "nextTithi": {
+          "te": "నవమి",
+          "en": "Navami",
+          "number": 9
+        }
+      },
+      "nakshatra": {
+        "te": "చిత్ర",
+        "en": "Chitra",
+        "number": 14,
+        "pada": 3,
+        "endsAt": "2026-07-21T20:48:58+05:30"
+      },
+      "yoga": {
+        "te": "సిద్ధ",
+        "en": "Siddha",
+        "number": 21,
+        "isAuspicious": true,
+        "endsAt": "2026-07-21T18:25:00+05:30"
+      },
+      "karana": {
+        "te": "విష్టి",
+        "en": "Vishti",
+        "number": 7,
+        "endsAt": "2026-07-21T16:35:28+05:30"
+      },
+      "vara": {
+        "te": "మంగళవారం",
+        "en": "Tuesday",
+        "number": 2
+      },
+      "sunrise": "2026-07-21T05:52:50+05:30",
+      "sunset": "2026-07-21T18:54:15+05:30",
+      "moonrise": "2026-07-21T12:07:30+05:30",
+      "moonset": "2026-07-21T23:53:10+05:30",
+      "moonPhase": {
+        "te": "శుక్ల అష్టమి",
+        "en": "First Quarter",
+        "illuminationPercent": 48,
+        "phase": 0.244
+      },
+      "rahukalam": {
+        "start": "2026-07-21T15:38:54+05:30",
+        "end": "2026-07-21T17:16:34+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-21T14:01:13+05:30",
+        "end": "2026-07-21T15:38:54+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-21T10:45:52+05:30",
+        "end": "2026-07-21T12:23:32+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-22": {
+      "date": "2026-07-22",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "నవమి",
+        "en": "Navami",
+        "number": 9,
+        "endsAt": "2026-07-23T07:03:43+05:30",
+        "nextTithi": {
+          "te": "దశమి",
+          "en": "Dashami",
+          "number": 10
+        }
+      },
+      "nakshatra": {
+        "te": "స్వాతి",
+        "en": "Swati",
+        "number": 15,
+        "pada": 3,
+        "endsAt": "2026-07-22T23:03:12+05:30"
+      },
+      "yoga": {
+        "te": "సాధ్య",
+        "en": "Sadhya",
+        "number": 22,
+        "isAuspicious": true,
+        "endsAt": "2026-07-22T18:41:36+05:30"
+      },
+      "karana": {
+        "te": "బాలవ",
+        "en": "Balava",
+        "number": 2,
+        "endsAt": "2026-07-22T18:06:52+05:30"
+      },
+      "vara": {
+        "te": "బుధవారం",
+        "en": "Wednesday",
+        "number": 3
+      },
+      "sunrise": "2026-07-22T05:53:10+05:30",
+      "sunset": "2026-07-22T18:54:01+05:30",
+      "moonrise": "2026-07-22T12:59:01+05:30",
+      "moonset": "",
+      "moonPhase": {
+        "te": "శుక్ల అష్టమి",
+        "en": "First Quarter",
+        "illuminationPercent": 57.9,
+        "phase": 0.275
+      },
+      "rahukalam": {
+        "start": "2026-07-22T12:23:36+05:30",
+        "end": "2026-07-22T14:01:12+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-22T15:38:48+05:30",
+        "end": "2026-07-22T17:16:25+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-22T09:08:23+05:30",
+        "end": "2026-07-22T10:45:59+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-23": {
+      "date": "2026-07-23",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "నవమి",
+        "en": "Navami",
+        "number": 9,
+        "endsAt": "2026-07-23T07:03:43+05:30",
+        "nextTithi": {
+          "te": "దశమి",
+          "en": "Dashami",
+          "number": 10
+        }
+      },
+      "nakshatra": {
+        "te": "విశాఖ",
+        "en": "Vishakha",
+        "number": 16,
+        "pada": 3,
+        "endsAt": "2026-07-24T01:42:31+05:30"
+      },
+      "yoga": {
+        "te": "శుభ",
+        "en": "Shubha",
+        "number": 23,
+        "isAuspicious": true,
+        "endsAt": "2026-07-23T19:19:32+05:30"
+      },
+      "karana": {
+        "te": "కౌలవ",
+        "en": "Kaulava",
+        "number": 3,
+        "endsAt": "2026-07-23T07:03:43+05:30"
+      },
+      "vara": {
+        "te": "గురువారం",
+        "en": "Thursday",
+        "number": 4
+      },
+      "sunrise": "2026-07-23T05:53:30+05:30",
+      "sunset": "2026-07-23T18:53:46+05:30",
+      "moonrise": "2026-07-23T13:52:11+05:30",
+      "moonset": "2026-07-23T00:31:29+05:30",
+      "moonPhase": {
+        "te": "శుక్ల గిబ్బస్",
+        "en": "Waxing Gibbous",
+        "illuminationPercent": 67.3,
+        "phase": 0.306
+      },
+      "rahukalam": {
+        "start": "2026-07-23T14:01:10+05:30",
+        "end": "2026-07-23T15:38:42+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-23T12:23:38+05:30",
+        "end": "2026-07-23T14:01:10+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-23T07:31:02+05:30",
+        "end": "2026-07-23T09:08:34+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-24": {
+      "date": "2026-07-24",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "దశమి",
+        "en": "Dashami",
+        "number": 10,
+        "endsAt": "2026-07-24T09:13:10+05:30",
+        "nextTithi": {
+          "te": "ఏకాదశి",
+          "en": "Ekadashi",
+          "number": 11
+        }
+      },
+      "nakshatra": {
+        "te": "అనూరాధ",
+        "en": "Anuradha",
+        "number": 17,
+        "pada": 2,
+        "endsAt": "2026-07-25T04:36:22+05:30"
+      },
+      "yoga": {
+        "te": "శుక్ల",
+        "en": "Shukla",
+        "number": 24,
+        "isAuspicious": true,
+        "endsAt": "2026-07-24T20:11:00+05:30"
+      },
+      "karana": {
+        "te": "గరజ",
+        "en": "Garija",
+        "number": 5,
+        "endsAt": "2026-07-24T09:13:10+05:30"
+      },
+      "vara": {
+        "te": "శుక్రవారం",
+        "en": "Friday",
+        "number": 5
+      },
+      "sunrise": "2026-07-24T05:53:50+05:30",
+      "sunset": "2026-07-24T18:53:31+05:30",
+      "moonrise": "2026-07-24T14:45:26+05:30",
+      "moonset": "2026-07-24T01:12:53+05:30",
+      "moonPhase": {
+        "te": "శుక్ల గిబ్బస్",
+        "en": "Waxing Gibbous",
+        "illuminationPercent": 75.9,
+        "phase": 0.337
+      },
+      "rahukalam": {
+        "start": "2026-07-24T09:08:45+05:30",
+        "end": "2026-07-24T10:46:13+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-24T10:46:13+05:30",
+        "end": "2026-07-24T12:23:40+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-24T14:01:08+05:30",
+        "end": "2026-07-24T15:38:35+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-25": {
+      "date": "2026-07-25",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "ఏకాదశి",
+        "en": "Ekadashi",
+        "number": 11,
+        "endsAt": "2026-07-25T11:34:40+05:30",
+        "nextTithi": {
+          "te": "ద్వాదశి",
+          "en": "Dwadashi",
+          "number": 12
+        }
+      },
+      "nakshatra": {
+        "te": "జ్యేష్ఠ",
+        "en": "Jyeshtha",
+        "number": 18,
+        "pada": 2,
+        "endsAt": "2026-07-26T07:34:34+05:30"
+      },
+      "yoga": {
+        "te": "బ్రహ్మ",
+        "en": "Brahma",
+        "number": 25,
+        "isAuspicious": true,
+        "endsAt": "2026-07-25T21:08:20+05:30"
+      },
+      "karana": {
+        "te": "విష్టి",
+        "en": "Vishti",
+        "number": 7,
+        "endsAt": "2026-07-25T11:34:40+05:30"
+      },
+      "vara": {
+        "te": "శనివారం",
+        "en": "Saturday",
+        "number": 6
+      },
+      "sunrise": "2026-07-25T05:54:10+05:30",
+      "sunset": "2026-07-25T18:53:14+05:30",
+      "moonrise": "2026-07-25T15:38:06+05:30",
+      "moonset": "2026-07-25T01:58:48+05:30",
+      "moonPhase": {
+        "te": "శుక్ల గిబ్బస్",
+        "en": "Waxing Gibbous",
+        "illuminationPercent": 83.4,
+        "phase": 0.367
+      },
+      "rahukalam": {
+        "start": "2026-07-25T05:54:10+05:30",
+        "end": "2026-07-25T07:31:33+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-25T07:31:33+05:30",
+        "end": "2026-07-25T09:08:56+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-25T15:38:28+05:30",
+        "end": "2026-07-25T17:15:51+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": [
+        {
+          "te": "దేవశయని ఏకాదశి",
+          "en": "Devshayani Ekadashi",
+          "type": "tithi",
+          "tier": 1,
+          "isSignificantEkadashi": true,
+          "significance": {
+            "te": "విష్ణువు నిద్రపోయే రోజు. చాతుర్మాస్య ప్రారంభం. ఈ రోజు నుండి 4 నెలలు శుభకార్యాలు చేయరు.",
+            "en": "The day Lord Vishnu goes to sleep. Marks the start of Chaturmas — 4 months when auspicious activities are avoided."
+          }
+        }
+      ]
+    },
+    "2026-07-26": {
+      "date": "2026-07-26",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "ద్వాదశి",
+        "en": "Dwadashi",
+        "number": 12,
+        "endsAt": "2026-07-26T13:58:12+05:30",
+        "nextTithi": {
+          "te": "త్రయోదశి",
+          "en": "Trayodashi",
+          "number": 13
+        }
+      },
+      "nakshatra": {
+        "te": "జ్యేష్ఠ",
+        "en": "Jyeshtha",
+        "number": 18,
+        "pada": 4,
+        "endsAt": "2026-07-26T07:34:35+05:30"
+      },
+      "yoga": {
+        "te": "ఐంద్ర",
+        "en": "Aindra",
+        "number": 26,
+        "isAuspicious": true,
+        "endsAt": "2026-07-26T22:04:40+05:30"
+      },
+      "karana": {
+        "te": "బాలవ",
+        "en": "Balava",
+        "number": 2,
+        "endsAt": "2026-07-26T13:58:12+05:30"
+      },
+      "vara": {
+        "te": "ఆదివారం",
+        "en": "Sunday",
+        "number": 0
+      },
+      "sunrise": "2026-07-26T05:54:30+05:30",
+      "sunset": "2026-07-26T18:52:56+05:30",
+      "moonrise": "2026-07-26T16:29:31+05:30",
+      "moonset": "2026-07-26T02:47:06+05:30",
+      "moonPhase": {
+        "te": "శుక్ల గిబ్బస్",
+        "en": "Waxing Gibbous",
+        "illuminationPercent": 89.8,
+        "phase": 0.396
+      },
+      "rahukalam": {
+        "start": "2026-07-26T17:15:38+05:30",
+        "end": "2026-07-26T18:52:56+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-26T09:09:07+05:30",
+        "end": "2026-07-26T10:46:25+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-26T05:54:30+05:30",
+        "end": "2026-07-26T07:31:48+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-27": {
+      "date": "2026-07-27",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "త్రయోదశి",
+        "en": "Trayodashi",
+        "number": 13,
+        "endsAt": "2026-07-27T16:15:16+05:30",
+        "nextTithi": {
+          "te": "చతుర్దశి",
+          "en": "Chaturdashi",
+          "number": 14
+        }
+      },
+      "nakshatra": {
+        "te": "మూల",
+        "en": "Mula",
+        "number": 19,
+        "pada": 4,
+        "endsAt": "2026-07-27T10:28:23+05:30"
+      },
+      "yoga": {
+        "te": "వైధృతి",
+        "en": "Vaidhriti",
+        "number": 27,
+        "isAuspicious": false,
+        "endsAt": "2026-07-27T22:54:20+05:30"
+      },
+      "karana": {
+        "te": "తైతిల",
+        "en": "Taitila",
+        "number": 4,
+        "endsAt": "2026-07-27T16:15:16+05:30"
+      },
+      "vara": {
+        "te": "సోమవారం",
+        "en": "Monday",
+        "number": 1
+      },
+      "sunrise": "2026-07-27T05:54:50+05:30",
+      "sunset": "2026-07-27T18:52:38+05:30",
+      "moonrise": "2026-07-27T17:17:53+05:30",
+      "moonset": "2026-07-27T03:37:57+05:30",
+      "moonPhase": {
+        "te": "శుక్ల గిబ్బస్",
+        "en": "Waxing Gibbous",
+        "illuminationPercent": 94.7,
+        "phase": 0.426
+      },
+      "rahukalam": {
+        "start": "2026-07-27T07:32:03+05:30",
+        "end": "2026-07-27T09:09:17+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-27T05:54:50+05:30",
+        "end": "2026-07-27T07:32:03+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-27T12:23:44+05:30",
+        "end": "2026-07-27T14:00:57+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-28": {
+      "date": "2026-07-28",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "చతుర్దశి",
+        "en": "Chaturdashi",
+        "number": 14,
+        "endsAt": "2026-07-28T18:19:19+05:30",
+        "nextTithi": {
+          "te": "పౌర్ణమి",
+          "en": "Purnima",
+          "number": 15
+        }
+      },
+      "nakshatra": {
+        "te": "పూర్వాషాఢ",
+        "en": "Purva Ashadha",
+        "number": 20,
+        "pada": 4,
+        "endsAt": "2026-07-28T13:10:53+05:30"
+      },
+      "yoga": {
+        "te": "విష్కంభ",
+        "en": "Vishkambha",
+        "number": 1,
+        "isAuspicious": false,
+        "endsAt": "2026-07-28T23:32:57+05:30"
+      },
+      "karana": {
+        "te": "వణిజ",
+        "en": "Vanija",
+        "number": 6,
+        "endsAt": "2026-07-28T18:19:19+05:30"
+      },
+      "vara": {
+        "te": "మంగళవారం",
+        "en": "Tuesday",
+        "number": 2
+      },
+      "sunrise": "2026-07-28T05:55:09+05:30",
+      "sunset": "2026-07-28T18:52:18+05:30",
+      "moonrise": "2026-07-28T18:03:15+05:30",
+      "moonset": "2026-07-28T04:30:58+05:30",
+      "moonPhase": {
+        "te": "శుక్ల గిబ్బస్",
+        "en": "Waxing Gibbous",
+        "illuminationPercent": 98.1,
+        "phase": 0.456
+      },
+      "rahukalam": {
+        "start": "2026-07-28T15:38:01+05:30",
+        "end": "2026-07-28T17:15:09+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-28T14:00:52+05:30",
+        "end": "2026-07-28T15:38:01+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-28T10:46:35+05:30",
+        "end": "2026-07-28T12:23:44+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    },
+    "2026-07-29": {
+      "date": "2026-07-29",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "శుక్ల పక్షం",
+        "en": "Shukla Paksha",
+        "value": "shukla"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "పౌర్ణమి",
+        "en": "Purnima",
+        "number": 15,
+        "endsAt": "2026-07-29T20:05:35+05:30",
+        "nextTithi": {
+          "te": "పాడ్యమి",
+          "en": "Pratipada",
+          "number": 16
+        }
+      },
+      "nakshatra": {
+        "te": "ఉత్తరాషాఢ",
+        "en": "Uttara Ashadha",
+        "number": 21,
+        "pada": 4,
+        "endsAt": "2026-07-29T15:37:01+05:30"
+      },
+      "yoga": {
+        "te": "ప్రీతి",
+        "en": "Priti",
+        "number": 2,
+        "isAuspicious": true,
+        "endsAt": "2026-07-29T23:57:16+05:30"
+      },
+      "karana": {
+        "te": "విష్టి",
+        "en": "Vishti",
+        "number": 7,
+        "endsAt": "2026-07-29T07:14:55+05:30"
+      },
+      "vara": {
+        "te": "బుధవారం",
+        "en": "Wednesday",
+        "number": 3
+      },
+      "sunrise": "2026-07-29T05:55:29+05:30",
+      "sunset": "2026-07-29T18:51:57+05:30",
+      "moonrise": "2026-07-29T18:46:19+05:30",
+      "moonset": "2026-07-29T05:24:04+05:30",
+      "moonPhase": {
+        "te": "పౌర్ణమి",
+        "en": "Full Moon",
+        "illuminationPercent": 99.8,
+        "phase": 0.486
+      },
+      "rahukalam": {
+        "start": "2026-07-29T12:23:43+05:30",
+        "end": "2026-07-29T14:00:47+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-29T15:37:50+05:30",
+        "end": "2026-07-29T17:14:54+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-29T09:09:36+05:30",
+        "end": "2026-07-29T10:46:39+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": [
+        {
+          "te": "పౌర్ణమి",
+          "en": "Purnima",
+          "type": "tithi",
+          "tier": 1
+        }
+      ]
+    },
+    "2026-07-30": {
+      "date": "2026-07-30",
+      "samvatsaram": {
+        "te": "పరాభవ",
+        "en": "Parabhava",
+        "number": 40
+      },
+      "masa": {
+        "te": "ఆషాఢం",
+        "en": "Ashadha",
+        "number": 4,
+        "isAdhika": false
+      },
+      "paksha": {
+        "te": "కృష్ణ పక్షం",
+        "en": "Krishna Paksha",
+        "value": "krishna"
+      },
+      "ritu": {
+        "te": "వర్ష ఋతువు",
+        "en": "Varsha (Monsoon)"
+      },
+      "ayana": {
+        "te": "దక్షిణాయనం",
+        "en": "Dakshinayana"
+      },
+      "tithi": {
+        "te": "పాడ్యమి",
+        "en": "Pratipada",
+        "number": 16,
+        "endsAt": "2026-07-30T21:30:41+05:30",
+        "nextTithi": {
+          "te": "విదియ",
+          "en": "Dwitiya",
+          "number": 17
+        }
+      },
+      "nakshatra": {
+        "te": "శ్రవణ",
+        "en": "Shravana",
+        "number": 22,
+        "pada": 4,
+        "endsAt": "2026-07-30T17:43:10+05:30"
+      },
+      "yoga": {
+        "te": "ఆయుష్మాన్",
+        "en": "Ayushman",
+        "number": 3,
+        "isAuspicious": true,
+        "endsAt": "2026-07-31T00:04:51+05:30"
+      },
+      "karana": {
+        "te": "బాలవ",
+        "en": "Balava",
+        "number": 2,
+        "endsAt": "2026-07-30T08:50:57+05:30"
+      },
+      "vara": {
+        "te": "గురువారం",
+        "en": "Thursday",
+        "number": 4
+      },
+      "sunrise": "2026-07-30T05:55:48+05:30",
+      "sunset": "2026-07-30T18:51:36+05:30",
+      "moonrise": "2026-07-30T19:25:23+05:30",
+      "moonset": "2026-07-30T06:17:15+05:30",
+      "moonPhase": {
+        "te": "పౌర్ణమి",
+        "en": "Full Moon",
+        "illuminationPercent": 99.6,
+        "phase": 0.519
+      },
+      "rahukalam": {
+        "start": "2026-07-30T14:00:40+05:30",
+        "end": "2026-07-30T15:37:39+05:30",
+        "te": "రాహుకాలం",
+        "en": "Rahukalam"
+      },
+      "gulikaKalam": {
+        "start": "2026-07-30T12:23:42+05:30",
+        "end": "2026-07-30T14:00:40+05:30",
+        "te": "గులికకాలం",
+        "en": "Gulika Kalam"
+      },
+      "yamagandam": {
+        "start": "2026-07-30T07:32:46+05:30",
+        "end": "2026-07-30T09:09:45+05:30",
+        "te": "యమగండం",
+        "en": "Yamagandam"
+      },
+      "festivals": []
+    }
+  }
+}

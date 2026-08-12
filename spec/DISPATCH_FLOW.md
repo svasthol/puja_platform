@@ -1,5 +1,9 @@
 # Dispatch flow — booking lifecycle, races, and how each is resolved (v3.2, go-live)
 
+**Puja MVP launch:** See §Puja MVP launch dispatch and `spec/plans/LAUNCH_POLICY.md`
+(SPEC_AMENDMENTS §21). Launch supersedes geo-radius rounds and direct-booking product
+path; DB constraints are **retained**.
+
 Every guarantee below is enforced by a database mechanism (base schema +
 migration 002 in DATABASE.md). App code must handle the resulting errors
 gracefully but must NOT reimplement the guarantees. v1 mechanisms were
@@ -45,6 +49,64 @@ on `ux_bookings_no_duplicate_submit` (lets the customer immediately re-book
 the same puja/slot after an abandoned checkout). A terminal status that skips
 `cancelled_at` permanently locks that customer out of that slot — this
 exact bug is why the rule exists.
+
+## Puja MVP launch dispatch (SPEC_AMENDMENTS §21) — normative for go-live
+
+**This section supersedes** the geo-radius round schedule (§Dispatch rounds) and
+direct-booking product path (§Direct vs broadcast) **for launch only**. Phase 2
+re-enables radius dispatch and optional direct booking without schema changes.
+
+### Launch matching (citywide broadcast)
+
+Eligibility at broadcast — **no `ST_DWithin`**, **no `pujari_live_location` join**:
+
+1. `verification_status = 'verified'`
+2. `EXISTS` `pujari_pricing` for booking's `puja_id`
+3. Redis `presence:{pujari_id}` alive (heartbeat — GPS optional at launch)
+4. `pujari_service_areas` → active `service_areas` in launch city
+5. Weekly availability covers slot; no `pujari_unavailability` on `scheduled_date`
+6. No hard overlap with pujari's other active bookings (`duration_minutes` window)
+7. No overlapping PAID `intended_pujari_id` windows
+8. **Soft buffer:** no other confirmed booking ending within `dispatch_buffer_minutes`
+   (default 60) before this slot — app filter only
+9. **Re-offer (status-aware):** exclude **rejected**; **expired** after cooldown (45m)
+
+Customer `addresses.service_area_id` is **display-only** on offers; does not filter dispatch.
+
+### Dispatch windows
+
+`dispatch_starts_at` / `dispatch_deadline` on `booking_dispatch_state` (migration 012).
+
+> **Dispatch v2 (SPEC_AMENDMENTS §21.6.A–H, migration 014):** the first broadcast fires
+> **immediately on payment** for both classes (`immediate_dispatch_on_payment=true`) — advance
+> `dispatch_starts_at` becomes `now()`. The `dispatch_deadline` stays **class-aware** (below).
+> The deferred `advance: slot − 4h` start is retained only as a rollback (flip the flag false).
+> The **worker** owns the state row and window computation, not the webhook (§below).
+
+| Class (frozen `booking_class`) | Starts (v2) | Deadline |
+|-------|--------|----------|
+| **Instant** (slot ≤ `instant_lead_hours` away at booking) | `now()` | `now() + instant_dispatch_minutes` (30 min) |
+| **Advance** (slot > `instant_lead_hours` away at booking) | `now()` (v2) / `slot − 4h` (rollback) | `slot − advance_dispatch_fail_hours` (3h) → fail + refund |
+
+`booking_class` is **frozen at `POST /v1/bookings`** and drives the night gate, offer TTL, RM
+escalation, and failure cutoff. Partner-app `urgency` (modal vs inbox) is computed live at
+`GET /v1/offers` and may escalate an advance booking's UX as it nears its slot (§21.6.E). Night
+slots (00:00–05:59 IST) are blocked at `POST /v1/bookings` (§21.6.A, launch 2a).
+
+### Presence at launch
+
+`PUT /heartbeat` — `{lat,lng}` optional; Redis presence required. Go online allowed
+without OS location permission.
+
+### Information + RM
+
+Offer: area label only. After confirm: pujari → address + map + RM; customer →
+pujari name + RM; no direct phones (§21.4).
+
+### DB safety nets (direct disabled — constraints kept)
+
+Trigger 3 still writes `intended_pujari_id` on every accept.
+`ex_bookings_intended_no_overlap` and `ex_bookings_pujari_no_overlap` unchanged.
 
 ## Payment models (`bookings.payment_mode`) — two checkout options
 
@@ -182,9 +244,13 @@ Customer picks one → `POST /v1/bookings { ..., payment_mode }`.
 6. ACCEPT      first pujari to accept wins; trigger 3 atomically writes
                bookings.pujari_id AND intended_pujari_id (= committed pujari
                — puts every accepted booking, both dispatch modes, under the
-               paid-slot exclusion), flips the booking to 'confirmed', and
-               inserts the booking_status_history row (changed_by = the
-               accepting pujari's user) — the app layer adds nothing
+               paid-slot exclusion), flips the booking to 'confirmed', inserts
+               the booking_status_history row (changed_by = the accepting
+               pujari's user), AND (Dispatch v2, §21.6.B) supersedes every
+               other live offer for that booking (status -> 'superseded',
+               responded_at = now()) so long-lived advance offers leave the
+               live indexes and vanish from losers' inboxes — the app layer
+               adds nothing
 7. SERVICE     in_progress -> completed; live location + chat active.
                advance_balance: pujari collects offline balance at door,
                confirms via confirm-balance-collected, then completes.
@@ -196,6 +262,10 @@ Customer picks one → `POST /v1/bookings { ..., payment_mode }`.
 
 ## Direct vs broadcast dispatch (`bookings.dispatch_mode`)
 
+> **Launch (§21):** **Broadcast only** at checkout. The direct path below is
+> **disabled in API/UI** but **schema and constraints are retained**. Phase 2 may
+> re-enable “book this pujari” when ratings/supply support it.
+
 The customer either picked a pujari by name/reviews, or asked for anyone.
 These are different products — never silently substitute a chosen pujari.
 
@@ -206,18 +276,25 @@ These are different products — never silently substitute a chosen pujari.
   (clearing `intended_pujari_id`) or cancels. **Guarded UPDATE** on broadcast
   conversion — 0 rows → 409 if already assigned or no longer direct:
   `WHERE status_id=requested AND dispatch_mode='direct' AND pujari_id IS NULL`.
-  Push failure on a direct offer escalates to SMS (MSG91).
+  Push failure on a direct offer escalates to SMS via `sms_router` (FAST2SMS → MSG91).
 - **broadcast** (`intended_pujari_id` NULL, or customer opted in after a
   direct miss): Uber-style rounds, below.
 
 ## Dispatch rounds (broadcast mode) — `booking_dispatch_state` row per booking
 
-Radius schedule: **3 km -> 6 km -> 10 km -> 15 km** (rounds 1..max_rounds=4),
+> **Launch (§21):** **Time-based** `dispatch_starts_at` / `dispatch_deadline` replace
+> round-count exhaustion. The radius schedule below is **Phase 2** (geo dispatch).
+
+Radius schedule (Phase 2 geo): **3 km -> 6 km -> 10 km -> 15 km** (rounds 1..max_rounds=4),
 values live in `booking_dispatch_state`, tunable per service_area later.
 
 `broadcast_booking(booking_id)` / `rebroadcast_booking(booking_id, fresh=False)`:
 0. Ensure dispatch-state row exists: `INSERT INTO booking_dispatch_state (booking_id)
    VALUES (%s) ON CONFLICT (booking_id) DO NOTHING` (worker owns this — callers must not).
+   **Dispatch v2 (§21.6.C):** the worker also computes `dispatch_starts_at` (= `now()` for advance
+   under immediate dispatch) and the class-aware `dispatch_deadline` here via `ensure_dispatch_windows()`.
+   The **webhook does NOT** compute windows or write this row — it only sets `paid_at` and enqueues
+   (the `compute_dispatch_windows` + INSERT block in `webhook_service.py` is removed).
 1. Redis lock: `SET dispatch_lock:{booking_id} 1 NX EX 60` — not acquired =
    another worker is dispatching this booking; exit.
    **If `fresh=True`** (pujari-cancel / admin return-to-requested): reset
@@ -241,30 +318,40 @@ values live in `booking_dispatch_state`, tunable per service_area later.
        intended_pujari_id = candidate, paid_at set, uncancelled) — keeps the
        accept-time exclusion_violation rare and the pujari UX clean; the
        constraint itself remains the backstop if this filter is missed
+   AND NOT EXISTS prior booking_assignments row for (booking, pujari) with
+       assignment status **rejected** — expired ignorers may be re-offered per §21.6
+   AND pujari is in an active service_area (`pujari_service_areas` join)
    AND ST_DWithin(pujari_live_location.geom, booking_address.geom, radius_km*1000)
-   AND pujari is in an active service_area (pujari_service_areas join)
-   AND NOT EXISTS prior booking_assignments row for (booking, pujari) —
-       rejectors and expired-ignorers are never re-pinged for the same booking
-4. INSERT one booking_assignments row per eligible pujari,
-   `expires_at = now() + 2 minutes` (`ux_booking_assignments_one_live` makes
-   duplicates impossible even here).
-5. FCM push per pujari — best-effort with 2 retries; on UNREGISTERED delete
-   the dead devices row. The pujari app's `GET /v1/offers` on foreground is
+       — **Phase 2 geo dispatch only**; omitted at launch (§Puja MVP launch dispatch)
+4. INSERT one booking_assignments row per eligible pujari
+   (`ux_booking_assignments_one_live` makes duplicates impossible even here).
+   TTL by frozen `booking_class` (Dispatch v2, §21.6.D): instant
+   `expires_at = now() + instant_offer_ttl_seconds` (120s); advance
+   `expires_at = now() + advance_offer_ttl_hours` (24h, rolling — refreshed in place
+   by the `refresh_advance_offers` beat task). **Inbox cap (§21.6.G, G1):** exclude
+   pujaris already holding `≥ max_live_advance_offers_per_pujari` (15) live advance offers.
+5. FCM push per pujari — best-effort with 2 retries (`fcm_client`); on UNREGISTERED delete
+   the dead devices row. Enqueued by `notify_offers` Celery task on `notifications` queue.
+   The pujari app's `GET /v1/offers` on foreground is
    the delivery safety net, not the push.
 6. Round > max_rounds with zero accepts: booking -> 'failed_no_pujari' AND
    `cancelled_at = now()` (terminal — frees the window and the
    duplicate-submit index), `exhausted_at = now()` on dispatch state,
    INSERT refunds row (reason='no_pujari', 100%), history row, FCM + SMS to
-   customer. Loud, honest failure — never a booking stuck in 'requested'
+   customer (via `sms_router`). Loud, honest failure — never a booking stuck in 'requested'
    forever.
 
 ## Presence — Redis TTL, not a boolean
 
-- Pujari app on duty: `PUT /v1/me/heartbeat` every 30s (piggybacked on the
-  location update — one call writes location + geom + `SET presence:{id} 1 EX 90`).
+> **Launch (§21):** Heartbeat sets presence **without requiring GPS**. `{lat,lng}` is
+> optional; `pujari_live_location` is not used by launch dispatch.
+
+- Pujari app on duty: `PUT /v1/me/heartbeat` every 30s — sets Redis
+  `SET presence:{id} 1 EX 90`. At launch `{lat,lng}` is **optional**; when provided
+  (Phase 2), also writes `pujari_live_location.geom`.
   **Launch invariant:** heartbeat is the sole writer of `pujari_live_location.geom`
   until partner availability endpoints exist; any future location writer MUST set
-  geom (optional defense: `P-PLL-GEOM` trigger in migration 007).
+  geom (optional defense: `P-PLL-GEOM` trigger in migration **008**).
 - 3 missed beats (90s) = offline by TTL lapse. App crash/kill needs no
   handling — no stuck-online state is possible.
 - Explicit "go offline" deletes the key immediately.
@@ -311,7 +398,13 @@ One transaction: set `cancelled_at`, flip `status_id` to 'cancelled', write
 history row, INSERT `refunds` row. Consequences, all automatic:
 - The pujari's time window is freed instantly (`cancelled_at IS NULL`
   predicate on both exclusion constraints excludes the row).
-- Any still-pending offers on that booking become unacceptable (trigger guard).
+- Any still-pending offers on that booking become unacceptable (accept trigger
+  guard → 410) **and** are resolved in the same cancel transaction:
+  `UPDATE booking_assignments` still `offered` → `('assignment','expired')` +
+  `responded_at = now()` (`cancellation_service`). History stays — never DELETE.
+- `GET /v1/offers` excludes rows where `bookings.cancelled_at IS NOT NULL` so
+  partner inbox does not show stale cards (poll safety net; see `P-FCM-CUSTOMER-CANCEL`
+  for push-driven instant removal).
 - The refund is processed asynchronously — see below. The cancel response
   returns immediately: "refund initiated, 5–7 business days."
 
@@ -375,11 +468,21 @@ Asia/Kolkata) has passed without `in_progress`:
 Pujari `start` already requires ±60 min of `scheduled_time`; this handles the
 case where pujari never calls `start`.
 
-## Pre-event reconfirmation — v3.2 planned (post-MVP default)
+## Pre-event reconfirmation — mandatory for advance (§21.7)
 
-For `scheduled_date - today() > 1 day`: 24h before event, ping assigned pujari
-to confirm. No response → admin alert. Optional auto re-dispatch — product
-decision. See `spec/plans/SPEC_AMENDMENTS.md` §4.
+For bookings where lead time ≥ 24h: **24h before slot**, FCM/SMS assigned pujari
+to confirm. No response within 4h → RM/admin alert. **Mandatory at launch** for
+advance scheduling. Optional auto re-dispatch is Phase 2 product decision.
+
+**Partner in-app confirm (§23, launch):** assigned pujari acknowledges via
+`POST /v1/pujari/bookings/{id}/reconfirm` → sets `booking_reconfirmations.pujari_confirmed_at`.
+Idempotent. **Decline** uses `POST /v1/bookings/{id}/pujari-cancel` (same as any
+confirmed dropout) — not a silent dismiss.
+
+**Dispatch v2 quiet-hours (§21.6.H):** the ping and its escalation are shifted out of
+`[reconfirm_quiet_hours_start, reconfirm_quiet_hours_end)` (default 22:00–08:00 IST) — the ping
+moves earlier (more lead), the escalation is clamped to `max(ping+4h, next 08:00)`.
+See `spec/plans/SPEC_AMENDMENTS.md` §21.7 + §21.6.H.
 
 ## Manual reassign (admin) — clear first, then insert
 
@@ -388,16 +491,27 @@ set FAILS on Guard 3 — that is intentional, not a bug. The correct flow, one
 transaction:
 1. `UPDATE bookings SET pujari_id = NULL, intended_pujari_id = NULL` +
    history row (`changed_by` = the admin) — this frees both exclusion windows.
-2. INSERT a booking_assignments row for the new pujari with status
-   'accepted' and a short future `expires_at` (e.g. now() + 5 min). The
-   INSERT path skips Guard 0 by design; Guards 1–3 and BOTH exclusion
+2. Flip the old pujari's accepted assignment to `('assignment', 'revoked')`
+   (seeded in migration 009). Without this, the booking keeps two `accepted`
+   rows forever — `ux_booking_assignments_one_live` cannot catch it because
+   both rows are resolved (`responded_at` set). Never reuse 'rejected': it
+   records the old pujari as refusing work they accepted and corrupts future
+   reliability scoring. Safe with trigger 3 — the UPDATE sets a non-accepted
+   status, so the trigger body is skipped.
+3. INSERT a booking_assignments row for the new pujari with status
+   'accepted', **`responded_at = now()`**, and a short future `expires_at`
+   (e.g. now() + 5 min — **not** `now()`; Guard 1 rejects `expires_at <= now()` on INSERT).
+   The INSERT path skips Guard 0 by design; Guards 1–3 and BOTH exclusion
    constraints still validate the new pujari (overlap with their other
    accepted bookings AND with paid direct reservations elsewhere).
-3. Trigger 3 re-fires its first-accept block: writes the new pujari onto the
+4. Trigger 3 re-fires its first-accept block: writes the new pujari onto the
    booking and a fresh 'confirmed' history row (changed_by = the new
    pujari's user — the admin's action is the step-1 row).
 Any failure rolls the whole reassign back — the booking is never left
 unassigned by a half-completed reassign.
+
+**Policy:** Do not reassign when booking is `in_progress`, `completed`, or terminal —
+use `A-DISPUTE` instead (`ADMIN.md` `A-REASSIGN`).
 
 ## Refund execution (refund worker) — NEVER inline in a request
 
@@ -445,6 +559,11 @@ skips instead of stacking. Row-level safety additionally via
    rows must leave the `responded_at IS NULL` partial indexes
    (`ix_booking_assignments_sweep`, `ux_booking_assignments_one_live`) or the
    sweep scan grows unboundedly and future re-offers collide.
+   **Dispatch v2 carve-out (§21.6.D):** this step **skips advance-class** live offers while
+   `bookings.status='requested'`, `dispatch_deadline > now()`, and `urgency_escalated_at IS NULL`
+   — those are long-lived (24h) offers refreshed in place by the `refresh_advance_offers` beat task
+   (never re-INSERTed). Instant offers keep this expire→rebroadcast behaviour unchanged. When an
+   advance booking flips to instant urgency (§21.6.E) it re-enters this step.
 4. Independently scans for stranded bookings (status='requested', unassigned,
    not cancelled, broadcast before, zero live offers) and fires
    `workers.dispatch.rebroadcast_booking` for each.
@@ -468,6 +587,23 @@ The worker is hygiene + re-dispatch, NOT the safety mechanism: even with the
 worker down, the accept trigger independently rejects accepts on expired
 offers, and `ex_bookings_intended_no_overlap` independently rejects
 double-paid slots.
+
+## Dispatch v2 beat tasks (SPEC_AMENDMENTS §21.6.D–F) — separate from the 30s sweep
+
+The three time-driven scans introduced by immediate dispatch are **separate Celery Beat tasks**,
+each with its own Redis lock and cadence — they are **never** folded into the 30s `sweep_task`
+(different cadences; piling them on risks the sweep exceeding its `EX 25` lock and backing up).
+All are idempotent (at-least-once delivery).
+
+| Task | Cadence | Lock | Work |
+|---|---|---|---|
+| `sweep_task` (existing) | 30s | `sweep_lock EX 25` | holds, abandonment, **instant** offer expiry, stranded rebroadcast, presence |
+| `refresh_advance_offers` (§21.6.D) | ~5 min | `refresh_lock` | extend advance `expires_at` **in place** (UPDATE only), guarded on `status='requested' AND responded_at IS NULL AND booking_class='advance' AND urgency_escalated_at IS NULL` |
+| `escalate_urgency_on_threshold` (§21.6.E) | ~2 min | `urgency_lock` | advance booking crossing `instant_lead_hours` → one-shot `UPDATE … WHERE urgency_escalated_at IS NULL`, shorten offers to instant TTL, high-priority `offer_instant` FCM |
+| `rm_escalation_scan` (§21.6.F) | ~15 min | `rm_lock` | idempotent RM alerts via `rm_escalated_no_accept_at` (long-lead no-accept) + `rm_escalated_t24_at` (approaching slot; covers 4h–48h mid-lead band) |
+
+The `slot − advance_dispatch_fail_hours` (3h) automated `failed_no_pujari` + full refund backstop
+(broadcast step 6) is unchanged — RM escalation buys a human runway *before* it fires, not instead.
 
 ## Seed-data contract (deployment gate)
 
@@ -520,3 +656,17 @@ v2 launch gate — the following MUST be tested the same way before go-live:
   the stuck row resolves.
 - Manual reassign: clear-then-insert flow succeeds end to end; a direct
   accepted-insert against a still-assigned booking is rejected by Guard 3.
+
+Dispatch v2 (§21.6.A–H) launch gate — additional concurrent-transaction tests:
+- Sibling supersede: one pujari accepts an advance booking broadcast to N pujaris; the other
+  N−1 live offers flip to 'superseded' with `responded_at` set in the SAME transaction — none
+  remain in `ux_booking_assignments_one_live` / `ix_booking_assignments_sweep`.
+- `refresh_advance_offers` extending `expires_at` while a pujari accepts the SAME row: accept
+  wins (trigger 3 supersede); the refresh UPDATE either no-ops (row now resolved) or is overwritten
+  — no phantom live offer survives.
+- Urgency-flip idempotency: two `escalate_urgency_on_threshold` ticks on the same booking →
+  exactly one fires the FCM (`UPDATE … WHERE urgency_escalated_at IS NULL` = 0 rows on the second).
+- `duration_minutes > 0` gate: two pujaris accept overlapping-window offers → exactly one wins,
+  the other gets `exclusion_violation` (409) on `ex_bookings_pujari_no_overlap`.
+- Night gate: `POST /v1/bookings` for a 00:00–05:59 slot → 422 before any Razorpay order
+  (instant → `INSTANT_NIGHT_BLOCKED`; advance at launch → `NIGHT_BOOKINGS_DISABLED`).

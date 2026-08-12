@@ -42,6 +42,10 @@ celery_app = Celery(
         "app.workers.dispatch",
         "app.workers.refund",
         "app.workers.notifications",
+        "app.workers.advance_offers",
+        "app.workers.urgency_flip",
+        "app.workers.rm_escalation",
+        "app.workers.panchangam",
     ],
 )
 
@@ -57,19 +61,43 @@ celery_app.conf.update(
     task_default_queue="sweep",
     task_routes={
         "app.workers.sweep.*": {"queue": "sweep"},
+        "app.workers.advance_offers.*": {"queue": "sweep"},
+        "app.workers.urgency_flip.*": {"queue": "sweep"},
+        "app.workers.rm_escalation.*": {"queue": "sweep"},
         "app.workers.dispatch.*": {"queue": "dispatch"},
         "app.workers.refund.*": {"queue": "refund"},
         "app.workers.notifications.*": {"queue": "notifications"},
+        "app.workers.panchangam.*": {"queue": "sweep"},
     },
     beat_schedule={
         "sweep-every-30s": {
             "task": "app.workers.sweep.sweep_task",
             "schedule": 30.0,
         },
+        "refresh-advance-offers-every-5m": {
+            "task": "app.workers.advance_offers.refresh_advance_offers_task",
+            "schedule": 300.0,
+            "options": {"queue": "sweep"},
+        },
+        "escalate-urgency-every-2m": {
+            "task": "app.workers.urgency_flip.escalate_urgency_on_threshold_task",
+            "schedule": 120.0,
+            "options": {"queue": "sweep"},
+        },
+        "rm-escalation-scan-every-15m": {
+            "task": "app.workers.rm_escalation.rm_escalation_scan_task",
+            "schedule": 900.0,
+            "options": {"queue": "sweep"},
+        },
         "process-refunds-every-60s": {
             "task": "app.workers.refund.process_refunds",
             "schedule": 60.0,
             "options": {"queue": "refund"},
+        },
+        "refresh-panchangam-daily": {
+            "task": "app.workers.panchangam.refresh_panchangam_cache_task",
+            "schedule": 3600.0,
+            "options": {"queue": "sweep"},
         },
     },
 )

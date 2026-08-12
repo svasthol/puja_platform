@@ -5,6 +5,7 @@ import datetime as dt
 import uuid
 from decimal import Decimal
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status as http
 from fastapi.responses import ORJSONResponse
 from sqlalchemy import select, text
@@ -22,27 +23,44 @@ from app.schemas.booking import (
     BookingCreateResponse,
     CheckoutQuote,
     DispatchChoice,
+    GateWarning,
     QuotePaymentOption,
     SlotHoldRequest,
     SlotHoldResponse,
 )
 from app.schemas.common import decode_cursor, encode_cursor
 from app.services import booking_service, cancellation_service
+from app.services.razorpay_client import RazorpayError
+from app.services.booking_gate import (
+    evaluate_booking_gate,
+    gate_warning_payload,
+    load_booking_gate_settings,
+    night_gate_error_code,
+)
+from app.services.launch_policy import DIRECT_BOOKING_ENABLED, reject_direct_booking
+from app.services.relationship_manager import fetch_rm_public, status_exposes_rm
 from app.services.status import status_id
 
 router = APIRouter(tags=["bookings"])
+log = structlog.get_logger()
 
 
 @router.get("/checkout/quote", response_model=CheckoutQuote)
 async def checkout_quote(
     puja_id: uuid.UUID,
+    pujari_id: uuid.UUID | None = None,
     addon_ids: list[uuid.UUID] = Query(default_factory=list),
     _p: Principal = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
+    if pujari_id is not None:
+        reject_direct_booking()
+    from app.services.pricing_resolver import resolve_puja_unit_price
+
     puja = (await db.execute(select(Puja).where(Puja.id == puja_id))).scalar_one_or_none()
     if puja is None or not puja.is_active:
         raise HTTPException(http.HTTP_404_NOT_FOUND, "Puja not found.")
+    unit_price = await resolve_puja_unit_price(db, puja_id, pujari_id)
     addon_total = Decimal("0")
     if addon_ids:
         prices = (
@@ -53,7 +71,7 @@ async def checkout_quote(
             )
         ).scalars().all()
         addon_total = sum((Decimal(str(p)) for p in prices), Decimal("0"))
-    total = Decimal(str(puja.default_price)) + addon_total
+    total = unit_price + addon_total
 
     setting = (
         await db.execute(
@@ -84,11 +102,13 @@ async def create_slot_hold(
     p: Principal = Depends(require_customer),
     db: AsyncSession = Depends(get_db_txn),
 ):
+    if payload.pujari_id is not None:
+        reject_direct_booking()
     now = dt.datetime.now(dt.UTC)
     hold = SlotHold(
         id=uuid.uuid4(),
         user_id=p.user_id,
-        pujari_id=payload.pujari_id,
+        pujari_id=None,
         slot_date=payload.date,
         slot_time=payload.time,
         held_at=now,
@@ -97,8 +117,22 @@ async def create_slot_hold(
     )
     db.add(hold)
     await db.flush()  # ux_slot_holds_active -> 409 via shared handler if taken
+    gate_settings = await load_booking_gate_settings(db)
+    gate = evaluate_booking_gate(payload.date, payload.time, gate_settings, now=now)
+    warnings: list[GateWarning] = []
+    code = night_gate_error_code(
+        gate.booking_class, gate.is_night, gate_settings.night_bookings_enabled
+    )
+    if code is not None:
+        payload_dict = gate_warning_payload(code)
+        warnings.append(GateWarning(**payload_dict))
     return SlotHoldResponse(
-        hold_id=hold.id, expires_at=hold.expires_at, pujari_id=hold.pujari_id, server_time=now
+        hold_id=hold.id,
+        expires_at=hold.expires_at,
+        pujari_id=hold.pujari_id,
+        server_time=now,
+        advisory_booking_class=gate.booking_class,
+        gate_warnings=warnings,
     )
 
 
@@ -116,6 +150,12 @@ async def create_booking(
             status_code=http.HTTP_409_CONFLICT,
             content=dup.response.model_dump(mode="json"),
         )
+    except RazorpayError as exc:
+        log.error("booking_razorpay_order_failed", error=str(exc))
+        raise HTTPException(
+            http.HTTP_503_SERVICE_UNAVAILABLE,
+            "Payment gateway is temporarily unavailable. Please try again.",
+        ) from exc
 
 
 @router.post("/bookings/{booking_id}/cancel")
@@ -149,12 +189,15 @@ async def list_bookings(
     rows = (
         await db.execute(
             text(
-                "SELECT b.id, st.code AS status, pj.name AS puja_name, "
+                "SELECT b.id, st.code AS status, b.booking_class, pj.name AS puja_name, "
                 "b.scheduled_date, b.scheduled_time, b.payment_mode, b.total_amount, "
-                "b.amount_due_online, b.amount_due_offline, b.pujari_id, b.created_at "
+                "b.amount_due_online, b.amount_due_offline, b.pujari_id, "
+                "pu.full_name AS pujari_name, b.created_at "
                 "FROM bookings b "
                 "JOIN status_types st ON st.id = b.status_id "
                 "JOIN pujas pj ON pj.id = b.puja_id "
+                "LEFT JOIN pujaris pr ON pr.id = b.pujari_id "
+                "LEFT JOIN users pu ON pu.id = pr.user_id "
                 "WHERE b.user_id = :uid "
                 + cursor_pred
                 + "ORDER BY b.created_at DESC, b.id DESC LIMIT :lim"
@@ -180,10 +223,11 @@ async def get_booking(
     row = (
         await db.execute(
             text(
-                "SELECT b.id, st.code AS status, b.payment_mode, b.total_amount, "
+                "SELECT b.id, st.code AS status, b.booking_class, b.payment_mode, b.total_amount, "
                 "b.amount_due_online, b.amount_due_offline, b.balance_collected_at, "
                 "b.pujari_id, b.user_id, b.dispatch_mode, b.scheduled_date, "
                 "b.scheduled_time, b.duration_minutes, b.created_at, b.cancelled_at, "
+                "b.razorpay_order_id, "
                 "pj.name AS puja_name, "
                 "a.line1 AS address_line1, a.city AS address_city "
                 "FROM bookings b "
@@ -238,6 +282,12 @@ async def get_booking(
     ).mappings().first()
     detail["refund"] = dict(refund) if refund else None
 
+    if status_exposes_rm(row["status"]):
+        rm = await fetch_rm_public(db, booking_id)
+        detail["relationship_manager"] = rm.model_dump() if rm else None
+    else:
+        detail["relationship_manager"] = None
+
     return detail
 
 
@@ -248,7 +298,20 @@ async def dispatch_choice(
     p: Principal = Depends(require_customer),
     db: AsyncSession = Depends(get_db_txn),
 ):
-    # answers "your chosen pujari is unavailable": broadcast or cancel
+    if not DIRECT_BOOKING_ENABLED:
+        reject_direct_booking()
+    return await _dispatch_choice_enabled(
+        booking_id, payload, p, db
+    )
+
+
+async def _dispatch_choice_enabled(
+    booking_id: uuid.UUID,
+    payload: DispatchChoice,
+    p: Principal,
+    db: AsyncSession,
+):
+    """Phase 2 direct-booking fallback — broadcast or cancel when intended pujari unavailable."""
     row = (
         await db.execute(
             text("SELECT user_id, dispatch_mode FROM bookings WHERE id = :bid FOR UPDATE"),

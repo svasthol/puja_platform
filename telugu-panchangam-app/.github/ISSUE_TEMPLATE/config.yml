@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security vulnerability
+    url: https://github.com/suhasatluri/telugu-panchangam-app/security/policy
+    about: Please report security issues privately, see SECURITY.md
+  - name: 💬 General question
+    url: https://github.com/suhasatluri/telugu-panchangam-app/discussions
+    about: Use Discussions for usage questions, ideas, and community chat

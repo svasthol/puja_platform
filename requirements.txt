@@ -40,11 +40,15 @@ click-plugins==1.1.1.2
     # via celery
 click-repl==0.3.0
     # via celery
+cffi==1.17.1
+    # via cryptography
 colorama==0.4.6
     # via
     #   click
     #   typer
     #   uvicorn
+cryptography==44.0.0
+    # via puja-platform (pyproject.toml)
 detect-installer==0.1.0
     # via fastapi-cloud-cli
 dnspython==2.8.0
@@ -105,6 +109,8 @@ packaging==26.2
     # via kombu
 prompt-toolkit==3.0.52
     # via click-repl
+pycparser==2.22
+    # via cffi
 psycopg==3.2.13
     # via puja-platform (pyproject.toml)
 psycopg-binary==3.2.13

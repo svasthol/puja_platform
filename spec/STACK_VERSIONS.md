@@ -33,7 +33,7 @@ Every choice is justified. Cursor reads this before suggesting upgrades.
 |---|---|---|
 | `sqlalchemy` | **2.0.44** | Latest 2.0.x. 2.1 is in alpha — skip. Use 2.0 API throughout (`select()`, `Session`, mapped columns). Do NOT use legacy `Query` API. |
 | `alembic` | **1.16.1** | Latest. Compatible with SQLAlchemy 2.0.x. |
-| `psycopg[binary,pool]` | **3.2.9** | **psycopg3**, NOT psycopg2. Async-native (`AsyncConnection`), PgBouncer transaction-mode compatible, official SQLAlchemy 2.0 async support. `[binary]` = C extensions (faster). `[pool]` = `ConnectionPool` class used by the app. |
+| `psycopg[binary,pool]` | **3.2.13** | **psycopg3**, NOT psycopg2. Pin matches `pyproject.toml`. Async-native, PgBouncer transaction-mode compatible. |
 
 > **Why psycopg3 not psycopg2?**
 > psycopg2 is synchronous-only and has no native async support. The app uses
@@ -66,7 +66,7 @@ Every choice is justified. Cursor reads this before suggesting upgrades.
 
 | Package | Pinned | Why |
 |---|---|---|
-| `httpx` | **0.28.1** | Async HTTP for Razorpay API, FCM, MSG91. Same interface as requests but fully async. Used by FastAPI's `TestClient`. |
+| `httpx` | **0.28.1** | Async HTTP for Razorpay API, FCM, FAST2SMS, MSG91 (via `sms_router`). Same interface as requests but fully async. Used by FastAPI's `TestClient`. |
 
 ---
 
@@ -91,19 +91,89 @@ Every choice is justified. Cursor reads this before suggesting upgrades.
 
 ---
 
-## Flutter (mobile apps) — for reference
+## Flutter (mobile apps)
 
-| Component | Version | Notes |
-|---|---|---|
-| Flutter SDK | **3.32.x** (stable) | Dart 3.8 included |
-| Dart | **3.8.x** | — |
-| `dio` | **5.7.0** | HTTP client with interceptors (auth token refresh) |
-| `flutter_riverpod` | **2.6.1** | State management |
-| `go_router` | **14.6.1** | Navigation |
-| `firebase_messaging` | **15.2.4** | FCM push |
-| `google_maps_flutter` | **2.9.0** | Maps |
-| `web_socket_channel` | **3.0.1** | Native WebSocket client. Server is FastAPI **native** WS, NOT Socket.IO. Connect with `wss://.../v1/ws/bookings/{id}?ticket=<single-use>`. Do NOT use `socket_io_client`. |
-| `flutter_secure_storage` | **9.2.4** | Token storage |
+**Implementation contract:** [`MOBILE_FLUTTER.md`](./MOBILE_FLUTTER.md) · Firebase IDs: [`MOBILE_FIREBASE.md`](./MOBILE_FIREBASE.md)
+
+**Authority:** `mana_guruji_mobile/pubspec.lock` (packages), `mana_guruji_mobile/.fvm/fvm_config.json` (Flutter SDK).
+Human tables below are derived from the machine block. Enforced by `mana_guruji_mobile/tool/check_stack_versions_sync.py`.
+
+<!-- stack-check:
+flutter_sdk: 3.44.8
+packages:
+  dio: 5.11.0
+  flutter_riverpod: 2.6.1
+  go_router: 14.8.1
+  firebase_core: 3.15.2
+  firebase_messaging: 15.2.10
+  flutter_secure_storage: 9.2.4
+  web_socket_channel: 3.0.3
+  google_fonts: 6.3.3
+  url_launcher: 6.3.2
+-->
+
+### Layer A — Runtimes (mobile + toolchain)
+
+| Layer | Pinned | Min | Max tested | Notes |
+|-------|--------|-----|------------|-------|
+| Flutter SDK | **3.44.8** (`.fvm/fvm_config.json`) | 3.38.4 | 3.44.8 | `fvm use` optional |
+| Dart | **3.12.2** (bundled) | 3.11 | 3.12 | `pubspec.yaml` still `^3.8.0` — STACK-UPGRADE |
+| JDK (Android) | 17 target | 17 | 21 | Studio JBR 21 OK |
+| Android minSdk | 24 | 24 | — | Flutter 3.44 default |
+| Android compile/targetSdk | 36 | 36 | — | |
+| Android Gradle Plugin | 9.0.1 | — | 9.0.1 | `settings.gradle.kts` |
+| Gradle | 9.1.0 | — | 9.1.0 | |
+| Kotlin | 2.3.20 | — | 2.3.20 | |
+| iOS deployment | **13.0** (current) | 13 | — | STACK-UPGRADE: raise to 15 |
+
+### Layer B — Flutter packages (lockfile authoritative)
+
+| Package | pubspec constraint | Lockfile resolved |
+|---------|-------------------|-------------------|
+| `dio` | ^5.7.0 | **5.11.0** |
+| `flutter_riverpod` | ^2.6.1 | **2.6.1** |
+| `go_router` | ^14.6.1 | **14.8.1** |
+| `firebase_core` | ^3.12.1 | **3.15.2** |
+| `firebase_messaging` | ^15.2.4 | **15.2.10** |
+| `flutter_secure_storage` | ^9.2.4 | **9.2.4** |
+| `web_socket_channel` | ^3.0.1 | **3.0.3** |
+| `google_fonts` | ^6.2.1 | **6.3.3** |
+| `url_launcher` | ^6.3.1 | **6.3.2** |
+
+### PLANNED (not in pubspec yet)
+
+| Package | When |
+|---------|------|
+| `google_maps_flutter` | Phase B booking-detail maps slice |
+
+`web_socket_channel`: native WebSocket only — **not** `socket_io_client`. Server is FastAPI native WS + `POST /v1/ws-tickets`.
+
+### Layer C — Cross-stack integration
+
+| Integration | Client | Server | Forbidden |
+|-------------|--------|--------|-----------|
+| REST | Dio + generated client | FastAPI OpenAPI | Hand-written DTOs; Socket.IO |
+| Auth | `flutter_secure_storage` | PyJWT 2.10 | `python-jose`; token in URL |
+| Push | `firebase_messaging` | `fcm_client.py` HTTP v1 | Legacy FCM server key |
+| Realtime | `web_socket_channel` | FastAPI native WS | `socket_io_client` |
+| Payments | Razorpay Flutter SDK | Webhooks | **PLANNED Phase 3** |
+
+### Layer D — Production gates (mobile)
+
+| Gate | Status |
+|------|--------|
+| OpenAPI drift | `python tool/check_openapi_sync.py` |
+| Stack doc drift | `python tool/check_stack_versions_sync.py` |
+| Release Android signing | Debug keystore — prod task |
+| iOS Firebase + APNs | Not registered — `MOBILE_FIREBASE.md` |
+
+### Known doc drift (STACK-UPGRADE — do not fix silently)
+
+| Item | Documented | Reality |
+|------|------------|---------|
+| `pubspec.yaml` SDK | `^3.8.0` | lockfile needs `>=3.11.0` |
+| iOS floor | 13 in project | Recommend 15 |
+| Release signing | debug | Play Store blocker |
 
 ---
 
@@ -128,6 +198,9 @@ Every choice is justified. Cursor reads this before suggesting upgrades.
 5. **Pydantic models use v2 syntax** — `model_config = ConfigDict(...)`, not inner `class Config`.
 6. **Do not pin Starlette separately** — FastAPI pins the compatible version.
 7. **Do not upgrade to SQLAlchemy 2.1** until it is marked stable on pypi.
+8. **Mobile contract:** on any `API_CONTRACTS.md` change, re-export `spec/openapi.json`
+   (`DEBUG=true` → `GET /openapi.json`) for Flutter codegen; run `mana_guruji_mobile/tool/check_openapi_sync.py`.
+9. **Stack doc:** after `flutter pub get` or FVM change, run `mana_guruji_mobile/tool/check_stack_versions_sync.py`.
 
 ---
 

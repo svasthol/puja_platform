@@ -8,7 +8,7 @@ customer-app token calling a pujari endpoint -> 403."
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import jwt
 import structlog
@@ -20,16 +20,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.redis_client import redis_getdel
 from app.core.security import decode_token
 from app.db.engine import get_db
-from app.models.identity import User
+from app.models.identity import User, UserRole
+from app.models.lookups import Role
 
 log = structlog.get_logger()
+
+ADMIN_ROLES = ("admin", "support")
 
 
 @dataclass
 class Principal:
     user_id: uuid.UUID
     app_context: str  # 'customer' | 'pujari' | 'admin'
-    roles: tuple[str, ...] = ()
+    roles: tuple[str, ...] = field(default_factory=tuple)
+
+    def has_role(self, *names: str) -> bool:
+        return any(r in self.roles for r in names)
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -72,7 +78,29 @@ async def get_principal(
         log.warning("auth_failed", reason="user_inactive_or_unknown", user_id=str(user_id))
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User inactive or unknown")
 
-    return Principal(user_id=user_id, app_context=app_context)
+    # P-ADMIN-ROLE: load roles ONLY for admin-context tokens. A global lookup
+    # would add a join to every customer/pujari request AND — since neither has
+    # user_roles rows — is simply unnecessary. An admin token whose roles were
+    # revoked after issuance is rejected here, so revocation takes effect within
+    # one access-token lifetime (≤ 30 min) without waiting for refresh.
+    roles: tuple[str, ...] = ()
+    if app_context == "admin":
+        rows = (
+            await db.execute(
+                select(Role.name)
+                .join(UserRole, UserRole.role_id == Role.id)
+                .where(UserRole.user_id == user_id)
+            )
+        ).scalars().all()
+        roles = tuple(rows)
+        if not any(r in ADMIN_ROLES for r in roles):
+            log.warning("auth_failed", reason="admin_token_without_role", user_id=str(user_id))
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Admin access revoked. Contact an administrator.",
+            )
+
+    return Principal(user_id=user_id, app_context=app_context, roles=roles)
 
 
 def require_context(*allowed: str):
@@ -100,6 +128,35 @@ def require_context(*allowed: str):
 require_customer = require_context("customer")
 require_pujari = require_context("pujari")
 require_admin = require_context("admin")
+require_customer_or_pujari = require_context("customer", "pujari")
+
+
+def require_roles(*allowed: str):
+    """Dependency factory for role-gated admin actions (RBAC matrix, ADMIN.md).
+
+    Assumes app_context=admin already (roles are only loaded there). Use for
+    admin-only actions like role assignment / catalogue writes that `support`
+    must not perform. Layer on top of require_admin at the router.
+    """
+
+    async def _dep(principal: Principal = Depends(require_admin)) -> Principal:
+        if not principal.has_role(*allowed):
+            log.warning(
+                "auth_role_denied",
+                required=list(allowed),
+                actual=list(principal.roles),
+                user_id=str(principal.user_id),
+            )
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"This action requires role in {allowed}.",
+            )
+        return principal
+
+    return _dep
+
+
+require_admin_role = require_roles("admin")  # strictly 'admin', not 'support'
 
 
 # ---- WebSocket ticket auth (single-use Redis GETDEL) ----------------------

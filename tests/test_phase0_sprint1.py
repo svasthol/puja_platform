@@ -167,8 +167,9 @@ async def test_fresh_rebroadcast_resets_round_to_one(session, seed, uniq):
     )
     await session.execute(
         text(
-            "INSERT INTO booking_dispatch_state (booking_id, round, radius_km, max_rounds) "
-            "VALUES (:bid, 3, 10.0, 4)"
+            "INSERT INTO booking_dispatch_state "
+            "(booking_id, round, radius_km, max_rounds, dispatch_starts_at, dispatch_deadline) "
+            "VALUES (:bid, 3, 10.0, 4, now() - interval '1 minute', now() + interval '30 minutes')"
         ),
         {"bid": bid},
     )

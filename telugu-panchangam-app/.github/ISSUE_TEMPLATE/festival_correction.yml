@@ -1,0 +1,70 @@
+name: 📅 Festival / Panchangam correction
+description: A festival date, Tithi, or other Panchangam value looks wrong.
+title: "[Correction] "
+labels: ["correction", "accuracy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Festival accuracy is the most important form of contribution.
+
+        Different publishers sometimes give different dates — there are
+        legitimate regional variations. We use **Venkatrama & Co. (Eluru)**
+        as our primary reference for AP/Telangana conventions. If your
+        correction matches Venkatrama, that's the fastest path to a fix.
+  - type: input
+    id: date
+    attributes:
+      label: Date the app shows
+      description: The date the app currently displays (YYYY-MM-DD).
+      placeholder: "2026-04-02"
+    validations:
+      required: true
+  - type: input
+    id: city
+    attributes:
+      label: City selected in the app
+      placeholder: "Hyderabad, Vijayawada, Melbourne, ..."
+    validations:
+      required: true
+  - type: input
+    id: festival
+    attributes:
+      label: Festival or Panchangam value in question
+      placeholder: "Hanuman Jayanti, Vaikunta Ekadashi, Tithi at sunrise, Rahukalam, ..."
+    validations:
+      required: true
+  - type: textarea
+    id: app_value
+    attributes:
+      label: What does the app show?
+      placeholder: "App says Hanuman Jayanti is on 12 May 2026."
+    validations:
+      required: true
+  - type: textarea
+    id: correct_value
+    attributes:
+      label: What do you believe is correct?
+      placeholder: "Should be 11 May 2026."
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Reference source
+      description: Which printed calendar or trusted Panchangam are you using?
+      placeholder: "Venkatrama 2026, Eenadu calendar, family tradition, ..."
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Anything else? Screenshots of the printed calendar are very helpful.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow this project's [Code of Conduct](../CODE_OF_CONDUCT.md)
+          required: true

@@ -1,0 +1,31 @@
+date,vaaram_te,tithi_te,nakshatram_te,tithi_number,nakshatra_number,vara_number,is_transition,rahu_start,rahu_end,yama_start,yama_end,sunrise,sunset,notes
+2026-07-01,బుధవారం,పాడ్యమి (Pratipada),పూర్వాషాఢ (Purva Ashadha),16,20,3,N,12:20,13:59,09:03,10:42,05:46,18:55,Drikpanchang
+2026-07-02,గురువారం,విదియ (Dwitiya),ఉత్తరాషాఢ (Uttara Ashadha),17,21,4,Y,13:59,15:38,07:25,09:03,05:46,18:55,Venkatrama (Likely transition day: Dwitiya ends near sunrise)
+2026-07-03,శుక్రవారం,తదియ (Tritiya),శ్రవణం (Shravana),18,22,5,N,09:04,10:42,13:59,15:38,05:46,18:55,Drikpanchang
+2026-07-04,శనివారం,చవితి (Chaturthi),ధనిష్ఠ (Dhanishta),19,23,6,N,05:47,07:25,15:38,17:17,05:47,18:55,Drikpanchang
+2026-07-05,ఆదివారం,పంచమి (Panchami),శతభిషం (Shatabhisha),20,24,0,N,17:17,18:55,05:47,07:26,05:47,18:55,Drikpanchang
+2026-07-06,సోమవారం,షష్ఠి (Shashthi),పూర్వాభాద్ర (Purva Bhadrapada),21,25,1,N,07:26,09:04,12:21,14:00,05:47,18:55,Drikpanchang
+2026-07-07,మంగళవారం,సప్తమి (Saptami),ఉత్తరాభాద్ర (Uttara Bhadrapada),22,26,2,N,15:38,17:17,10:43,12:21,05:48,18:55,Drikpanchang
+2026-07-08,బుధవారం,అష్టమి (Ashtami),రేవతి (Revati),23,27,3,N,12:22,14:00,09:05,10:43,05:48,18:55,Drikpanchang
+2026-07-09,గురువారం,నవమి (Navami),అశ్విని (Ashwini),24,1,4,N,14:00,15:39,07:27,09:05,05:48,18:55,Drikpanchang
+2026-07-10,శుక్రవారం,దశమి (Dashami),భరణి (Bharani),25,2,5,N,09:05,10:44,14:00,15:39,05:49,18:55,Drikpanchang
+2026-07-11,శనివారం,ఏకాదశి (Ekadashi),కృత్తిక (Krittika),27,3,6,N,05:49,07:27,15:39,17:17,05:49,18:55,Drikpanchang
+2026-07-12,ఆదివారం,ద్వాదశి (Dwadashi),రోహిణి (Rohini),28,4,0,N,17:17,18:55,05:49,07:28,05:49,18:55,Drikpanchang
+2026-07-13,సోమవారం,త్రయోదశి (Trayodashi),మృగశిర (Mrigashirsha),29,6,1,N,07:28,09:06,12:22,14:01,05:50,18:55,Drikpanchang
+2026-07-14,మంగళవారం,అమావాస్య (Amavasya),పునర్వసు (Punarvasu),30,7,2,Y,15:39,17:17,10:44,12:22,05:50,18:55,Corrected tithi/nak (engine Lahiri); transition day
+2026-07-15,బుధవారం,పాడ్యమి (Pratipada),పుష్యమి (Pushya),1,8,3,Y,12:23,14:01,09:06,10:44,05:50,18:55,Corrected — Shukla Pratipada at sunrise (was Amavasya)
+2026-07-16,గురువారం,విదియ (Dwitiya),ఆశ్లేష (Ashlesha),2,9,4,N,14:01,15:39,07:29,09:07,05:51,18:55,Corrected cascade from Jul 15 fix
+2026-07-17,శుక్రవారం,తదియ (Tritiya),మఖ (Magha),3,10,5,N,09:07,10:45,14:01,15:39,05:51,18:55,Corrected cascade from Jul 15 fix
+2026-07-18,శనివారం,పంచమి (Panchami),పుబ్బ (Purva Phalguni),5,11,6,N,05:51,07:29,15:39,17:16,05:51,18:54,Corrected tithi/nak (engine Lahiri)
+2026-07-19,ఆదివారం,షష్టి (Shashthi),ఉత్తర (Uttara Phalguni),6,12,0,Y,17:16,18:54,05:52,07:29,05:52,18:54,Corrected — Shashthi at sunrise (transition near Jul 20 AM)
+2026-07-20,సోమవారం,సప్తమి (Saptami),హస్త (Hasta),7,13,1,N,07:30,09:07,12:23,14:01,05:52,18:54,Corrected tithi/nak (engine Lahiri)
+2026-07-21,మంగళవారం,షష్ఠి (Shashthi),హస్త (Hasta),8,14,2,N,15:38,17:16,10:45,12:23,05:52,18:54,Drikpanchang
+2026-07-22,బుధవారం,సప్తమి (Saptami),చిత్త (Chitra),9,15,3,N,12:23,14:01,09:08,10:45,05:53,18:54,Drikpanchang
+2026-07-23,గురువారం,అష్టమి (Ashtami),స్వాతి (Swati),9,16,4,N,14:01,15:38,07:31,09:08,05:53,18:53,Drikpanchang
+2026-07-24,శుక్రవారం,నవమి (Navami),విశాఖ (Vishakha),10,17,5,N,09:08,10:46,14:01,15:38,05:53,18:53,Venkatrama
+2026-07-25,శనివారం,దశమి (Dashami),అనూరాధ (Anuradha),11,18,6,N,05:54,07:31,15:38,17:15,05:54,18:53,Drikpanchang
+2026-07-26,ఆదివారం,ఏకాదశి (Ekadashi),జ్యేష్ఠ (Jyeshtha),12,18,0,N,17:15,18:52,05:54,07:31,05:54,18:52,Venkatrama
+2026-07-27,సోమవారం,ద్వాదశి (Dwadashi),మూల (Mula),13,19,1,N,07:32,09:09,12:23,14:00,05:54,18:52,Drikpanchang
+2026-07-28,మంగళవారం,త్రయోదశి (Trayodashi),పూర్వాషాఢ (Purva Ashadha),14,20,2,N,15:38,17:15,10:46,12:23,05:55,18:52,Drikpanchang
+2026-07-29,బుధవారం,చతుర్దశి (Chaturdashi),ఉత్తరాషాఢ (Uttara Ashadha),15,21,3,N,12:23,14:00,09:09,10:46,05:55,18:51,Drikpanchang
+2026-07-30,గురువారం,పాడ్యమి (Pratipada),శ్రవణం (Shravana),16,22,4,N,14:00,15:37,07:32,09:09,05:55,18:51,Corrected nak+yama (engine Lahiri Udaya; was Uttara Ashadha from Purnima row)

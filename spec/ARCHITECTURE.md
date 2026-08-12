@@ -5,11 +5,13 @@ and perform them. One shared backend, two mobile apps, one admin panel. Single
 city at launch; multi-city is a data change (`service_areas`), not a code change.
 
 v2 closes the gaps found in architecture review: unpaid-booking lifecycle,
-refund state machine, dispatch rounds with geo radius, Redis-TTL presence,
+refund state machine, dispatch rounds with geo radius (Phase 2), Redis-TTL presence,
 WebSocket ticket auth, and hard multi-instance gates. **v3 adds dual payment
 models** (`full_online` | `advance_balance`). **v3.1 adds idempotent checkout**
 (`bookings.razorpay_order_id` + SAVEPOINT duplicate handling on
-`POST /v1/bookings`). DISPATCH_FLOW.md is the behavioural source of truth;
+`POST /v1/bookings`). **Puja MVP launch (July 2026):** broadcast-only, citywide
+dispatch without pujari GPS, RM mediator — `spec/plans/LAUNCH_POLICY.md`,
+`SPEC_AMENDMENTS.md` §21. DISPATCH_FLOW.md is the behavioural source of truth;
 DATABASE.md carries migrations 002, 003, and 004 DDL.
 
 ## Stack (final)
@@ -18,7 +20,9 @@ DATABASE.md carries migrations 002, 003, and 004 DDL.
 |---|---|---|
 | Customer app | Flutter | Same codebase as pujari app, separate build flavor |
 | Pujari app | Flutter | Build flavor of the same codebase |
-| Admin panel | Next.js + TypeScript | Internal only |
+| Mobile API contract | `spec/openapi.json` + `API_CONTRACTS.md` v3.4 | Flutter codegen via `openapi_generator`; §23 |
+| Mobile Firebase IDs | `spec/MOBILE_FIREBASE.md` | Package names, Firebase project, FCM setup — **read before Flutter create** |
+| Admin panel | Next.js + TypeScript | Internal ops control plane — catalogue, supply, bookings, RBAC (`SPEC_AMENDMENTS.md` §19). Phase 4 ≠ go-live. |
 | Backend API | FastAPI | Python 3.12 |
 | ORM / migrations | SQLAlchemy 2.0 + Alembic | See DATABASE.md — the SQL files are the source of truth, not the ORM |
 | Database | PostgreSQL 16 | Extensions REQUIRED: `pgcrypto`, `btree_gist`, `postgis` (dispatch radius queries use `ST_DWithin`; see migration 002) |
@@ -27,12 +31,12 @@ DATABASE.md carries migrations 002, 003, and 004 DDL.
 | Async jobs | Celery + Celery Beat, **broker = Redis** (deliberate single-dependency choice, see below) | Workers: sweep (30s), dispatch, refund, notifications, payouts, reconciliation (daily) |
 | Realtime | WebSockets (FastAPI native) | ALL fan-out via Redis pub/sub channels from day one — see rule 6 |
 | Push | Firebase Cloud Messaging | Best-effort only; `GET /v1/offers` polling is the delivery safety net — see DISPATCH_FLOW.md |
-| SMS / OTP | MSG91 (or Exotel) | OTPs stored hashed (`otp_verifications.otp_hash`), never raw; SMS is also the push-failure fallback for direct offers |
+| SMS / OTP | **Multi-provider failover** — FAST2SMS (primary at launch) + MSG91 (secondary; held until DLT) | `sms_router` tries `SMS_PROVIDER_ORDER` left→right; OTPs stored hashed (`otp_hash`), never raw; SMS is push-failure fallback for direct offers. **Not** the MSG91 OTP Widget (`widgetId`/`tokenAuth`) — server uses SendOTP REST + FAST2SMS Dev API only. See SPEC_AMENDMENTS §17. |
 | Payments | Razorpay | Orders + webhooks + refunds API; webhook signature verification is a MUST; `payments.idempotency_key` dedupes retries |
 | Storage | S3-compatible (R2/MinIO) | KYC docs in a PRIVATE bucket, SSE enabled, signed URLs only |
 | Maps | Google Maps Platform | |
 | Reverse proxy | Nginx or Caddy | TLS + WebSocket proxying |
-| Monitoring | Prometheus + Grafana + Sentry | Alert on: `refunds.status='failed_permanent'`, dispatch exhaustion rate, webhook signature failures, **stuck `payment_pending` past hold+grace**, **stuck `confirmed` past scheduled_time+90min without start**, refunds pending high `attempt_count` (v3.2) |
+| Monitoring | Prometheus + Grafana + Sentry | Alert on: `refunds.status='failed_permanent'`, dispatch exhaustion rate, webhook signature failures, **stuck `payment_pending` past hold+grace**, **stuck `confirmed` past scheduled_time+90min without start**, refunds pending high `attempt_count` (v3.2). **Full policy:** [`OBSERVABILITY.md`](./OBSERVABILITY.md) |
 | Secrets | AWS SSM Parameter Store / Doppler (env injection) | Never `.env` in repo. Razorpay keys + KYC bucket keys: rotation owner assigned, quarterly cadence |
 
 ## System layout
@@ -49,7 +53,7 @@ DATABASE.md carries migrations 002, 003, and 004 DDL.
          |               |            notifications / payouts / reconcile(daily)
          |          [PgBouncer]
          |               |
-   [PostgreSQL 16 + PostGIS]   [S3 private bucket]   [Razorpay / FCM / MSG91 / Maps]
+   [PostgreSQL 16 + PostGIS]   [S3 private bucket]   [Razorpay / FCM / FAST2SMS / MSG91 / Maps]
 ```
 
 ## Non-negotiable design rules
@@ -67,15 +71,15 @@ DATABASE.md carries migrations 002, 003, and 004 DDL.
    (`otp_hash`, `refresh_token_hash UNIQUE`). KYC document URLs point to a
    private bucket; API returns short-lived signed URLs. WS auth uses
    single-use Redis tickets — bearer tokens NEVER appear in URLs or logs.
-4. **Money math is trigger-computed, money movement is a state machine.**
-   `payment_splits.net_pujari_amount` is written by a DB trigger on the
-   **platform-captured amount only** (`amount_due_online`). Two payment
-   models coexist: `full_online` (100% via Razorpay) and `advance_balance`
-   (configurable advance via Razorpay — `platform_settings.advance_booking_amount`,
-   admin-tunable without redeploy — + rest collected directly by pujari, never
-   through the platform). Refunds are capped at `amount_due_online`. Every
-   refund is a `refunds` row with retry state — Razorpay is NEVER called
-   inline in a request handler.
+4. **Money math is trigger-computed; tax config is snapshotted; money movement is a state machine.**
+   Platform fee GST is on **supply #3** (`platform_fee_gross`), not on commission when
+   `commission_pct = 0` (SPEC_AMENDMENTS §16). `tax_statutory_config` + `tax_commercial_config`
+   are snapshotted on **slot_holds** at quote time; bookings inherit — never re-read "current".
+   `payment_splits` uses snapshotted ids. Statutory rates: **`puja_migrate` role only**
+   (`REVOKE INSERT ON tax_statutory_config FROM puja_app`). Commercial prices: Admin API
+   INSERT on `tax_commercial_config` only. Razorpay order = `total_charged_online`
+   (= `amount_due_online` + `platform_fee_gross`). Refunds capped at captured amount.
+   Refunds via `refunds` row + worker — never inline Razorpay in handlers.
 5. **Every booking state change is recorded** in `booking_status_history`,
    including cancellation (which flips `status_id` AND sets `cancelled_at`
    atomically) — this is the audit trail for disputes and support.
@@ -88,8 +92,13 @@ DATABASE.md carries migrations 002, 003, and 004 DDL.
    no stuck-online state is possible. The DB column is analytics-only.
 8. **Background work is idempotent.** Sweep uses `FOR UPDATE SKIP LOCKED`;
    rebroadcast uses a per-booking Redis lock plus a DB compare-and-set on
-   `booking_dispatch_state.round`. Duplicate task delivery is harmless by
-   construction.
+   `booking_dispatch_state` (round CAS for Phase 2 geo; time-based deadline at launch §21).
+   Duplicate task delivery is harmless by construction.
+9. **Puja MVP launch dispatch (§21):** Broadcast-only at checkout. **Never remove**
+   `intended_pujari_id`, trigger 3, or `ex_bookings_intended_no_overlap` when disabling
+   direct booking — they protect broadcast accepts. Heartbeat-without-GPS and
+   dispatch-without-`ST_DWithin` must ship together. Customer `addresses.geom` stays
+   required; pujari live location is Phase 2.
 
 ## Connection policy (PgBouncer + SQLAlchemy)
 
@@ -103,6 +112,31 @@ DATABASE.md carries migrations 002, 003, and 004 DDL.
 - Constraint of transaction mode: no session state across transactions
   (no session-held advisory locks, `SET` only as `SET LOCAL`). All triggers
   and `FOR UPDATE` patterns in this design are transaction-scoped — compatible.
+
+## SMS / OTP delivery (multi-provider failover)
+
+All outbound SMS goes through **`app/services/sms_router.py`** — never call MSG91 or
+FAST2SMS directly from route handlers or workers.
+
+| Provider | Role at launch | Credentials | Notes |
+|---|---|---|---|
+| **FAST2SMS** | Primary (`SMS_PROVIDER_ORDER` first) | `FAST2SMS_API_KEY` | Dev API `bulkV2`: OTP route `otp`, transactional Quick SMS route `q` (no DLT header). |
+| **MSG91** | Secondary / held | `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID` | SendOTP REST API only. **`MSG91_ENABLED=false`** until DLT + template ready. **Do not** use OTP Widget embed (`widgetId` / `tokenAuth`) on the server. |
+
+**Failover:** `SMS_PROVIDER_ORDER=fast2sms,msg91` — on provider failure, try next in chain.
+Log `sms_provider` on success. If all fail and `DEBUG=true`, uvicorn logs `otp_dev_only`
+(dev fallback only).
+
+**DLT (India):** TRAI DLT registration (entity ID, sender header, approved template) is
+**mandatory for SMS delivery — including vendor sandbox/test sends**. Providers may accept
+HTTP requests but fail or silently drop messages without DLT. This is an **ops/compliance
+gate**, not a backend wiring bug. Verify integration via mocked tests + provider API
+response logs until DLT is approved. See SPEC_AMENDMENTS §18.
+
+**FCM** (`fcm_client.py`) is separate from SMS. Backend push worker is implemented;
+**end-to-end FCM verification waits on the Flutter app** to obtain and register a real
+`device_token` (`POST /v1/me/devices`). Poll (`GET /v1/offers`) remains the push safety net.
+See SPEC_AMENDMENTS §18.
 
 ## Redis as single dependency — deliberate, with mitigations
 
@@ -127,8 +161,12 @@ exponential backoff retries.
 
 - App connects as `puja_app`: `SELECT/INSERT/UPDATE` on app tables only.
   **No `DELETE`** (audit rules forbid deletes — enforced at the grant level),
-  no DDL, not superuser.
-- Alembic migrations run as separate `puja_migrate` role (DDL owner).
+  no DDL, not superuser. **`tax_statutory_config`: SELECT only** — statutory
+  rates cannot be written by the app role (SPEC_AMENDMENTS §16).
+- **Append-only tables need an explicit `REVOKE UPDATE`** — "no DELETE" alone still
+  lets the app rewrite rows. Migration 009: `REVOKE UPDATE, DELETE ON admin_audit_log,
+  booking_status_history FROM puja_app` (SPEC_AMENDMENTS §19).
+- Alembic migrations run as separate `puja_migrate` role (DDL owner + statutory seed).
 
 ## Payment product policy (v3.2)
 
@@ -144,8 +182,9 @@ Spec additions log: `spec/plans/SPEC_AMENDMENTS.md`.
 
 ## Open items (explicitly NOT done — do not assume otherwise)
 
-- GST is a single `gst_amount` column; CGST/SGST breakout is a planned
-  migration before invoicing goes live (single-state launch, so no IGST branch).
+- **Migration 007** (tax): `tax_statutory_config`, `tax_commercial_config`, snapshot columns,
+  `billing_state_code`, extended `payment_splits` — see SPEC_AMENDMENTS §16 / `A-TAX-CONFIG_spec.md`.
+  **IGST branch at launch** (not deferred). CGST/SGST/IGST derived from `platform_fee_gst_pct` + address.
 - Platform timezone is fixed to `Asia/Kolkata` for launch; all
   `scheduled_date + scheduled_time` arithmetic (refund 24h cutoff, start
   window) MUST use this zone explicitly, never server-default TZ. A

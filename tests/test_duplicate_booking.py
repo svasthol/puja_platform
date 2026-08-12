@@ -69,11 +69,11 @@ async def test_duplicate_booking_submit_savepoint_lookup(session, seed, uniq, mo
                     id, user_id, puja_id, address_id, status_id, cancellation_policy_id,
                     scheduled_date, scheduled_time, duration_minutes, total_amount,
                     amount_due_online, amount_due_offline, payment_mode, hold_id,
-                    razorpay_order_id, created_at, updated_at
+                    booking_class, razorpay_order_id, created_at, updated_at
                 ) VALUES (
                     :bid, :uid, :pid, :aid, :sid, :cpid,
                     :sd, :st, 90, 2100, 2100, 0, 'full_online', :hid,
-                    :oid, :now, :now
+                    'advance', :oid, :now, :now
                 )
             """),
             {

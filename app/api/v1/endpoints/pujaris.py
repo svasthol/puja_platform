@@ -22,8 +22,14 @@ _TZ = zoneinfo.ZoneInfo(settings.PLATFORM_TIMEZONE)
 
 
 class Heartbeat(BaseModel):
-    lat: float
-    lng: float
+    lat: float | None = None
+    lng: float | None = None
+
+    @model_validator(mode="after")
+    def lat_lng_together(self) -> "Heartbeat":
+        if (self.lat is None) ^ (self.lng is None):
+            raise ValueError("lat and lng must be provided together or omitted")
+        return self
 
 
 async def _pujari_id(db: AsyncSession, user_id: uuid.UUID) -> uuid.UUID:
@@ -37,19 +43,22 @@ async def _pujari_id(db: AsyncSession, user_id: uuid.UUID) -> uuid.UUID:
 
 @router.put("/heartbeat")
 async def heartbeat(
-    body: Heartbeat, p: Principal = Depends(require_pujari), db: AsyncSession = Depends(get_db_txn)
+    body: Heartbeat | None = None,
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db_txn),
 ):
+    payload = body or Heartbeat()
     pid = await _pujari_id(db, p.user_id)
-    # write live location + geom, then presence key with TTL
-    await db.execute(
-        text(
-            "INSERT INTO pujari_live_location (pujari_id, latitude, longitude, geom, updated_at) "
-            "VALUES (:pid, :lat, :lng, ST_SetSRID(ST_MakePoint(:lng, :lat),4326)::geography, now()) "
-            "ON CONFLICT (pujari_id) DO UPDATE SET latitude=:lat, longitude=:lng, "
-            "geom=ST_SetSRID(ST_MakePoint(:lng, :lat),4326)::geography, updated_at=now()"
-        ),
-        {"pid": str(pid), "lat": body.lat, "lng": body.lng},
-    )
+    if payload.lat is not None and payload.lng is not None:
+        await db.execute(
+            text(
+                "INSERT INTO pujari_live_location (pujari_id, latitude, longitude, geom, updated_at) "
+                "VALUES (:pid, :lat, :lng, ST_SetSRID(ST_MakePoint(:lng, :lat),4326)::geography, now()) "
+                "ON CONFLICT (pujari_id) DO UPDATE SET latitude=:lat, longitude=:lng, "
+                "geom=ST_SetSRID(ST_MakePoint(:lng, :lat),4326)::geography, updated_at=now()"
+            ),
+            {"pid": str(pid), "lat": payload.lat, "lng": payload.lng},
+        )
     await redis_set(f"presence:{pid}", "1", ex=settings.PUJARI_PRESENCE_TTL_SECONDS)
     return {"status": "ok"}
 

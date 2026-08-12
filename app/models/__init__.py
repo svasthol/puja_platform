@@ -1,4 +1,5 @@
 """Import all ORM models so Alembic metadata and mappers see every table."""
+from app.models.admin import AdminAuditLog, AdminCredential  # noqa: F401
 from app.models.booking import (  # noqa: F401
     Booking,
     BookingAddon,
@@ -10,8 +11,11 @@ from app.models.booking import (  # noqa: F401
 from app.models.catalog import (  # noqa: F401
     Puja,
     PujaAddon,
+    PujaContentItem,
+    PujaMedia,
     Pujari,
     PujariAvailability,
+    PujariDocument,
     PujariLiveLocation,
     PujariServiceArea,
     PujariUnavailability,
@@ -28,6 +32,7 @@ from app.models.identity import (  # noqa: F401
     AuthSession,
     OtpVerification,
     User,
+    UserRole,
 )
 from app.models.lookups import (  # noqa: F401
     CancellationPolicy,
@@ -38,3 +43,4 @@ from app.models.lookups import (  # noqa: F401
     StatusType,
 )
 from app.models.payment import Payment, PaymentSplit, Refund  # noqa: F401
+from app.models.relationship_manager import RelationshipManager  # noqa: F401

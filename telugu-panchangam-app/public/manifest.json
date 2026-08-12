@@ -1,0 +1,70 @@
+{
+  "name": "తెలుగు పంచాంగం",
+  "short_name": "పంచాంగం",
+  "description": "Free Telugu Panchangam for any city, any date. The sky has no expiry date.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF6EE",
+  "theme_color": "#D4603A",
+  "orientation": "portrait-primary",
+  "lang": "te",
+  "dir": "ltr",
+  "categories": ["lifestyle", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "label": "Telugu Panchangam"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's Panchangam",
+      "short_name": "Today",
+      "description": "View today's Panchangam",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "పండుగలు — Festivals",
+      "short_name": "Festivals",
+      "description": "Telugu festival calendar",
+      "url": "/festivals",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "పితృ స్మరణ — Reminders",
+      "short_name": "Reminders",
+      "description": "Ancestor remembrance reminders",
+      "url": "/reminders",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

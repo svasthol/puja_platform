@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Puja Platform — E2E Test UI (DEV ONLY)</title>
+  <link rel="stylesheet" href="styles.css?v=14" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Puja Platform — E2E Test UI</h1>
+    <p class="banner">TEST ONLY · not shipped · lives in <code>tests/e2e_ui/</code> · <span id="e2eVersion">v?</span></p>
+  </header>
+
+  <section class="panel" id="settings">
+    <h2>Settings</h2>
+    <label>API proxy base (leave as <code>/proxy/v1</code>)
+      <input id="apiBase" value="/proxy/v1" readonly />
+    </label>
+    <label>Razorpay Key ID (test, public) <input id="rzKey" placeholder="rzp_test_…" /></label>
+    <p class="hint">Required to enable <strong>Razorpay Pay</strong>. Same value as <code>RAZORPAY_KEY_ID</code> in .env (not the secret).</p>
+    <label>Webhook secret (mock pay only) <input id="whSecret" type="password" placeholder="skip if using real Razorpay + ngrok" /></label>
+    <button type="button" id="btnHealth">Check API health</button>
+    <p id="otpEnvStatus" class="hint">OTP: loading env…</p>
+  </section>
+
+  <nav class="tabs">
+    <button type="button" class="tab" data-tab="otp">OTP / SMS</button>
+    <button type="button" class="tab active" data-tab="customer">Customer</button>
+    <button type="button" class="tab" data-tab="partner">Partner</button>
+    <button type="button" class="tab" data-tab="admin">Admin</button>
+    <button type="button" class="tab" data-tab="ops">Test ops</button>
+    <button type="button" class="tab" data-tab="log">Log</button>
+  </nav>
+
+  <main id="tab-otp" class="tab-panel">
+    <section class="panel">
+      <h2>SMS provider status</h2>
+      <p id="otpModeHint" class="hint warn">—</p>
+      <p id="otpProviderSummary" class="hint">—</p>
+    </section>
+
+    <section class="panel">
+      <h2>FAST2SMS — direct vendor test</h2>
+      <p class="hint">
+        Calls FAST2SMS <code>bulkV2</code> via this test server only (<code>/test-fast2sms.json</code>).
+        Does <strong>not</strong> need uvicorn. Use this first to confirm your
+        <code>FAST2SMS_API_KEY</code> in <code>.env</code>.
+      </p>
+      <label>Phone
+        <input id="fast2smsPhone" placeholder="+919876543210" />
+      </label>
+      <button type="button" id="btnFast2smsDirect">Send OTP via FAST2SMS (direct)</button>
+      <p id="fast2smsDirectStatus" class="otp-status">Direct test: —</p>
+      <p id="fast2smsOtpHint" class="hint">OTP value (for verify below): —</p>
+    </section>
+
+    <section class="panel">
+      <h2>Via API — OTP request / verify</h2>
+      <p class="hint">
+        Exercises <code>POST /auth/otp/request</code> through uvicorn →
+        <code>sms_router</code> (FAST2SMS first, MSG91 if enabled and failover).
+        Same flow as Customer / Partner tabs.
+      </p>
+      <label>Phone
+        <input id="otpPhone" placeholder="+919876543210" />
+      </label>
+      <label>App context (verify)
+        <select id="otpAppContext">
+          <option value="customer">customer</option>
+          <option value="pujari">pujari</option>
+        </select>
+      </label>
+      <div class="otp-actions">
+        <button type="button" id="btnOtpRequest">1 — Request OTP (API)</button>
+        <button type="button" id="btnOtpVerify">2 — Verify OTP</button>
+        <button type="button" id="btnOtpRequestVerify">Request + verify (manual OTP)</button>
+      </div>
+      <p id="otpSmsStatus" class="otp-status">Last API request: —</p>
+      <label>OTP code
+        <input id="otpCode" placeholder="6 digits — SMS or uvicorn otp_dev_only" maxlength="6" />
+      </label>
+      <p id="otpTokenStatus" class="hint">Token: —</p>
+      <details class="otp-help">
+        <summary>How to test</summary>
+        <ul>
+          <li><strong>FAST2SMS onboarding:</strong> sidebar <strong>Smart OTP</strong> (not Settings) → KYC. Need ₹100 wallet (you may only have ₹50 signup credit), Aadhaar verify, website URL. Error <code>996</code> = KYC incomplete; <code>999</code> = need ₹100 top-up.</li>
+          <li><strong>MSG91 (after DLT):</strong> use dashboard <strong>API authkey</strong> + <strong>SendOTP template id</strong> — not OTP Widget <code>tokenAuth</code> / <code>widgetId</code>. Set <code>MSG91_ENABLED=true</code>.</li>
+          <li><strong>Dev (no SMS):</strong> <code>DEBUG=true</code> → Request OTP → copy <code>otp_dev_only</code> from uvicorn.</li>
+          <li><strong>Partner + seed:</strong> context <code>pujari</code>, phone <code>+910000000011</code> after <code>ensure_seed.py</code>.</li>
+        </ul>
+      </details>
+    </section>
+  </main>
+
+  <main id="tab-customer" class="tab-panel active">
+    <section class="panel">
+      <h2>1 — Customer login (OTP)</h2>
+      <label>Phone <input id="custPhone" value="+910000000001" /></label>
+      <button type="button" id="btnCustOtp">Request OTP</button>
+      <label>OTP <input id="custOtp" placeholder="6 digits" /></label>
+      <p id="custOtpStatus" class="hint otp-inline-status">—</p>
+      <button type="button" id="btnCustVerify">Verify → customer token</button>
+      <p class="hint">Token stored in memory for this page session only.</p>
+    </section>
+
+    <section class="panel">
+      <h2>2 — Address</h2>
+      <p class="hint warn">
+        <strong>service_area_id required</strong> (P-LAUNCH-AREA). Run
+        <code>ensure_seed.py</code> then <strong>Load service areas</strong> below.
+      </p>
+      <button type="button" id="btnLoadServiceAreas">GET /service-areas</button>
+      <label>Service area
+        <select id="addrServiceArea">
+          <option value="">— load areas first —</option>
+        </select>
+      </label>
+      <label>Line1 <input id="addrLine1" value="Test Street 1" /></label>
+      <label>City <input id="addrCity" value="Hyderabad" /></label>
+      <label>Lat <input id="addrLat" value="17.385044" /></label>
+      <label>Lng <input id="addrLng" value="78.486671" /></label>
+      <button type="button" id="btnCreateAddr">POST /addresses</button>
+      <p>Address ID: <code id="addressId">—</code></p>
+    </section>
+
+    <section class="panel">
+      <h2>3 — Catalog &amp; hold</h2>
+      <p class="hint warn">
+        <strong>P-LAUNCH-NO-DIRECT test:</strong> on the <strong>Customer</strong> tab (not Partner),
+        paste a pujari UUID below → <strong>POST /slot-holds</strong> must return <strong>410</strong>.
+        Leave blank for normal broadcast holds.
+      </p>
+      <button type="button" id="btnLoadPujas">Load pujas (E2E)</button>
+      <label>Puja ID
+        <input id="pujaId" placeholder="11111111-1111-1111-1111-111111111111 = Test Puja" />
+      </label>
+      <p class="hint warn">
+        For offers: run <code>ensure_seed.py</code>, click <strong>Load pujas (E2E)</strong> — picks
+        <strong>Test Puja</strong> and sets slot ~2h ahead (instant dispatch).
+      </p>
+      <label>Date <input id="slotDate" type="date" /></label>
+      <label>Time <input id="slotTime" value="10:00" /></label>
+      <label>Pujari ID (optional, direct)
+        <input id="holdPujari" placeholder="blank = broadcast" />
+      </label>
+      <button type="button" id="btnFillSeedPujari">Fill seed pujari ID (+910000000011)</button>
+      <button type="button" id="btnHold">POST /slot-holds</button>
+      <p>Hold ID: <code id="holdId">—</code></p>
+    </section>
+
+    <section class="panel">
+      <h2>4 — Booking &amp; pay</h2>
+      <label>Payment mode
+        <select id="payMode">
+          <option value="full_online">full_online</option>
+          <option value="advance_balance">advance_balance</option>
+        </select>
+      </label>
+      <button type="button" id="btnBook">POST /bookings</button>
+      <p>Booking: <code id="bookingId">—</code></p>
+      <p>Order: <code id="orderId">—</code></p>
+      <p>Amount online: <code id="amountOnline">—</code></p>
+      <label>Razorpay Key ID (test, public)
+        <input id="rzKeyPay" placeholder="rzp_test_… or auto-loaded from .env" />
+      </label>
+      <p id="rzPayHint" class="hint warn">Pay button enables when Key ID is set and order exists.</p>
+      <button type="button" id="btnRzpPay" disabled>Razorpay Pay (test)</button>
+      <button type="button" id="btnMockWebhook" disabled>Mock payment webhook</button>
+      <button type="button" id="btnConfirmPayTest" disabled>Confirm payment (test — no ngrok)</button>
+      <p class="hint warn">
+        After <strong>Razorpay Pay</strong>, booking stays <code>payment_pending</code> until the
+        webhook hits the API. Local dev: use <strong>Confirm payment (test)</strong> or
+        <strong>Mock payment webhook</strong> (needs webhook secret in Settings).
+      </p>
+      <button type="button" id="btnBookingStatus">GET booking status</button>
+    </section>
+  </main>
+
+  <main id="tab-partner" class="tab-panel">
+    <section class="panel">
+      <h2>Partner login</h2>
+      <p class="hint warn">
+        <strong>403 “Not a pujari account”</strong> means this phone’s user has no row in
+        <code>pujaris</code>. OTP only creates a <code>users</code> row. Run once:
+        <code>python tests/e2e_ui/ensure_seed.py</code> then login with
+        <code>+910000000011</code> (not your personal number unless seeded).
+      </p>
+      <label>Phone <input id="pjPhone" value="+910000000011" /></label>
+      <p id="pjLoginHint" class="hint warn">
+        Use <code>+910000000011</code> (seed partner). <code>+910000000012</code> is a
+        <em>different</em> pujari — offers dispatched to 011 will show 403 on 012.
+      </p>
+      <button type="button" id="btnPjOtp">Request OTP</button>
+      <label>OTP <input id="pjOtp" /></label>
+      <p id="pjOtpStatus" class="hint otp-inline-status">—</p>
+      <button type="button" id="btnPjVerify">Verify → pujari token</button>
+    </section>
+    <section class="panel">
+      <h2>Go online</h2>
+      <label>Lat <input id="pjLat" value="17.385044" /></label>
+      <label>Lng <input id="pjLng" value="78.486671" /></label>
+      <button type="button" id="btnHeartbeat">PUT /me/heartbeat</button>
+    </section>
+    <section class="panel">
+      <h2>Offers</h2>
+      <p class="hint warn">
+        <strong>Empty offers?</strong> Run <code>python tests/e2e_ui/ensure_seed.py</code> once,
+        then Partner → <strong>Heartbeat</strong>, then Test ops → <strong>Re-dispatch offers</strong>.
+        Accept uses <code>assignment_id</code> from GET /offers — <em>not</em> booking id.
+      </p>
+      <button type="button" id="btnOffers">GET /offers</button>
+      <label>Assignment ID <input id="assignmentId" placeholder="from GET /offers — NOT booking id" /></label>
+      <button type="button" id="btnAccept">Accept offer</button>
+      <button type="button" id="btnReject">Reject offer</button>
+    </section>
+  </main>
+
+  <main id="tab-admin" class="tab-panel">
+    <section class="panel">
+      <h2>Phase 4 — Admin login (TOTP)</h2>
+      <p id="adminEnvStatus" class="hint warn">Admin auth: loading env…</p>
+      <p class="hint warn">
+        Admin uses <strong>TOTP</strong> (<code>POST /admin/auth/login</code>) — not SMS OTP.
+        SMS <code>app_context=admin</code> is blocked (422). One-time setup:
+      </p>
+      <ol class="admin-steps">
+        <li>Set <code>TOTP_ENC_KEYS</code> in <code>.env</code> (same value uvicorn uses).</li>
+        <li>Run <code>python scripts/bootstrap_admin.py --phone +91…</code> — save the printed secret.</li>
+        <li>Either scan the <code>otpauth://</code> URI in Google Authenticator / Authy, <em>or</em> paste the secret below and click <strong>Fill current code (dev)</strong>.</li>
+      </ol>
+      <label>Admin phone
+        <input id="adminPhone" placeholder="+919111111100" />
+      </label>
+      <label>TOTP code (6 digits)
+        <input id="adminTotpCode" placeholder="from authenticator app" maxlength="8" />
+      </label>
+      <label class="admin-dev-secret">Dev only — bootstrap secret (never commit)
+        <input id="adminTotpSecret" type="password" placeholder="paste secret from bootstrap_admin.py" autocomplete="off" />
+      </label>
+      <div class="admin-actions">
+        <button type="button" id="btnAdminFillCode">Fill current code (dev)</button>
+        <button type="button" id="btnAdminLogin">Login → admin token</button>
+      </div>
+      <p id="adminLoginStatus" class="hint">Token: —</p>
+    </section>
+
+    <section class="panel">
+      <h2>Platform settings</h2>
+      <p class="hint">Requires admin token. <code>support</code> role can read; <code>admin</code> role required to write.</p>
+      <button type="button" id="btnAdminGetAdvance">GET advance-booking-amount</button>
+      <label>New amount (INR)
+        <input id="adminAdvanceAmt" type="number" min="1" max="10000" step="1" placeholder="501" />
+      </label>
+      <label>Change reason (optional)
+        <input id="adminAdvanceReason" placeholder="E2E test" maxlength="300" />
+      </label>
+      <button type="button" id="btnAdminSetAdvance">PUT advance-booking-amount</button>
+      <pre id="adminAdvanceOut" class="admin-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Role management</h2>
+      <p class="hint">Lookup by phone (read-only DB helper), then assign/revoke via admin API. Writes require <code>admin</code> role.</p>
+      <label>Target phone
+        <input id="adminTargetPhone" placeholder="+910000000001" />
+      </label>
+      <button type="button" id="btnAdminLookupUser">Lookup user</button>
+      <p>User ID: <code id="adminTargetUserId">—</code></p>
+      <p>Roles: <code id="adminTargetRoles">—</code></p>
+      <p>Credential: <code id="adminTargetCred">—</code></p>
+      <label>Role to assign
+        <select id="adminAssignRole">
+          <option value="support">support</option>
+          <option value="admin">admin</option>
+        </select>
+      </label>
+      <label>Change reason
+        <input id="adminRoleReason" placeholder="onboarding" maxlength="300" />
+      </label>
+      <button type="button" id="btnAdminAssignRole">POST assign role</button>
+      <button type="button" id="btnAdminListRoles">GET roles</button>
+      <button type="button" id="btnAdminRevokeRole">DELETE revoke selected role</button>
+    </section>
+
+    <section class="panel">
+      <h2>Catalogue (4B Wave 1)</h2>
+      <p class="hint">
+        Exercises <code>/v1/admin/catalog/*</code> — categories, pujas, content, addons.
+        Login with TOTP above first (<code>admin</code> role required for writes).
+      </p>
+      <button type="button" id="btnAdminCatalogSmoke" class="catalog-smoke-btn">
+        Run full catalogue smoke
+      </button>
+      <p id="adminCatalogSmokeStatus" class="hint">Smoke: not run yet</p>
+
+      <h3 class="catalog-subhead">Categories</h3>
+      <div class="catalog-actions">
+        <button type="button" id="btnAdminCatList">GET categories</button>
+        <button type="button" id="btnAdminCatCreate">POST category</button>
+        <button type="button" id="btnAdminCatUpdate">PUT category</button>
+      </div>
+      <label>New category name
+        <input id="adminCatName" placeholder="E2E Cat (auto-suffixed on create)" />
+      </label>
+      <p>Category ID: <code id="adminCatId">—</code> · Slug: <code id="adminCatSlug">—</code></p>
+
+      <h3 class="catalog-subhead">Pujas</h3>
+      <div class="catalog-actions">
+        <button type="button" id="btnAdminPujaList">GET pujas</button>
+        <button type="button" id="btnAdminPujaCreate">POST puja</button>
+        <button type="button" id="btnAdminPujaUpdate">PUT puja</button>
+        <button type="button" id="btnAdminPujaImpact">GET impact</button>
+      </div>
+      <label>Puja name
+        <input id="adminPujaName" placeholder="E2E Puja (auto-suffixed on create)" />
+      </label>
+      <label>Default price (INR)
+        <input id="adminPujaPrice" type="number" min="1" step="1" value="1500" />
+      </label>
+      <p>Puja ID: <code id="adminPujaId">—</code></p>
+
+      <h3 class="catalog-subhead">Content &amp; addons</h3>
+      <div class="catalog-actions">
+        <button type="button" id="btnAdminContentGet">GET content</button>
+        <button type="button" id="btnAdminContentPut">PUT inclusions</button>
+        <button type="button" id="btnAdminAddonList">GET addons</button>
+        <button type="button" id="btnAdminAddonCreate">POST addon</button>
+        <button type="button" id="btnAdminAddonUpdate">PUT addon</button>
+      </div>
+      <p>Addon ID: <code id="adminAddonId">—</code></p>
+
+      <h3 class="catalog-subhead">Media upload (Wave 2 — needs S3 in .env)</h3>
+      <p class="hint warn">
+        Set <code>S3_ACCESS_KEY</code>, <code>S3_SECRET_KEY</code>, <code>S3_BUCKET_CATALOG</code>,
+        and <code>S3_CATALOG_PUBLIC_URL</code> in <code>.env</code>, then restart uvicorn.
+        Create a puja above first — uses its ID as <code>entity_id</code>.
+      </p>
+      <label>Entity type
+        <select id="adminMediaEntityType">
+          <option value="puja">puja (hero)</option>
+          <option value="gallery">gallery</option>
+          <option value="category">category</option>
+        </select>
+      </label>
+      <label>Image file
+        <input type="file" id="adminMediaFile" accept="image/jpeg,image/png,image/webp" />
+      </label>
+      <button type="button" id="btnAdminMediaUpload">Presign → Upload (API) → Confirm</button>
+      <p>Media ID: <code id="adminMediaId">—</code> · Public URL: <code id="adminMediaUrl">—</code></p>
+
+      <pre id="adminCatalogOut" class="admin-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>TOTP credential provisioning</h2>
+      <p class="hint warn">
+        <code>admin</code> role only. Returns secret + <code>otpauth://</code> URI <strong>once</strong>.
+        Target must already have <code>admin</code> or <code>support</code> role.
+      </p>
+      <button type="button" id="btnAdminProvision">POST provision / reset credential</button>
+      <pre id="adminProvisionOut" class="admin-pre admin-secret">—</pre>
+    </section>
+  </main>
+
+  <main id="tab-ops" class="tab-panel">
+    <section class="panel">
+      <h2>Booking test dashboard</h2>
+      <p class="hint">
+        Read-only view of <code>bookings</code> + <code>payments</code> + dispatch offers.
+        Validates DB structure during E2E — not part of the product API.
+      </p>
+      <p class="hint warn">
+        If refresh fails with HTML/JSON error, stop the old server (Ctrl+C) and restart:
+        <code>python tests/e2e_ui/serve.py</code>
+      </p>
+      <p class="hint warn">
+        <strong>Payment stuck on PAYMENT_PENDING?</strong> Razorpay Pay alone does not confirm
+        the booking — you need a webhook. Without ngrok, click
+        <strong>Confirm payment (test)</strong> below (uses <code>RAZORPAY_WEBHOOK_SECRET</code>
+        from <code>.env</code>).
+      </p>
+      <div class="ops-toolbar">
+        <button type="button" id="btnOpsRefresh">Refresh now</button>
+        <label>Booking ID <input id="opsRedispatchId" class="ops-id-input" placeholder="from table below" /></label>
+        <button type="button" id="btnOpsConfirmPay">Confirm payment (test)</button>
+        <button type="button" id="btnOpsRedispatch">Re-dispatch offers</button>
+        <label class="inline-check">
+          <input type="checkbox" id="opsAutoRefresh" checked /> Auto-refresh every 5s
+        </label>
+        <label class="inline-check">
+          <input type="checkbox" id="opsNotify" /> Browser alert on new booking
+        </label>
+        <span id="opsUpdated" class="hint ops-meta">—</span>
+      </div>
+      <p id="opsError" class="hint log-err" hidden></p>
+      <div class="ops-table-wrap">
+        <table class="ops-table" id="opsTable">
+          <thead>
+            <tr>
+              <th>Created</th>
+              <th>Status</th>
+              <th>Customer</th>
+              <th>Puja</th>
+              <th>Slot</th>
+              <th>Online ₹</th>
+              <th>Paid</th>
+              <th>Payment ID</th>
+              <th>Offers</th>
+              <th>Pujari</th>
+              <th>Booking ID</th>
+            </tr>
+          </thead>
+          <tbody id="opsTableBody">
+            <tr><td colspan="11" class="ops-empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <main id="tab-log" class="tab-panel">
+    <pre id="log"></pre>
+    <button type="button" id="btnClearLog">Clear log</button>
+  </main>
+
+  <script src="app.js?v=14"></script>
+</body>
+</html>

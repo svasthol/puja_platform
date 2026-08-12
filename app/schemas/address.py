@@ -24,6 +24,7 @@ class AddressCreate(BaseModel):
     pincode: str | None = Field(default=None, max_length=10)
     latitude: Decimal = Field(ge=-90, le=90)
     longitude: Decimal = Field(ge=-180, le=180)
+    service_area_id: int = Field(ge=1)
     is_default: bool = False
 
 
@@ -36,6 +37,7 @@ class AddressUpdate(BaseModel):
     pincode: str | None = Field(default=None, max_length=10)
     latitude: Decimal | None = Field(default=None, ge=-90, le=90)
     longitude: Decimal | None = Field(default=None, ge=-180, le=180)
+    service_area_id: int | None = Field(default=None, ge=1)
     is_default: bool | None = None
 
 
@@ -48,6 +50,7 @@ class AddressOut(BaseModel):
     pincode: str | None
     latitude: Decimal | None
     longitude: Decimal | None
+    service_area_id: int
     is_default: bool
     created_at: dt.datetime
 

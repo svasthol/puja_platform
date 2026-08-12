@@ -4,6 +4,38 @@ Follow this exactly. Everything is already configured; you're just starting the 
 
 ---
 
+## Supported platforms
+
+The repo is **cross-platform**: develop on **Linux, Windows, or macOS**; deploy the API and workers on **Linux** (VM, Docker, K8s). Application code is OS-agnostic — only a few **local dev** commands differ.
+
+| Task | Linux / macOS | Windows (PowerShell) |
+|---|---|---|
+| Install uv | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `irm https://astral.sh/uv/install.ps1 \| iex` |
+| Activate venv | `source .venv/bin/activate` | `.\.venv\Scripts\Activate.ps1` |
+| Copy env file | `cp ".env - Copy.example" .env` | `copy ".env - Copy.example" .env` |
+| Run migrations | `alembic upgrade head` | same |
+| Start API (normal) | `uvicorn app.main:app --reload --port 8000` | same *(if DB calls fail, use row below)* |
+| Start API (psycopg async) | not needed — default loop is fine | see [Windows API note](#windows-api-note) below |
+| Start Redis | `sudo systemctl start redis` or `brew services start redis` | Docker: `docker run -d -p 6379:6379 redis:7-alpine`, or WSL2 / Memurai |
+| Celery worker | `celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,notifications` | add `--pool=solo` |
+| Admin UI | `cd admin_ui && npm install && npm run dev` | same |
+
+**Node.js (admin UI):** use **20 LTS** or **22 LTS** (`>=20.18`, `<23`). See `admin_ui/README.md`.
+
+**Production:** Linux containers/VMs; no Windows-specific runtime paths in `app/` or `admin_ui/`.
+
+### Windows API note
+
+On Windows, `psycopg` async requires the **selector** event loop (not the default Proactor). Scripts and tests set this automatically when `sys.platform == "win32"`. For manual `uvicorn`:
+
+```powershell
+python -c "import asyncio; asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()); import uvicorn; uvicorn.run('app.main:app', host='127.0.0.1', port=8000, reload=True)"
+```
+
+Linux and macOS do **not** need this.
+
+---
+
 ## Prerequisites (install once on your laptop)
 
 | Tool | Version | Install |
@@ -51,15 +83,8 @@ python -c "import fastapi; print(fastapi.__version__)"   # 0.139.0
 python -c "import sqlalchemy; print(sqlalchemy.__version__)"  # 2.0.44
 python -c "import psycopg; print(psycopg.__version__)"   # 3.2.x
 ```
-```
 
-> **Windows users:**
-> - Install uv with PowerShell instead of curl:
->   `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
-> - Activate the venv with `.venv\Scripts\activate`
-> - Redis has no native Windows build — use ONE of:
->   **WSL2** (`wsl --install`, then `sudo apt install redis`), **Memurai**
->   (drop-in Redis for Windows), or **Docker**: `docker run -d -p 6379:6379 redis:7-alpine`
+> **Windows users:** see [Supported platforms](#supported-platforms) for uv, Redis, Celery, and the API event-loop note.
 
 
 
@@ -115,19 +140,13 @@ uvicorn app.main:app --reload --port 8000
 # Visit http://localhost:8000/health
 ```
 
+On **Windows**, if DB endpoints error at runtime, use the [Windows API note](#windows-api-note) instead of plain `uvicorn`.
+
 ---
 
 ## Step 7: Start Redis (for Celery)
 
-```bash
-# macOS
-brew services start redis
-
-# Linux
-sudo systemctl start redis
-
-# Windows: download Redis for Windows or use WSL
-```
+See [Supported platforms](#supported-platforms) for OS-specific Redis commands.
 
 ---
 
@@ -140,8 +159,7 @@ celery -A app.workers.celery_app beat --loglevel=info   # scheduler (30s sweep)
 # (app/workers/celery_app.py is the real module — verified to import cleanly)
 ```
 
-> **Windows:** Celery's default prefork pool is not supported. Add `--pool=solo`:
-> `celery -A app.workers.celery_app worker --pool=solo --loglevel=info -Q sweep,dispatch,refund,notifications`
+> **Windows:** add `--pool=solo` — see [Supported platforms](#supported-platforms).
 
 ---
 

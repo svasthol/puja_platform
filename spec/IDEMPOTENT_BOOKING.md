@@ -38,6 +38,10 @@ The duplicate itself was **correct**; only the handler was broken.
   "amount_due_online": "2100.00",
   "amount_due_offline": "0.00",
   "total_amount": "2100.00",
+  "platform_fee_gross": "21.00",
+  "total_charged_online": "2121.00",
+  "tax_statutory_config_id": "uuid",
+  "tax_commercial_config_id": "uuid",
   "payment_mode": "full_online",
   "hold_expires_at": "2026-08-07T10:45:00Z",
   "idempotent": false
@@ -46,7 +50,8 @@ The duplicate itself was **correct**; only the handler was broken.
 
 ### 409 Conflict — duplicate active booking (idempotent)
 
-Same shape as 201, with `"idempotent": true`. Client should:
+Same shape as 201, with `"idempotent": true`. **Must return the same `platform_fee_gross` and
+`tax_*_config_id` values as the original 201** — replays snapshot, does not recompute.
 
 - If `payment_pending`: reopen Razorpay with `razorpay_order_id`.
 - If `confirmed` / later: navigate to `GET /v1/bookings/{id}` (no new checkout).

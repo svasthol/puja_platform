@@ -10,9 +10,13 @@ Steps:
   1. Release expired slot_holds.
   2. Flip payment_pending bookings >15min to 'abandoned' + cancelled_at, and
      release ONLY the hold linked to each abandoned booking (bookings.hold_id).
-  3. Flip 'offered' assignments past expiry to 'expired' + responded_at.
+  3. Flip 'offered' assignments past expiry to 'expired' + responded_at
+     (carve-out: advance offers on active requested bookings inside dispatch
+     window are refreshed by refresh_advance_offers beat instead — §21.6.D).
   4. Independently scan stranded bookings -> enqueue rebroadcast.
   5. Lazily sync pujaris.is_online from Redis presence keys (analytics only).
+  6. Advance reconfirmation pings + RM escalation (§21.7).
+  7. Stuck-state ops monitor (P-MONITOR) — payment_pending, no-show, refund stall.
 
 FIX (was a latent bug): step 2 previously released ALL of a user's active holds
 (WHERE user_id IN ...). It now releases only the hold tied to the abandoned
@@ -131,6 +135,7 @@ def abandon_stale_payment_pending(conn: psycopg.Connection, ttl_minutes: int = 1
 # Step 3 — expire stale 'offered' assignments (+ responded_at)
 # --------------------------------------------------------------------------- #
 def expire_stale_assignments(conn: psycopg.Connection) -> list[str]:
+    """Expire past-TTL offers. Advance live offers are carved out (§21.6.D)."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -138,9 +143,21 @@ def expire_stale_assignments(conn: psycopg.Connection) -> list[str]:
                 SELECT ba.id, ba.booking_id
                 FROM booking_assignments ba
                 JOIN status_types st ON st.id = ba.status_id
-                WHERE st.domain='assignment' AND st.code='offered'
+                JOIN bookings b ON b.id = ba.booking_id
+                JOIN status_types bst ON bst.id = b.status_id
+                LEFT JOIN booking_dispatch_state bds ON bds.booking_id = b.id
+                WHERE st.domain = 'assignment' AND st.code = 'offered'
                   AND ba.responded_at IS NULL
                   AND ba.expires_at <= now()
+                  AND NOT (
+                      b.booking_class = 'advance'
+                      AND bst.domain = 'booking'
+                      AND bst.code = 'requested'
+                      AND b.cancelled_at IS NULL
+                      AND bds.urgency_escalated_at IS NULL
+                      AND bds.dispatch_deadline IS NOT NULL
+                      AND bds.dispatch_deadline > now()
+                  )
                 FOR UPDATE OF ba SKIP LOCKED
             )
             UPDATE booking_assignments ba
@@ -159,24 +176,101 @@ def expire_stale_assignments(conn: psycopg.Connection) -> list[str]:
 
 
 # --------------------------------------------------------------------------- #
-# Step 4 — independent scan for stranded bookings needing rebroadcast
+# Step 4a — exhaust requested bookings past dispatch_deadline (launch)
 # --------------------------------------------------------------------------- #
-def bookings_needing_rebroadcast(conn: psycopg.Connection) -> list[str]:
+def exhaust_past_dispatch_deadline(conn: psycopg.Connection) -> list[str]:
+    from app.workers.dispatch import exhaust_booking_no_pujari
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT b.id
+            FROM bookings b
+            JOIN booking_dispatch_state bds ON bds.booking_id = b.id
+            JOIN status_types st ON st.id = b.status_id
+            WHERE st.domain = 'booking' AND st.code = 'requested'
+              AND b.pujari_id IS NULL
+              AND b.cancelled_at IS NULL
+              AND bds.dispatch_deadline IS NOT NULL
+              AND bds.dispatch_deadline <= now()
+            FOR UPDATE OF b SKIP LOCKED
+            """
+        )
+        booking_ids = [str(r[0]) for r in cur.fetchall()]
+    conn.commit()
+
+    exhausted: list[str] = []
+    for booking_id in booking_ids:
+        with conn.cursor() as cur:
+            result = exhaust_booking_no_pujari(cur, conn, booking_id)
+            if result.get("status") == "failed_no_pujari":
+                exhausted.append(booking_id)
+    if exhausted:
+        log.info("dispatch_deadline_exhausted", count=len(exhausted))
+    return exhausted
+
+
+# --------------------------------------------------------------------------- #
+# Step 4 — independent scan for stranded bookings needing (re)dispatch
+# --------------------------------------------------------------------------- #
+def bookings_needing_initial_broadcast(conn: psycopg.Connection) -> list[str]:
+    """Paid requested bookings inside the dispatch window that never finished a round.
+
+    Covers lost `broadcast_booking` tasks (no dispatch row yet) and `fresh=True`
+    resets where `last_dispatched` was cleared. Does not overlap rebroadcast scan.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT b.id
             FROM bookings b
             JOIN status_types st ON st.id = b.status_id
-            WHERE st.domain='booking' AND st.code='requested'
+            LEFT JOIN booking_dispatch_state bds ON bds.booking_id = b.id
+            WHERE st.domain = 'booking' AND st.code = 'requested'
               AND b.pujari_id IS NULL
               AND b.cancelled_at IS NULL
-              AND EXISTS (SELECT 1 FROM booking_assignments ba WHERE ba.booking_id = b.id)
+              AND b.paid_at IS NOT NULL
+              AND (bds.last_dispatched IS NULL)
+              AND (bds.exhausted_at IS NULL)
+              AND (
+                  bds.booking_id IS NULL
+                  OR (
+                      (bds.dispatch_starts_at IS NULL OR bds.dispatch_starts_at <= now())
+                      AND (bds.dispatch_deadline IS NULL OR bds.dispatch_deadline > now())
+                  )
+              )
+            """
+        )
+        return [str(r[0]) for r in cur.fetchall()]
+
+
+def bookings_needing_rebroadcast(conn: psycopg.Connection) -> list[str]:
+    """Requested bookings that already broadcast but have zero live offers (DISPATCH_FLOW §4).
+
+    Includes rounds that inserted `offers=0` (e.g. no online pujari) — not only bookings
+    that previously had assignment rows. Retries every sweep cycle until offers land or
+    dispatch_deadline exhausts the booking.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT b.id
+            FROM bookings b
+            JOIN status_types st ON st.id = b.status_id
+            JOIN booking_dispatch_state bds ON bds.booking_id = b.id
+            WHERE st.domain = 'booking' AND st.code = 'requested'
+              AND b.pujari_id IS NULL
+              AND b.cancelled_at IS NULL
+              AND b.paid_at IS NOT NULL
+              AND bds.last_dispatched IS NOT NULL
+              AND bds.exhausted_at IS NULL
+              AND (bds.dispatch_starts_at IS NULL OR bds.dispatch_starts_at <= now())
+              AND (bds.dispatch_deadline IS NULL OR bds.dispatch_deadline > now())
               AND NOT EXISTS (
                   SELECT 1 FROM booking_assignments ba
                   JOIN status_types s2 ON s2.id = ba.status_id
                   WHERE ba.booking_id = b.id
-                    AND s2.domain='assignment' AND s2.code='offered'
+                    AND s2.domain = 'assignment' AND s2.code = 'offered'
                     AND ba.responded_at IS NULL
                     AND ba.expires_at > now()
               )
@@ -211,12 +305,21 @@ def sync_pujari_presence(conn: psycopg.Connection, redis_client) -> int:
 
 
 def run_sweep(conn: psycopg.Connection, redis_client=None) -> dict:
+    from app.monitoring.scanner import run_stuck_state_monitor
+    from app.workers.reconfirmation import run_reconfirmation
+
+    reconfirm_summary = run_reconfirmation(conn)
+    monitor_summary = run_stuck_state_monitor(conn)
     return {
         "holds_released": release_expired_slot_holds(conn),
         "bookings_abandoned": abandon_stale_payment_pending(conn),
         "offers_expired_on": expire_stale_assignments(conn),
+        "dispatch_deadline_exhausted": exhaust_past_dispatch_deadline(conn),
+        "needs_initial_broadcast": bookings_needing_initial_broadcast(conn),
         "needs_rebroadcast": bookings_needing_rebroadcast(conn),
         "presence_synced": sync_pujari_presence(conn, redis_client),
+        **monitor_summary,
+        **reconfirm_summary,
     }
 
 
@@ -242,6 +345,10 @@ try:
         conn = get_connection()
         try:
             summary = run_sweep(conn, redis_client=r)
+            for booking_id in summary["needs_initial_broadcast"]:
+                celery_app.send_task(
+                    "app.workers.dispatch.broadcast_booking", args=[str(booking_id)]
+                )
             for booking_id in summary["needs_rebroadcast"]:
                 celery_app.send_task(
                     "app.workers.dispatch.rebroadcast_booking", args=[str(booking_id)]

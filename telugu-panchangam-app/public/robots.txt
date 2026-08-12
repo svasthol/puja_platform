@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# Internal cron endpoint — bot-discoverable but auth-gated
+Disallow: /api/cron/
+
+Sitemap: https://telugupanchangam.app/sitemap.xml

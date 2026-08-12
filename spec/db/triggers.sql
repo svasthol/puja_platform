@@ -42,19 +42,20 @@ CREATE TRIGGER aiud_reviews_rating_sync
     FOR EACH ROW EXECUTE FUNCTION trg_recompute_pujari_rating();
 
 -- =============================================================================
--- TRIGGER 3 â€” accept resolution (v2.1).
+-- TRIGGER 3 — accept resolution (v2.2 — migration 014 sibling supersede).
 -- On the first valid accept, atomically and in the accepting transaction:
 --   * writes bookings.pujari_id AND bookings.intended_pujari_id
 --   * flips the booking to (booking, confirmed)
 --   * inserts the booking_status_history row (changed_by = pujari's user)
+--   * supersedes every other live offer for that booking (§21.6.B)
 -- Writing intended_pujari_id is NOT cosmetic: it puts every accepted booking
 -- under ex_bookings_intended_no_overlap (paid_at is always set before offers
--- exist), which closes the cross-mode overlap hole â€” a pujari who is the
+-- exist), which closes the cross-mode overlap hole — a pujari who is the
 -- intended pujari of a PAID direct booking cannot accept an overlapping
 -- broadcast booking; the exclusion constraint raises here, at the DB layer,
 -- even if the dispatch eligibility query missed it.
 -- Guards (in order): offer must be live 'offered' (no resurrecting rejected /
--- expired rows), offer unexpired by time (fresh accepts only â€” an idempotent
+-- expired rows), offer unexpired by time (fresh accepts only — an idempotent
 -- re-fire of an already-accepted row is NOT time-checked, so a network retry
 -- of a successful accept arriving after expires_at cannot spuriously fail),
 -- booking not cancelled, booking not taken by another pujari. Idempotent: a
@@ -66,6 +67,7 @@ DECLARE
     v_accepted_status_id  SMALLINT;
     v_offered_status_id   SMALLINT;
     v_confirmed_status_id SMALLINT;
+    v_superseded_status_id SMALLINT;
     v_current_pujari_id   UUID;
     v_cancelled_at        TIMESTAMPTZ;
     v_pujari_user_id      UUID;
@@ -157,6 +159,20 @@ BEGIN
 
             INSERT INTO booking_status_history (booking_id, status_id, changed_by)
             VALUES (NEW.booking_id, v_confirmed_status_id, v_pujari_user_id);
+
+            -- §21.6.B (migration 014): sibling live offers -> superseded.
+            SELECT id INTO v_superseded_status_id
+            FROM status_types WHERE domain = 'assignment' AND code = 'superseded';
+            IF v_superseded_status_id IS NULL THEN
+                RAISE EXCEPTION 'Seed data missing: status_types(domain=assignment, code=superseded) not found.';
+            END IF;
+
+            UPDATE booking_assignments
+            SET status_id = v_superseded_status_id,
+                responded_at = now()
+            WHERE booking_id = NEW.booking_id
+              AND id <> NEW.id
+              AND responded_at IS NULL;
         END IF;
     END IF;
     RETURN NEW;

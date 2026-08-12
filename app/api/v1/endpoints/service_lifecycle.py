@@ -16,7 +16,8 @@ from app.core.config import get_settings
 from app.core.dependencies import Principal, require_pujari
 from app.core.exceptions import StaleBookingState
 from app.db.engine import get_db_txn
-from app.schemas.booking import BalanceCollected
+from app.schemas.booking import BalanceCollected, PujariCancelResponse
+from app.services import pujari_cancel_service
 from app.services.status import status_id
 
 router = APIRouter(tags=["service"])
@@ -40,6 +41,28 @@ async def _assigned_booking(db: AsyncSession, booking_id: uuid.UUID, user_id: uu
     if row is None:
         raise HTTPException(http.HTTP_403_FORBIDDEN, "Not the assigned pujari for this booking.")
     return dict(row)
+
+
+@router.post("/bookings/{booking_id}/pujari-cancel", response_model=PujariCancelResponse)
+async def pujari_cancel(
+    booking_id: uuid.UUID,
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    result = await pujari_cancel_service.pujari_cancel_booking(
+        db, user_id=p.user_id, booking_id=booking_id
+    )
+    if result.get("enqueue_rebroadcast"):
+        from app.workers.celery_app import celery_app
+
+        celery_app.send_task(
+            "app.workers.dispatch.rebroadcast_booking",
+            args=[result["enqueue_rebroadcast"], True],
+        )
+    return PujariCancelResponse(
+        booking_id=booking_id,
+        status=result["status"],
+    )
 
 
 @router.post("/bookings/{booking_id}/start")
