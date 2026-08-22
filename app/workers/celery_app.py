@@ -46,6 +46,7 @@ celery_app = Celery(
         "app.workers.urgency_flip",
         "app.workers.rm_escalation",
         "app.workers.panchangam",
+        "app.workers.kyc",
     ],
 )
 
@@ -68,6 +69,7 @@ celery_app.conf.update(
         "app.workers.refund.*": {"queue": "refund"},
         "app.workers.notifications.*": {"queue": "notifications"},
         "app.workers.panchangam.*": {"queue": "sweep"},
+        "app.workers.kyc.*": {"queue": "sweep"},
     },
     beat_schedule={
         "sweep-every-30s": {
@@ -97,6 +99,11 @@ celery_app.conf.update(
         "refresh-panchangam-daily": {
             "task": "app.workers.panchangam.refresh_panchangam_cache_task",
             "schedule": 3600.0,
+            "options": {"queue": "sweep"},
+        },
+        "expire-kyc-requests-every-5m": {
+            "task": "app.workers.kyc.expire_kyc_requests_task",
+            "schedule": 300.0,
             "options": {"queue": "sweep"},
         },
     },

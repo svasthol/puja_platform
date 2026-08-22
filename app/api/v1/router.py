@@ -20,6 +20,7 @@ from app.api.v1.endpoints import (
     devices,
     offers,
     panchangam,
+    partner_onboarding,
     pujaris,
     pujari_bookings,
     service_areas,
@@ -41,6 +42,8 @@ api_router.include_router(bookings.router)
 api_router.include_router(offers.router)
 api_router.include_router(pujari_bookings.router)
 api_router.include_router(pujaris.router)
+api_router.include_router(partner_onboarding.router)
+api_router.include_router(partner_onboarding.callback_router)
 api_router.include_router(service_lifecycle.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_catalog.router)

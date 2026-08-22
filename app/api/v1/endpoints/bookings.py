@@ -6,7 +6,7 @@ import uuid
 from decimal import Decimal
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status as http
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status as http
 from fastapi.responses import ORJSONResponse
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -161,10 +161,14 @@ async def create_booking(
 @router.post("/bookings/{booking_id}/cancel")
 async def cancel_booking(
     booking_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     p: Principal = Depends(require_customer),
     db: AsyncSession = Depends(get_db_txn),
 ):
     result = await cancellation_service.cancel_booking(db, user_id=p.user_id, booking_id=booking_id)
+    background_tasks.add_task(
+        cancellation_service.enqueue_offer_withdrawn_notification, booking_id
+    )
     return result
 
 
@@ -295,13 +299,14 @@ async def get_booking(
 async def dispatch_choice(
     booking_id: uuid.UUID,
     payload: DispatchChoice,
+    background_tasks: BackgroundTasks,
     p: Principal = Depends(require_customer),
     db: AsyncSession = Depends(get_db_txn),
 ):
     if not DIRECT_BOOKING_ENABLED:
         reject_direct_booking()
     return await _dispatch_choice_enabled(
-        booking_id, payload, p, db
+        booking_id, payload, p, db, background_tasks
     )
 
 
@@ -310,6 +315,7 @@ async def _dispatch_choice_enabled(
     payload: DispatchChoice,
     p: Principal,
     db: AsyncSession,
+    background_tasks: BackgroundTasks,
 ):
     """Phase 2 direct-booking fallback — broadcast or cancel when intended pujari unavailable."""
     row = (
@@ -323,7 +329,13 @@ async def _dispatch_choice_enabled(
     if str(row["user_id"]) != str(p.user_id):
         raise HTTPException(http.HTTP_403_FORBIDDEN, "Not your booking.")
     if payload.action == "cancel":
-        return await cancellation_service.cancel_booking(db, user_id=p.user_id, booking_id=booking_id)
+        result = await cancellation_service.cancel_booking(
+            db, user_id=p.user_id, booking_id=booking_id
+        )
+        background_tasks.add_task(
+            cancellation_service.enqueue_offer_withdrawn_notification, booking_id
+        )
+        return result
 
     requested_id = await status_id(db, "booking", "requested")
     result = await db.execute(

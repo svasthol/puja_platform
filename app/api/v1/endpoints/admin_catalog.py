@@ -41,6 +41,7 @@ from app.schemas.catalog_admin import (
     MediaResponse,
 )
 from app.services.audit import record_admin_action
+from app.services.partner_dispatch_readiness import ensure_puja_pricing_for_verified_pujaris
 from app.services.catalog_media import (
     CatalogMediaError,
     CatalogStorageNotConfigured,
@@ -352,6 +353,8 @@ async def create_puja(
             await db.flush()
         except IntegrityError as exc:
             raise HTTPException(status.HTTP_409_CONFLICT, "Puja slug conflict.") from exc
+
+    await ensure_puja_pricing_for_verified_pujaris(db, puja_id=puja.id)
 
     await record_admin_action(
         db,

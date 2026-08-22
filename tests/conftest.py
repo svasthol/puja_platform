@@ -13,7 +13,7 @@ would prove nothing. Run:
          -f spec/db/migration_009.sql -f spec/db/migration_010.sql -f spec/db/migration_011.sql \
          -f spec/db/migration_012.sql -f spec/db/migration_013.sql -f spec/db/migration_014.sql \
          -f spec/db/migration_015.sql -f spec/db/migration_016.sql -f spec/db/migration_017.sql \
-         -f spec/db/migration_018.sql
+         -f spec/db/migration_018.sql -f spec/db/migration_019.sql -f spec/db/migration_020.sql
     export DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji
     pytest -q
 """

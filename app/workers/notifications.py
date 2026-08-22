@@ -519,6 +519,76 @@ def _notify_accept_ack_impl(booking_id: str, pujari_user_id: str) -> dict:
         conn.close()
 
 
+_WITHDRAWN_TARGETS_SQL = """
+SELECT DISTINCT pj.user_id
+FROM booking_assignments ba
+JOIN pujaris pj ON pj.id = ba.pujari_id
+JOIN bookings b ON b.id = ba.booking_id
+JOIN status_types st ON st.id = ba.status_id
+    AND st.domain = 'assignment' AND st.code = 'expired'
+WHERE ba.booking_id = %s
+  AND b.cancelled_at IS NOT NULL
+"""
+
+
+def _notify_offer_withdrawn_impl(booking_id: str) -> dict:
+    """Partner push when customer cancels — `offer_withdrawn` (P-FCM-CUSTOMER-CANCEL)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_WITHDRAWN_TARGETS_SQL, (booking_id,))
+            user_ids = [str(row[0]) for row in cur.fetchall()]
+            if not user_ids:
+                log.info("notify_offer_withdrawn_none", booking_id=booking_id)
+                return {"booking_id": booking_id, "targets": 0}
+
+            title = "Offer withdrawn"
+            body = "The customer cancelled this booking."
+            data = {"type": "offer_withdrawn", "booking_id": booking_id}
+            total_sent = total_failed = total_deleted = 0
+
+            for uid in user_ids:
+                sent, failed, deleted = _push_to_user(
+                    cur,
+                    user_id=uid,
+                    title=title,
+                    body=body,
+                    data=data,
+                    priority="normal",
+                )
+                total_sent += sent
+                total_failed += failed
+                total_deleted += deleted
+                _insert_notification(
+                    cur,
+                    user_id=uid,
+                    app_context="pujari",
+                    related_type="assignment",
+                    related_id=booking_id,
+                    title=title,
+                    body=body,
+                )
+
+            conn.commit()
+            log.info(
+                "notify_offer_withdrawn_done",
+                booking_id=booking_id,
+                targets=len(user_ids),
+                fcm_sent=total_sent,
+                fcm_failed=total_failed,
+                devices_deleted=total_deleted,
+            )
+            return {
+                "booking_id": booking_id,
+                "targets": len(user_ids),
+                "fcm_sent": total_sent,
+                "fcm_failed": total_failed,
+                "devices_deleted": total_deleted,
+            }
+    finally:
+        conn.close()
+
+
 def _notify_offer_instant_impl(booking_id: str) -> dict:
     """High-priority modal push on urgency flip (§21.6.E)."""
     conn = get_connection()
@@ -609,3 +679,8 @@ def notify_reconfirm_ping(booking_id: str) -> dict:
 @celery_app.task(name="app.workers.notifications.notify_reconfirm_escalation")
 def notify_reconfirm_escalation(booking_id: str) -> dict:
     return _notify_reconfirm_escalation_impl(booking_id)
+
+
+@celery_app.task(name="app.workers.notifications.notify_offer_withdrawn")
+def notify_offer_withdrawn(booking_id: str) -> dict:
+    return _notify_offer_withdrawn_impl(booking_id)

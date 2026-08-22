@@ -27,7 +27,7 @@ Admin UI  ──write──►  /admin/catalog/*  ──►  pujas, puja_categor
 
 | Entity | Admin `GET /admin/catalog/pujas` | Customer `GET /v1/pujas` | Partner app |
 |--------|----------------------------------|--------------------------|-------------|
-| Puja `is_active=true` | Shown | **Shown** | Name on offer/booking when dispatched |
+| Puja `is_active=true` | Shown | **Shown only if** at least one **verified** pujari has `pujari_pricing` for that puja | Name on offer/booking when dispatched |
 | Puja `is_active=false` | Shown (Off badge) | **Hidden** | N/A (not in customer catalogue) |
 | Category `is_active=true` | Shown | In `categories` array | N/A |
 | Category `is_active=false` | Shown | **Hidden** from `categories` | N/A |
@@ -52,14 +52,18 @@ Admin UI  ──write──►  /admin/catalog/*  ──►  pujas, puja_categor
 
 ## Flutter customer catalogue (C-FLUTTER-CUSTOMER Wave 2)
 
-| Screen | Design ref | API | Status |
-|--------|------------|-----|--------|
-| Home categories row | design 01 | `categories` from `GET /v1/pujas` | IN_PROGRESS |
-| Home popular list + See all | design 01 | same, `limit=8` | IN_PROGRESS |
-| Full catalogue + chips | design 02 | `GET /v1/pujas?category_id=` + cursor | IN_PROGRESS |
-| Puja detail | design 03 | `GET /v1/pujas/{id}` | IN_PROGRESS |
-| Checkout / slot pick | design checkout | `slot-holds`, `bookings` | PENDING (Wave 4) |
-| Addresses | Account → saved addresses | `GET/POST/PUT /v1/addresses`, `GET /v1/service-areas` | IN_PROGRESS (`C-FLUTTER-ADDR`) |
+**Status:** see `STATUS.md` — `C-FLUTTER-CATALOG`, `C-FLUTTER-ADDR`, `C-FLUTTER-CHECKOUT` =
+**COMPLETED** (device-verified 2026-08-05 / 2026-08-06). This table is a screen map, not the
+status tracker.
+
+| Screen | Design ref | API | STATUS task |
+|--------|------------|-----|-------------|
+| Home categories row | design 01 | `categories` from `GET /v1/pujas` | `C-FLUTTER-CATALOG` |
+| Home popular list + See all | design 01 | same, `limit=8` | `C-FLUTTER-CATALOG` |
+| Full catalogue + chips | design 02 | `GET /v1/pujas?category_id=` + cursor | `C-FLUTTER-CATALOG` |
+| Puja detail | design 03 | `GET /v1/pujas/{id}` | `C-FLUTTER-CATALOG` |
+| Checkout / slot pick | design checkout | `slot-holds`, `bookings` | `C-FLUTTER-CHECKOUT` |
+| Addresses | Account → saved addresses | `GET/POST/PUT /v1/addresses`, `GET /v1/service-areas` | `C-FLUTTER-ADDR` |
 
 ---
 
@@ -67,9 +71,17 @@ Admin UI  ──write──►  /admin/catalog/*  ──►  pujas, puja_categor
 
 1. Puja badge **Active** (not Off) in Admin → Catalogue.
 2. Category **enabled** (customer `categories` list is active-only).
-3. Customer app signed in with **customer** flavor (`app_context=customer`).
-4. Same API host: Admin `127.0.0.1:8000` ≡ emulator `10.0.2.2:8000`.
-5. Pull to refresh on customer home or open full catalogue.
+3. At least one **verified** pujari has **`pujari_pricing`** for the puja (customer `GET /v1/pujas` filters on this; admin list does not).
+4. Customer app signed in with **customer** flavor (`app_context=customer`).
+5. Same API host: Admin `127.0.0.1:8000` ≡ device LAN IP (e.g. `192.168.1.5:8000`).
+6. Pull to refresh on customer home or open full catalogue.
+7. **Dev backfill:** after seeding catalogue or adding pujas, run  
+   `python scripts/sync_active_puja_pricing.py`  
+   (links every active puja to every verified pujari at `default_price`).
+8. **Production path:** when admin KYC promotes a pujari to `verified`, the API auto-applies
+   city service-area links, default weekly hours (06:00–23:59), and catalogue pricing via
+   `partner_dispatch_readiness.ensure_partner_dispatch_readiness()`. New admin puja creates
+   call `ensure_puja_pricing_for_verified_pujaris()`. Dev scripts remain for one-off DB repair.
 
 ---
 

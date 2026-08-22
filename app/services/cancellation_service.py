@@ -155,3 +155,13 @@ async def cancel_booking(
         refund_amount=refund_amount,
         refund_eta="5–7 business days" if refund_amount > 0 else "No refund applicable",
     )
+
+
+def enqueue_offer_withdrawn_notification(booking_id: uuid.UUID | str) -> None:
+    """Post-commit Celery enqueue — partner FCM `offer_withdrawn` (P-FCM-CUSTOMER-CANCEL)."""
+    from app.workers.celery_app import celery_app
+
+    celery_app.send_task(
+        "app.workers.notifications.notify_offer_withdrawn",
+        args=[str(booking_id)],
+    )

@@ -24,7 +24,7 @@ def _status_class(status_code: int) -> str:
 
 class MonitoringMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.path in ("/metrics", "/health"):
+        if request.url.path in ("/metrics", "/health", "/health/live"):
             return await call_next(request)
         route = _route_template(request)
         method = request.method

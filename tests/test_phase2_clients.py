@@ -117,7 +117,34 @@ class TestFcmClient:
         assert "/v1/projects/manapujari/messages:send" in url
         payload = post_call.kwargs["json"]["message"]
         assert payload["android"]["notification"]["channel_id"] == "mana_guruji_offers_high"
-        assert payload["android"]["notification"]["sound"] == "default"
+        assert payload["android"]["notification"]["sound"] == "offer_instant_bell"
+
+    @patch("app.services.fcm_client._access_token", return_value="oauth-token")
+    @patch("app.services.fcm_client._load_service_account")
+    @patch("app.services.fcm_client._service_account_path")
+    @patch("app.services.fcm_client.httpx.Client")
+    def test_v1_advance_offer_uses_default_notification(
+        self, mock_client_cls, mock_path, mock_load_sa, mock_token
+    ):
+        mock_path.return_value = MagicMock()
+        mock_load_sa.return_value = {"project_id": "manapujari"}
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {"name": "projects/manapujari/messages/msg-2"}
+        mock_client_cls.return_value.__enter__.return_value.post.return_value = resp
+        result = send_push_sync(
+            "device-tok-adv",
+            title="Offer",
+            body="Advance inbox",
+            priority="normal",
+        )
+        assert result.outcome == FcmOutcome.SENT
+        payload = mock_client_cls.return_value.__enter__.return_value.post.call_args.kwargs[
+            "json"
+        ]["message"]
+        android = payload["android"]
+        assert "notification" not in android
+        assert android["priority"] == "NORMAL"
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")
