@@ -8,3 +8,15 @@ DOC_TYPE_LABELS: dict[str, str] = {
     "address_proof": "Address proof",
     "photo": "Profile photo",
 }
+
+# DigiLocker scope → document types ingested from vendor (photo is camera selfie only).
+SCOPE_TO_DOC_TYPES: dict[str, tuple[str, ...]] = {
+    "ADHAR": ("identity_proof", "address_proof"),
+}
+
+KYC_CONSENT_PURPOSE_DIGILOCKER_AADHAAR = "digilocker_aadhaar"
+KYC_CONSENT_TEXT_VERSION = "v1"
+KYC_CONSENT_TEXT = (
+    "I consent to Mana Guruji fetching my Aadhaar details from DigiLocker "
+    "for partner KYC verification under applicable Indian law."
+)

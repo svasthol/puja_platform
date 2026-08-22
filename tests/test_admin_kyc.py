@@ -124,6 +124,21 @@ async def test_approve_promotes_when_all_required_verified(session):
     assert result.all_required_verified is True
     assert result.pujari_verification_status == "verified"
 
+    area_count = (
+        await session.execute(
+            text("SELECT count(*) FROM pujari_service_areas WHERE pujari_id = :id"),
+            {"id": str(pid)},
+        )
+    ).scalar_one()
+    avail_count = (
+        await session.execute(
+            text("SELECT count(*) FROM pujari_availability WHERE pujari_id = :id"),
+            {"id": str(pid)},
+        )
+    ).scalar_one()
+    assert area_count >= 1
+    assert avail_count == 7
+
 
 @pytest.mark.asyncio
 async def test_reject_requires_reason(session):

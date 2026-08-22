@@ -161,6 +161,15 @@ async def redis_set(key: str, value: str, *, ex: int | None = None) -> None:
     await redis_execute(_op)
 
 
+async def redis_set_nx(key: str, value: str, *, ex: int) -> bool:
+    """SET key value NX EX — returns True if lock acquired."""
+
+    async def _op(r: aioredis.Redis) -> bool:
+        return bool(await r.set(key, value, nx=True, ex=ex))
+
+    return await redis_execute(_op)
+
+
 async def redis_delete(key: str) -> int:
     async def _op(r: aioredis.Redis) -> int:
         return await r.delete(key)

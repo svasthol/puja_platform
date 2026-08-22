@@ -139,9 +139,9 @@ before any dispatch, booking-gate, offer-TTL, or reconfirmation change. Migratio
   `bookings.cancelled_at IS NULL`. Customer cancel (`cancellation_service`) must expire
   pending assignments in the same transaction (`expired` + `responded_at`) — history stays;
   never DELETE assignment rows. Partner Flutter refreshes inbox on 410 accept.
-- **`P-FCM-CUSTOMER-CANCEL` (IN_PROGRESS):** Push partner when customer cancels so the
-  offer disappears without waiting for poll. Planned `data.type = offer_withdrawn`; poll +
-  410 refresh are interim safety nets only.
+- **`P-FCM-CUSTOMER-CANCEL` (SHIPPED — 2026-08-12):** Customer cancel enqueues
+  `offer_withdrawn` FCM via `notify_offer_withdrawn` worker; partner Flutter
+  dismisses instant modal + refreshes Offers. Poll + 410 refresh remain safety nets.
 
 ### Migrations
 - **Migration 001**: `op.execute(open("spec/db/schema.sql").read())` then triggers then seed.

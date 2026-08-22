@@ -295,6 +295,10 @@ Normative data model: `pujas`, `puja_categories`, `puja_addons`, `pujari_pricing
   - Signed URLs for private bucket docs only; show `pan_status` when available
   - **Role:** approve/reject = `admin` only — identity verification decides who enters
     customers' homes; `support` may view and recommend (see RBAC matrix)
+  - On promotion to `verified`, `recompute_pujari_verification()` runs
+    `ensure_partner_dispatch_readiness()` idempotently (service areas, default availability,
+    catalogue pricing) — same transaction path as doc approve; see `DISPATCH_FLOW.md` §Launch
+    matching and `tests/test_admin_kyc.py`
 - **Depends on:** B-KYC; S3 bucket configured (`S3_BUCKET_KYC`)
 - **Priority:** Cannot onboard real supply without this
 

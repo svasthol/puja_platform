@@ -68,6 +68,11 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+    @app.get("/health/live")
+    async def health_live():
+        """Liveness only — no DB/Redis (use for device LAN reachability probes)."""
+        return {"status": "ok"}
+
     @app.get("/health")
     async def health():
         """Liveness + DB/Redis readiness (so LBs don't route to a broken pod)."""

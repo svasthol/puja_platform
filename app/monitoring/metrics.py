@@ -38,6 +38,15 @@ OPS_SCAN_CANDIDATES = Gauge(
     ["alert_type"],
 )
 
+KYC_PENDING_DOCS = Gauge(
+    "puja_kyc_pending_documents",
+    "Distinct pujaris with at least one pending current KYC document (M-HEALTH-KYC)",
+)
+
+
+def set_kyc_pending_docs(count: int) -> None:
+    KYC_PENDING_DOCS.set(count)
+
 # ---- Instant (non-persisted) counters ----------------------------------------
 WEBHOOK_SIGNATURE_FAILURES = Counter(
     "puja_webhook_signature_failures_total",

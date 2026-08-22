@@ -7,7 +7,11 @@ import pytest
 from sqlalchemy import text
 
 from app.services.fcm_client import FcmOutcome, FcmResult
-from app.workers.notifications import _notify_no_pujari_impl, _notify_offers_impl
+from app.workers.notifications import (
+    _notify_no_pujari_impl,
+    _notify_offer_withdrawn_impl,
+    _notify_offers_impl,
+)
 
 CUSTOMER = "aaaaaaaa-0000-0000-0000-000000000001"
 PUJARI = "cccccccc-0000-0000-0000-000000000001"
@@ -210,3 +214,68 @@ async def test_notify_no_pujari_customer_push_and_notification(session, seed, un
         )
     ).scalar_one_or_none()
     assert notif == "No pujari available"
+
+
+@pytest.mark.asyncio
+async def test_notify_offer_withdrawn_after_customer_cancel(session, seed, uniq):
+    bid = await _seed_booking_with_live_offer(session, uniq)
+    await _clear_devices(session, PUJARI_USER)
+    tok = f"withdraw-tok-{uniq.id()[:10]}"
+    await session.execute(
+        text(
+            "INSERT INTO devices (user_id, device_token, platform, created_at) "
+            "VALUES (:uid, :tok, 'android', now())"
+        ),
+        {"uid": PUJARI_USER, "tok": tok},
+    )
+    cancelled_id = (
+        await session.execute(
+            text("SELECT id FROM status_types WHERE domain='booking' AND code='cancelled'")
+        )
+    ).scalar_one()
+    expired_id = (
+        await session.execute(
+            text("SELECT id FROM status_types WHERE domain='assignment' AND code='expired'")
+        )
+    ).scalar_one()
+    await session.execute(
+        text(
+            "UPDATE bookings SET cancelled_at = now(), status_id = :sid WHERE id = :bid"
+        ),
+        {"sid": cancelled_id, "bid": bid},
+    )
+    await session.execute(
+        text(
+            """
+            UPDATE booking_assignments
+            SET status_id = :expired_id, responded_at = now()
+            WHERE booking_id = :bid AND responded_at IS NULL
+            """
+        ),
+        {"expired_id": expired_id, "bid": bid},
+    )
+    await session.commit()
+
+    with patch(
+        "app.workers.notifications.send_push_sync",
+        return_value=FcmResult(outcome=FcmOutcome.SENT, message_id="w1"),
+    ) as mock_push:
+        result = _notify_offer_withdrawn_impl(bid)
+
+    assert result["targets"] == 1
+    assert result["fcm_sent"] == 1
+    mock_push.assert_called_once()
+    _args, kwargs = mock_push.call_args
+    assert kwargs["data"]["type"] == "offer_withdrawn"
+    assert kwargs["data"]["booking_id"] == bid
+    assert kwargs["priority"] == "normal"
+
+    notif = (
+        await session.execute(
+            text(
+                "SELECT title FROM notifications WHERE user_id = :uid AND related_id = :bid"
+            ),
+            {"uid": PUJARI_USER, "bid": bid},
+        )
+    ).scalar_one_or_none()
+    assert notif == "Offer withdrawn"

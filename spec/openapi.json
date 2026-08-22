@@ -1755,6 +1755,364 @@
         ]
       }
     },
+    "/v1/pujari/register": {
+      "post": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Register Pujari",
+        "operationId": "register_pujari_v1_pujari_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerRegisterResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/pujari/kyc/digilocker": {
+      "post": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Start Digilocker",
+        "operationId": "start_digilocker_v1_pujari_kyc_digilocker_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigilockerStartResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/pujari/kyc/requests/{request_id}": {
+      "get": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Get Kyc Request",
+        "operationId": "get_kyc_request_v1_pujari_kyc_requests__request_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KycRequestStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pujari/documents": {
+      "post": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Presign Selfie Document",
+        "description": "Camera-captured selfie only \u2014 gating `photo` doc (UX control, not liveness).",
+        "operationId": "presign_selfie_document_v1_pujari_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelfiePresignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelfiePresignResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/pujari/documents/{document_id}/confirm": {
+      "post": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Confirm Selfie Document",
+        "description": "After presigned PUT \u2014 verify S3 object and strip JPEG EXIF before admin review.",
+        "operationId": "confirm_selfie_document_v1_pujari_documents__document_id__confirm_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelfieConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pujari/kyc/status": {
+      "get": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Partner Kyc Status",
+        "operationId": "partner_kyc_status_v1_pujari_kyc_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerKycStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/pujari/kyc/callback": {
+      "get": {
+        "tags": [
+          "pujari-kyc-callback"
+        ],
+        "summary": "Kyc Callback",
+        "description": "PUBLIC \u2014 nonce-bound DigiLocker redirect landing (no bearer token).",
+        "operationId": "kyc_callback_v1_pujari_kyc_callback_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Setu DigiLocker request id",
+              "title": "Id"
+            },
+            "description": "Setu DigiLocker request id"
+          },
+          {
+            "name": "success",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean",
+              "title": "Success"
+            }
+          },
+          {
+            "name": "kyc_nonce",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kyc Nonce"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "errCode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Errcode"
+            }
+          },
+          {
+            "name": "errMessage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Errmessage"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/bookings/{booking_id}/pujari-cancel": {
       "post": {
         "tags": [
@@ -4089,6 +4447,53 @@
             }
           }
         }
+      }
+    },
+    "/v1/admin/kyc/identity/deny": {
+      "post": {
+        "tags": [
+          "admin-kyc"
+        ],
+        "summary": "Deny Identity",
+        "description": "Ban a DigiLocker identity hash \u2014 blocks re-registration under a new phone.",
+        "operationId": "deny_identity_v1_admin_kyc_identity_deny_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityDenyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityDenyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/v1/admin/bookings": {
@@ -6850,16 +7255,14 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Muhurat Help Contact"
+            ]
           }
         },
         "type": "object",
         "required": [
           "night_bookings_enabled",
           "instant_lead_hours",
-          "advance_booking_amount",
-          "payments_enabled"
+          "advance_booking_amount"
         ],
         "title": "AppConfigResponse"
       },
@@ -7852,6 +8255,31 @@
         ],
         "title": "DeviceRegister"
       },
+      "DigilockerStartResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "url",
+          "expires_at"
+        ],
+        "title": "DigilockerStartResponse"
+      },
       "DispatchChoice": {
         "properties": {
           "action": {
@@ -7927,6 +8355,105 @@
         },
         "type": "object",
         "title": "Heartbeat"
+      },
+      "IdentityDenyRequest": {
+        "properties": {
+          "denied_reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Denied Reason"
+          },
+          "digilocker_id_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digilocker Id Hash"
+          },
+          "pujari_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pujari Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "denied_reason"
+        ],
+        "title": "IdentityDenyRequest"
+      },
+      "IdentityDenyResponse": {
+        "properties": {
+          "registry_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Registry Id"
+          },
+          "digilocker_id_hash": {
+            "type": "string",
+            "title": "Digilocker Id Hash"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "registry_id",
+          "digilocker_id_hash",
+          "state"
+        ],
+        "title": "IdentityDenyResponse"
+      },
+      "KycDocRequirement": {
+        "properties": {
+          "doc_type": {
+            "type": "string",
+            "title": "Doc Type"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doc_type"
+        ],
+        "title": "KycDocRequirement"
       },
       "KycPendingItem": {
         "properties": {
@@ -8180,6 +8707,72 @@
           "all_required_verified"
         ],
         "title": "KycPujariStatusResponse"
+      },
+      "KycRequestStatusResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "doc_types_created": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Doc Types Created"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "review_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Review Flags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status"
+        ],
+        "title": "KycRequestStatusResponse"
       },
       "KycReviewRequest": {
         "properties": {
@@ -8842,6 +9435,82 @@
           "end"
         ],
         "title": "PanchangamTimeWindow"
+      },
+      "PartnerKycStatusResponse": {
+        "properties": {
+          "verification_status": {
+            "type": "string",
+            "title": "Verification Status"
+          },
+          "required": {
+            "items": {
+              "$ref": "#/components/schemas/KycDocRequirement"
+            },
+            "type": "array",
+            "title": "Required"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verification_status",
+          "required"
+        ],
+        "title": "PartnerKycStatusResponse"
+      },
+      "PartnerRegisterRequest": {
+        "properties": {
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "years_experience": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 80.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Years Experience"
+          }
+        },
+        "type": "object",
+        "title": "PartnerRegisterRequest"
+      },
+      "PartnerRegisterResponse": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "verification_status": {
+            "type": "string",
+            "title": "Verification Status"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "verification_status",
+          "created"
+        ],
+        "title": "PartnerRegisterResponse"
       },
       "PujaAddonCreate": {
         "properties": {
@@ -9816,9 +10485,7 @@
           "area_label",
           "address",
           "map_url",
-          "relationship_manager",
-          "reconfirm_ping_sent_at",
-          "pujari_confirmed_at"
+          "relationship_manager"
         ],
         "title": "PujariBookingDetail"
       },
@@ -9918,8 +10585,7 @@
           "area_label",
           "payment_mode",
           "total_amount",
-          "amount_due_offline",
-          "reconfirm_pending"
+          "amount_due_offline"
         ],
         "title": "PujariBookingSummary"
       },
@@ -10544,6 +11210,85 @@
           "role"
         ],
         "title": "RoleAssignRequest"
+      },
+      "SelfieConfirmResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "doc_type": {
+            "type": "string",
+            "title": "Doc Type",
+            "default": "photo"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "status",
+          "file_url"
+        ],
+        "title": "SelfieConfirmResponse"
+      },
+      "SelfiePresignRequest": {
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "pattern": "^image/(jpeg|jpg|png|webp)$",
+            "title": "Content Type",
+            "default": "image/jpeg"
+          },
+          "content_length": {
+            "type": "integer",
+            "maximum": 5242880.0,
+            "minimum": 1.0,
+            "title": "Content Length"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content_length"
+        ],
+        "title": "SelfiePresignRequest"
+      },
+      "SelfiePresignResponse": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "upload_url": {
+            "type": "string",
+            "title": "Upload Url"
+          },
+          "upload_url_expires_in": {
+            "type": "integer",
+            "title": "Upload Url Expires In"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "upload_url",
+          "upload_url_expires_in",
+          "file_url"
+        ],
+        "title": "SelfiePresignResponse"
       },
       "ServiceAreaCreate": {
         "properties": {

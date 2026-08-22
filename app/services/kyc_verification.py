@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.kyc_config import REQUIRED_DOC_TYPES
 from app.models.catalog import Pujari, PujariDocument
+from app.services.partner_dispatch_readiness import ensure_partner_dispatch_readiness
 
 
 async def required_docs_verified(db: AsyncSession, pujari_id: uuid.UUID) -> bool:
@@ -38,14 +39,18 @@ async def recompute_pujari_verification(
     if pujari is None:
         raise ValueError(f"Pujari not found: {pujari_id}")
 
+    previous_status = pujari.verification_status
     if await required_docs_verified(db, pujari_id):
         new_status = "verified"
     else:
         new_status = "pending"
 
-    if pujari.verification_status != new_status:
+    if previous_status != new_status:
         pujari.verification_status = new_status
         pujari.updated_at = dt.datetime.now(dt.UTC)
         await db.flush()
+
+    if new_status == "verified":
+        await ensure_partner_dispatch_readiness(db, pujari_id=pujari_id)
 
     return new_status

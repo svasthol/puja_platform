@@ -23,9 +23,12 @@ from app.schemas.admin_kyc import (
     KycReviewResponse,
 )
 from app.schemas.common import decode_cursor, encode_cursor
+from app.schemas.partner_kyc import IdentityDenyRequest, IdentityDenyResponse
 from app.services.audit import record_admin_action
 from app.services.kyc_storage import presign_kyc_get
 from app.services.kyc_verification import recompute_pujari_verification, required_docs_verified
+from app.services import partner_kyc_service as kyc_svc
+from app.services.partner_kyc_service import PartnerKycError
 
 router = APIRouter(prefix="/admin/kyc", tags=["admin-kyc"])
 
@@ -296,4 +299,45 @@ async def reject_document(
         actor=p,
         request=request,
         payload=payload,
+    )
+
+
+@router.post("/identity/deny", response_model=IdentityDenyResponse)
+async def deny_identity(
+    payload: IdentityDenyRequest,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Ban a DigiLocker identity hash — blocks re-registration under a new phone."""
+    try:
+        row = await kyc_svc.deny_identity(
+            db,
+            actor_user_id=p.user_id,
+            denied_reason=payload.denied_reason,
+            digilocker_id_hash=payload.digilocker_id_hash,
+            pujari_id=payload.pujari_id,
+        )
+    except PartnerKycError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="deny_identity",
+        entity_type="kyc_identity_registry",
+        entity_id=str(row.id),
+        before={"state": "active"},
+        after={
+            "state": "denied",
+            "digilocker_id_hash": row.digilocker_id_hash,
+            "pujari_id": str(row.pujari_id) if row.pujari_id else None,
+        },
+        change_reason=payload.denied_reason,
+        ip=_client_ip(request),
+    )
+    return IdentityDenyResponse(
+        registry_id=row.id,
+        digilocker_id_hash=row.digilocker_id_hash,
+        state=row.state,
     )

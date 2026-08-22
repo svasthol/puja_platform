@@ -221,9 +221,23 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 
 ### Pujari app
 - `POST /v1/pujari/register`                   {bio?, years_experience?} — creates
-  `pujaris` row `verification_status='pending'`. KYC required before offers.
-- `POST /v1/pujari/documents`                  KYC upload metadata + signed S3 URL
-  flow (private bucket). See ARCHITECTURE.md.
+  `pujaris` row `verification_status='pending'`. Idempotent per user.
+- `POST /v1/pujari/kyc/digilocker`             Start Setu DigiLocker (consent row → vendor start).
+  Returns `{request_id, url, expires_at}`. Rate-limited. If a live request already
+  exists, **200** resumes it (same `request_id` + current vendor `url`) instead of
+  minting a second Setu session. **409** only if a live row exists but the vendor
+  URL is no longer available.
+- `GET  /v1/pujari/kyc/callback`               **PUBLIC** — DigiLocker redirect landing (nonce-bound;
+  no bearer). Lightweight: marks `authenticated` or `failed`; redirects to app deep link.
+- `GET  /v1/pujari/kyc/requests/{request_id}`  Self-healing poll — re-verifies Setu status,
+  drives finalize; returns `{status, scope, doc_types_created[], review_flags[]}`.
+- `GET  /v1/pujari/kyc/status`                 `{verification_status, required:[{doc_type, status}]}`.
+- `POST /v1/pujari/documents`                  **Selfie only** — presigned PUT to private KYC bucket
+  (gating `photo` doc; DigiLocker supplies `identity_proof` + `address_proof`).
+- `POST /v1/pujari/documents/{document_id}/confirm`  After presigned PUT — HEAD/S3 fetch, strip JPEG
+  EXIF/GPS, set `uploaded_at`. **200** `{document_id, doc_type, status, file_url}`.
+  **422** if object missing in S3.
+- `POST /v1/pujari/kyc/pan`                    Phase 4 — deferred.
 - `POST /v1/me/devices`                        {device_token, platform} — FCM target
   (customer or pujari token). Upsert by `device_token` (globally unique).
 - `DELETE /v1/me/devices/{device_token}`         unregister (owner only)
@@ -310,7 +324,8 @@ Admin auth: JWT `app_context=admin` **and** `user_roles` contains `admin` or
 - `POST /v1/admin/tax-config/commercial` — **only** `platform_fee_gross`,
   `platform_fee_inclusive`, `commission_pct`, `effective_from`, `change_reason`.
   Statutory/legal keys in body → **422**. See `spec/plans/A-TAX-CONFIG.md`.
-- KYC review queue (`pujari_documents` pending), booking search + manual
+- KYC review queue (`pujari_documents` pending), `POST /v1/admin/kyc/identity/deny`
+  (ban DigiLocker identity hash — audited), booking search + manual
   reassign — MUST use the clear-then-insert flow in DISPATCH_FLOW.md
   ("Manual reassign"): clear `pujari_id` + `intended_pujari_id` with a
   history row, THEN insert the accepted assignment; inserting while the old

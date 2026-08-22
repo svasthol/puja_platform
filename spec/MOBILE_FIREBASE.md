@@ -116,7 +116,8 @@ Recommended repo name: `mana_guruji_mobile` (separate from `puja_platform`).
 4. **On login** — `POST /v1/me/devices` with FCM token; refresh on `onTokenRefresh`.
 5. **API** — generate client from `spec/openapi.json`; base URL from env.
 6. **Handle FCM `data.type`** — `offer_instant`, `offer_advance`, `reconfirm_ping`,
-   `reconfirm_escalation` (see `DISPATCH_FLOW.md` §21.6.H, `app/workers/notifications.py`).
+   `reconfirm_escalation`, `accept_ack`, `offer_withdrawn` (see `DISPATCH_FLOW.md` §21.6.H,
+   `app/workers/notifications.py`, table below).
 7. **Safety net** — partner still polls `GET /v1/offers` (15–30s foreground / on-resume).
 
 ### Suggested `build.gradle` flavor sketch
@@ -164,7 +165,7 @@ API base URL:
 | `reconfirm_ping` | high | Open booking → reconfirm or cancel |
 | `reconfirm_escalation` | normal | RM / ops alert style |
 | `accept_ack` | normal | Advance accept confirmation |
-| `offer_withdrawn` | normal | **IN_PROGRESS (`P-FCM-CUSTOMER-CANCEL`)** — customer cancelled; refresh Offers tab / dismiss modal |
+| `offer_withdrawn` | normal | Customer cancelled — refresh Offers tab / dismiss instant modal |
 
 Customer push types: add rows here when customer notification worker paths are defined.
 
@@ -176,5 +177,6 @@ Customer push types: add rows here when customer notification worker paths are d
 |---|---|
 | 2026-07-29 | Firebase project `manapujari` created; Android apps `com.managuruji.customer` + `com.managuruji.partner` registered |
 | 2026-07-29 | Flutter repo `mana_guruji/mana_guruji_mobile` scaffolded — Phase A partner-first (flavors, OpenAPI client, OTP, FCM hook, offers/bookings shell) |
-| 2026-08-10 | `P-CANCEL-OFFERS-SYNC` — customer cancel expires pending assignments; `GET /v1/offers` excludes `cancelled_at`; partner 410 refresh. `P-FCM-CUSTOMER-CANCEL` (`offer_withdrawn`) IN_PROGRESS |
+| 2026-08-12 | `P-FCM-CUSTOMER-CANCEL` **COMPLETED** — `offer_withdrawn` FCM on customer cancel; partner Flutter handler + instant modal dismiss |
+| 2026-08-10 | `P-CANCEL-OFFERS-SYNC` — customer cancel expires pending assignments; `GET /v1/offers` excludes `cancelled_at`; partner 410 refresh |
 | 2026-07-30 | Added [`MOBILE_FLUTTER.md`](./MOBILE_FLUTTER.md) — normative Flutter implementation contract |

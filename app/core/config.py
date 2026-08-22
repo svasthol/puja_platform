@@ -98,6 +98,22 @@ class Settings(BaseSettings):
     S3_CATALOG_PUBLIC_URL: str = ""           # CDN base, e.g. https://cdn.example.com
     S3_CATALOG_URL_EXPIRE_SECONDS: int = 600  # presigned PUT TTL
     S3_CATALOG_MAX_BYTES: int = 5_242_880     # 5 MiB — catalogue images only
+    S3_KYC_MAX_BYTES: int = 5_242_880         # 5 MiB — selfie upload cap
+
+    # ---- Partner KYC (Setu DigiLocker — vendor-agnostic via KYC_VENDOR) --------
+    KYC_VENDOR: str = "setu_digilocker"
+    KYC_REDIRECT_URL: str = ""                # public callback base (Setu redirect landing)
+    KYC_APP_RETURN_URL: str = "managuruji://kyc/complete"
+    KYC_REQUEST_TTL_MINUTES: int = 30
+    KYC_RETENTION_DAYS: int = 365
+    KYC_IDENTITY_PEPPER: str = ""             # HMAC pepper for digilocker_id_hash
+    KYC_SETU_BASE_URL: str = "https://dg-sandbox.setu.co"
+    KYC_SETU_CLIENT_ID: str = ""
+    KYC_SETU_CLIENT_SECRET: str = ""
+    KYC_SETU_DIGILOCKER_PRODUCT_ID: str = ""
+    KYC_SETU_PAN_PRODUCT_ID: str = ""
+    KYC_CALLBACK_RATE_LIMIT_PER_HOUR: int = 60
+    KYC_START_RATE_LIMIT_PER_HOUR: int = 10
 
     # ---- Maps ----------------------------------------------------------------
     GOOGLE_MAPS_API_KEY: str = ""
@@ -148,6 +164,21 @@ class Settings(BaseSettings):
     def secret_key_length(cls, v: str) -> str:
         if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters")
+        return v
+
+    @field_validator(
+        "S3_ACCESS_KEY",
+        "S3_SECRET_KEY",
+        "S3_BUCKET_KYC",
+        "S3_BUCKET_CATALOG",
+        "S3_REGION",
+        "S3_ENDPOINT_URL",
+        mode="before",
+    )
+    @classmethod
+    def strip_s3_env_strings(cls, v: str | None) -> str | None:
+        if isinstance(v, str):
+            return v.strip()
         return v
 
 

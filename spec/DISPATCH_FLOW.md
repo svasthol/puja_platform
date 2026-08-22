@@ -71,6 +71,11 @@ Eligibility at broadcast — **no `ST_DWithin`**, **no `pujari_live_location` jo
    (default 60) before this slot — app filter only
 9. **Re-offer (status-aware):** exclude **rejected**; **expired** after cooldown (45m)
 
+**Supply provisioning (A-KYC):** on promotion to `verified`, `recompute_pujari_verification()`
+calls `ensure_partner_dispatch_readiness()` idempotently — links active service areas,
+default weekly hours (06:00–23:59), and `pujari_pricing` for all active pujas (criteria 2,
+4, 5 above). See `PARTNER.md` B-REGISTER and `CATALOG_SYNC.md` §8.
+
 Customer `addresses.service_area_id` is **display-only** on offers; does not filter dispatch.
 
 ### Dispatch windows

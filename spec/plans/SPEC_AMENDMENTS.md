@@ -1104,6 +1104,7 @@ Single audit trail for v3.2 architecture reviews. Implementation status: `plans/
 | P-AUTH-FIX | Refresh/logout broken (bcrypt equality lookup); OTP lockout dead | `jti` lookup + `verify_secret`; persist attempts outside txn |
 | P-REFUND-CAP text | `PLATFORM.md` said `total_charged_online`; trigger caps `payments.amount` | Mark COMPLETED; align acceptance text (trigger already shipped) |
 | B-KYC ↔ A-KYC cycle | `PARTNER.md` listed A-KYC as dependency — spec deadlock | B-KYC depends on B-REGISTER only; A-KYC is downstream reviewer |
+| B-KYC-VENDOR (Aug 2026) | Manual S3-only KYC upload | Vendor-agnostic DigiLocker (Setu v1): migration **020**, self-healing poll finalize, camera selfie gating `photo`, `kyc_identity_registry` dedup/deny-list |
 | P-EXC-ADMIN-PATHS | `exceptions.py` always 200 on active refund; pujari overlap copy on admin | Branch `"/admin/" in path` per API_CONTRACTS |
 | puja_app REVOKE | Migration 009 `REVOKE … FROM puja_app` fails if role missing on dev | Guard with `pg_roles` check in migration 009 |
 

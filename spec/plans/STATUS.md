@@ -9,7 +9,7 @@ gates: [`MASTER.md`](./MASTER.md).
 this file on every task). Status changes happen here and only here; track files own
 Spec / Files / Acceptance / Depends-on.
 
-**Last audited:** 2026-08-10 (cancel UX + `P-CANCEL-OFFERS-SYNC`; `P-FCM-CUSTOMER-CANCEL` IN_PROGRESS) · **pytest:** `test_launch_slice.py::test_list_offers_excludes_customer_cancelled_booking` added; run full `pytest tests/ -q` after clean seed
+**Last audited:** 2026-08-16 (spec doc sync — task-status conflicts vs `MOBILE_FLUTTER.md`, `CATALOG_SYNC.md`, `CUSTOMER.md`, Phase 2 exit gate) · **pytest:** `test_notify_offer_withdrawn_after_customer_cancel` added; run full `pytest tests/ -q` after clean seed
 
 ---
 
@@ -69,7 +69,7 @@ Customer + partner apps share one Flutter codebase (build flavors). Repo:
 | ID | Status | Notes |
 |---|---|---|
 | C-FLUTTER-CUSTOMER | IN_PROGRESS | Waves 0–4 + bookings + **cancel UX** shipped (2026-08-09). Next: **Wave 4 customer FCM** or panchangam ribbon QA. |
-| P-FLUTTER-PARTNER | IN_PROGRESS | **Core slice done** (auth, online, offers, bookings, cancel UX, FCM handlers, l10n). **IN_PROGRESS:** FCM sound QA, **`P-FCM-CUSTOMER-CANCEL`**. **HOLD:** availability, register/KYC, earnings. |
+| P-FLUTTER-PARTNER | IN_PROGRESS | **Core slice done** (auth, online, offers, bookings, cancel UX, FCM handlers incl. `offer_withdrawn`, l10n). **IN_PROGRESS:** FCM sound QA. **HOLD:** availability, register/KYC, earnings. |
 | C-LAUNCH-UX | IN_PROGRESS | **Alias → `P-FLUTTER-PARTNER`** (Offers vs Bookings tabs, §21.9); keep ID for cross-ref |
 
 ### Customer app — progress (`C-FLUTTER-CUSTOMER` sub-track)
@@ -96,19 +96,19 @@ Customer + partner apps share one Flutter codebase (build flavors). Repo:
 | P-FLUTTER-PUJARI-CANCEL | COMPLETED | `POST /pujari-cancel` from detail + reconfirm card; navigates to Requests + refreshes offers |
 | P-FLUTTER-FCM-REGISTER | COMPLETED | `POST /v1/me/devices`; Firebase partner flavor; token refresh on Pixel 10 |
 | P-FLUTTER-FCM-HANDLERS | COMPLETED | All 5 partner types routed (`offer_instant`, `offer_advance`, `reconfirm_*`, `accept_ack`); foreground + tap; `test/fcm_message_parser_test.dart` |
-| P-FLUTTER-FCM-CUSTOMER-CANCEL | IN_PROGRESS | **`P-FCM-CUSTOMER-CANCEL`** — handle `offer_withdrawn` FCM; refresh/dismiss instant modal. Safety nets shipped: poll + 410 refresh (`P-CANCEL-OFFERS-SYNC`) |
+| P-FLUTTER-FCM-CUSTOMER-CANCEL | COMPLETED | **`P-FCM-CUSTOMER-CANCEL`** — `offer_withdrawn` FCM handler; dismiss instant modal + refresh Offers. Safety nets: poll + 410 refresh (`P-CANCEL-OFFERS-SYNC`) |
 | P-FLUTTER-FCM-SOUND | IN_PROGRESS | Native channel + `OfferAlertSound` + FCM sound dedup (2026-08-09). Device sign-off: `mana_guruji_mobile/test/PARTNER_FCM_SOUND.md` C1–C4 |
 | P-FLUTTER-L10N | COMPLETED | Partner shell + **OTP auth screen** EN/TE; `LocaleToggleBar` on login |
 | P-FLUTTER-DEV-NETWORK | COMPLETED | Physical device: `adb reverse tcp:8000` or LAN IP + `uvicorn --host 0.0.0.0` |
 | P-FLUTTER-E2E-SMOKE | IN_PROGRESS | **A, B, D, E — PASS** (2026-08-03). **C1–C4** via `test/PARTNER_FCM_SOUND.md`; checklist: `test/PARTNER_E2E_SMOKE.md` |
 | P-FLUTTER-AVAILABILITY | HOLD | Weekly hours + date blocks UI — backend ready (`B-AVAIL`/`B-UNAVAIL`); unblock when onboarding track starts |
-| P-FLUTTER-REGISTER | HOLD | Onboarding UI — blocked on eKYC vendor decision + `B-REGISTER` |
-| P-FLUTTER-KYC | HOLD | KYC upload/status UI — blocked on eKYC vendor decision + `B-KYC` |
+| P-FLUTTER-REGISTER | IN_PROGRESS | Register screen + profile bootstrap wired to `POST /v1/pujari/register` |
+| P-FLUTTER-KYC | IN_PROGRESS | DigiLocker WebView + camera selfie + status hub; device QA pending |
 | P-FLUTTER-EARNINGS-UI | HOLD | Header earnings strip — blocked on Phase 3 `B-EARNINGS` / `P-SPLITS` |
 
-**Phase 2 FCM:** `P-FCM-E2E` **IN_PROGRESS** (partner sound device QA — `test/PARTNER_FCM_SOUND.md`). **`P-FCM-CUSTOMER-CANCEL` IN_PROGRESS** — partner push on customer cancel (`offer_withdrawn`). Customer FCM **PENDING** (`C-FLUTTER-FCM`).
+**Phase 2 FCM:** `P-FCM-E2E` **IN_PROGRESS** (partner sound device QA — `test/PARTNER_FCM_SOUND.md`). **`P-FCM-CUSTOMER-CANCEL` COMPLETED** (2026-08-12). Customer FCM **PENDING** (`C-FLUTTER-FCM`).
 
-**Partner polish (Aug 2026):** FCM sound device sign-off → **`P-FCM-CUSTOMER-CANCEL`** → then availability/register/KYC/earnings HOLD bucket.
+**Partner polish (Aug 2026):** FCM sound device sign-off → availability/register/KYC/earnings HOLD bucket.
 
 ---
 
@@ -134,7 +134,7 @@ exit gate in MASTER.md is met.
 | Phase | Name | Phase status | Exit gate (summary) |
 |---|---|---|---|
 | **0** | Integrity + dispatch | **COMPLETED** | P0 trio + dispatch wiring + Sprint 1 concurrency tests |
-| **0.5** | Supply onboarding | **IN_PROGRESS** | KYC approve path; earnings stub |
+| **0.5** | Supply onboarding | **IN_PROGRESS** | KYC approve path **signed off** (backend E2E); earnings stub still pending |
 | **1** | Customer + partner APIs | **COMPLETED** | Addresses, booking detail, availability |
 | **2** | Notifications | **IN_PROGRESS** | Backend done; live SMS blocked on DLT; partner FCM handlers **COMPLETED**; `P-FCM-E2E` + `P-FLUTTER-FCM-SOUND` QA pending |
 | **3** | Money pipeline | **ON HOLD** | CA memo + Razorpay Route → migration 007, splits, TDS, payouts |
@@ -188,7 +188,7 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | P-WEBHOOK-BRANCH | COMPLETED | direct vs broadcast enqueue |
 | P-DISP-PRICING | COMPLETED | `pujari_pricing` join in dispatch |
 | P-DISP-BROADCAST | COMPLETED | geo rounds + pricing filter |
-| P-DISPATCH-SUPPLY | COMPLETED | `assert_dispatch_supply()` — 422 `NO_DISPATCH_SUPPLY` at `POST /bookings`; catalog filters pujas without verified pricing; `scripts/sync_active_puja_pricing.py`; `tests/test_dispatch_supply.py` + `tests/test_wave1_dispatch_e2e.py` |
+| P-DISPATCH-SUPPLY | COMPLETED | `assert_dispatch_supply()` — 422 `NO_DISPATCH_SUPPLY` at `POST /bookings`; catalog filters pujas without verified pricing; `scripts/sync_active_puja_pricing.py`; `tests/test_dispatch_supply.py` + `tests/test_wave1_dispatch_e2e.py`; **auto readiness on verify** via `partner_dispatch_readiness.py` + `tests/test_partner_dispatch_readiness.py` |
 
 ### Sprint 1 concurrency tests (alongside code — not Phase 6 only)
 
@@ -217,7 +217,7 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | P-NOTIFY | COMPLETED | 2 | FCM + SMS fallback worker; `notifications` queue; **2026-08-02:** see `P-FCM-ANDROID-CHANNEL` |
 | P-FCM-ANDROID-CHANNEL | COMPLETED | 2 | `fcm_client.py` — high-priority pushes set `android.notification.channel_id=mana_guruji_offers_high` + `sound=default`; legacy API `android_channel_id`; `tests/test_phase2_clients.py::TestFcmClient` |
 | P-CANCEL-OFFERS-SYNC | COMPLETED | — | Customer cancel expires pending assignments (`expired` + `responded_at`); `GET /v1/offers` filters `cancelled_at IS NULL`; `test_launch_slice.py` |
-| P-FCM-CUSTOMER-CANCEL | IN_PROGRESS | 2 | Partner FCM when customer cancels — `data.type=offer_withdrawn`; enqueue from `cancellation_service`; partner handler + dismiss modal. Poll + 410 refresh are safety nets (`P-CANCEL-OFFERS-SYNC`) |
+| P-FCM-CUSTOMER-CANCEL | COMPLETED | 2 | Partner FCM when customer cancels — `data.type=offer_withdrawn`; enqueue from cancel endpoint (post-commit); partner handler + dismiss modal |
 | P-TXN-LOCK | COMPLETED | — | re-audit: `pujari_tax_year.gross_facilitated` under same guarded UPDATE |
 | P-REFUND-CAP | COMPLETED | 3 | `trg_refunds_cap_total` vs `payments.amount` (mig 005 verified) |
 | P-AUTH-FIX | COMPLETED | 4-0 | jti lookup + `verify_secret`; reuse-detection revokes all; Redis OTP lockout; `test_sprint40_auth.py` |
@@ -292,10 +292,12 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | B-EARNINGS | PENDING | 3 | blocked_by: P-SPLITS; + TDS line, ₹4.5L nudge |
 | B-AVAIL | COMPLETED | 1 | `PUT/GET /v1/me/availability` replace-all |
 | B-UNAVAIL | COMPLETED | 1 | `PUT/GET /v1/me/unavailability` replace-all |
-| B-KYC | HOLD | 0.5 | DigiLocker Aadhaar + **nullable PAN pull** — **deferred** (eKYC vendor discussions in progress) |
+| B-KYC | COMPLETED | 0.5 | Setu DigiLocker + selfie presign/confirm + admin approve → `verified`; `api-full` smoke + pytest green |
+| B-KYC-VENDOR | COMPLETED | 0.5 | `partner_kyc_service` + Setu async client + self-healing poll finalize |
+| B-KYC-SELFIE | COMPLETED | 0.5 | presign + confirm (EXIF strip); `tests/e2e/test_kyc_selfie_live.py` (7 cases) + `kyc_selfie_smoke.py` |
 | B-DEVICE | COMPLETED | 2 | `POST/DELETE /v1/me/devices`; upsert by `device_token` |
 | B-CANCEL | COMPLETED | 5 | `POST /v1/bookings/{id}/pujari-cancel` → requested + `rebroadcast(fresh=True)`; `test_pujari_cancel.py` |
-| B-REGISTER | HOLD | profile bootstrap — **deferred** (eKYC vendor discussions in progress) |
+| B-REGISTER | COMPLETED | 0.5 | `POST /v1/pujari/register` — idempotent pending pujari bootstrap |
 
 ---
 
@@ -353,8 +355,8 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | ID | Status | Notes |
 |---|---|---|
 | P-SMS-DLT | BLOCKED | Live SMS delivery — **DLT registration mandatory even for vendor testing** (TRAI). Provider may accept API calls but reject/drop messages without registered entity, header, and template. Use `DEBUG=true` + `otp_dev_only` until DLT approved. See SPEC_AMENDMENTS §18. |
-| P-FCM-E2E | IN_PROGRESS | Partner handlers + channel shipped (2026-08-09). **Remaining:** device sign-off `test/PARTNER_FCM_SOUND.md` C1–C4; **`P-FCM-CUSTOMER-CANCEL`**; customer flavor not started |
-| Phase 2 exit gate | PENDING | Met when P-WS location events done **and** P-SMS-DLT unblocked **and** `P-FCM-E2E` **COMPLETED** (partner sound QA + **`P-FCM-CUSTOMER-CANCEL`** + customer push) |
+| P-FCM-E2E | IN_PROGRESS | Partner handlers + channel shipped (2026-08-09). **`P-FCM-CUSTOMER-CANCEL` COMPLETED** (2026-08-12). **Remaining:** device sign-off `test/PARTNER_FCM_SOUND.md` C1–C4; customer flavor (`C-FLUTTER-FCM`) not started |
+| Phase 2 exit gate | PENDING | Met when P-WS location events done **and** P-SMS-DLT unblocked **and** `P-FCM-E2E` **COMPLETED** (partner sound QA + customer push) |
 
 ---
 
@@ -430,7 +432,7 @@ gate signed off; booking lifecycle API frozen.
 | M-HEALTH-REDIS | PENDING | 7 | Redis latency / ping |
 | M-HEALTH-CELERY | PENDING | 7 | Queue depth + task failures |
 | M-HEALTH-SMS | PENDING | 7 | Provider send/fail counters |
-| M-HEALTH-FCM | PENDING | 7 | Push send/fail counters; blocked_by: `P-FCM-E2E` + `P-FCM-CUSTOMER-CANCEL` (IN_PROGRESS) |
+| M-HEALTH-FCM | PENDING | 7 | Push send/fail counters; blocked_by: `P-FCM-E2E` |
 | M-HEALTH-PAYMENT | PENDING | 7 | Webhook + capture SLIs |
 | M-HEALTH-KYC | PENDING | 7 | Pending documents gauge |
 | M-HEALTH-BOOKING | PENDING | 7 | Time-in-status SLIs; blocked_by: M-LIFECYCLE-EVENTS |

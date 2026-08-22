@@ -39,8 +39,9 @@ _UNREGISTERED_ERRORS = frozenset(
     }
 )
 
-# Must match partner MainActivity.CHANNEL_ID (IMPORTANCE_HIGH + default sound).
-_PARTNER_OFFER_CHANNEL_ID = "mana_guruji_offers_high"
+# Must match partner MainActivity notification channels + res/raw sound files.
+_PARTNER_OFFER_CHANNEL_INSTANT = "mana_guruji_offers_high"
+_SOUND_OFFER_INSTANT = "offer_instant_bell"
 
 _token_cache: dict[str, Any] = {"access_token": None, "expires_at": 0.0}
 
@@ -140,15 +141,29 @@ def _android_priority(priority: str) -> str:
     return "HIGH" if priority == "high" else "NORMAL"
 
 
-def _android_message_config(priority: str) -> dict[str, Any]:
-    """Android FCM config. High-priority uses partner offer channel for audible alerts."""
+def _android_message_config(
+    priority: str,
+    *,
+    channel_id: str | None = None,
+    sound: str | None = None,
+) -> dict[str, Any]:
+    """Android FCM config — custom channel + raw sound per offer type."""
     config: dict[str, Any] = {"priority": _android_priority(priority)}
-    if priority == "high":
-        config["notification"] = {
-            "channel_id": _PARTNER_OFFER_CHANNEL_ID,
-            "sound": "default",
-        }
+    notification: dict[str, Any] = {}
+    if channel_id:
+        notification["channel_id"] = channel_id
+    if sound:
+        notification["sound"] = sound
+    if notification:
+        config["notification"] = notification
     return config
+
+
+def _default_android_notification(priority: str) -> tuple[str | None, str | None]:
+    """Only instant (high-priority) offers use the custom bell channel."""
+    if priority == "high":
+        return _PARTNER_OFFER_CHANNEL_INSTANT, _SOUND_OFFER_INSTANT
+    return None, None
 
 
 def _parse_v1_error(body: dict[str, Any]) -> tuple[FcmOutcome, str]:
@@ -174,6 +189,8 @@ def _send_once_v1(
     body: str,
     data: dict[str, str] | None,
     priority: str = "high",
+    android_channel_id: str | None = None,
+    android_sound: str | None = None,
 ) -> FcmResult:
     sa = _load_service_account()
     if sa is None:
@@ -185,10 +202,17 @@ def _send_once_v1(
     if not token:
         return FcmResult(outcome=FcmOutcome.SKIPPED)
 
+    if android_channel_id is None and android_sound is None:
+        android_channel_id, android_sound = _default_android_notification(priority)
+
     message: dict[str, Any] = {
         "token": device_token,
         "notification": {"title": title, "body": body},
-        "android": _android_message_config(priority),
+        "android": _android_message_config(
+            priority,
+            channel_id=android_channel_id,
+            sound=android_sound,
+        ),
         "apns": {
             "headers": {"apns-priority": "10" if priority == "high" else "5"},
             "payload": {"aps": {"sound": "default"}},
@@ -230,13 +254,18 @@ def _send_once_legacy(
     body: str,
     data: dict[str, str] | None,
     priority: str = "high",
+    android_channel_id: str | None = None,
+    android_sound: str | None = None,
 ) -> FcmResult:
     if not settings.FCM_SERVER_KEY:
         return FcmResult(outcome=FcmOutcome.SKIPPED)
+    if android_channel_id is None and android_sound is None:
+        android_channel_id, android_sound = _default_android_notification(priority)
     notification: dict[str, Any] = {"title": title, "body": body}
-    if priority == "high":
-        notification["sound"] = "default"
-        notification["android_channel_id"] = _PARTNER_OFFER_CHANNEL_ID
+    if android_channel_id:
+        notification["android_channel_id"] = android_channel_id
+    if android_sound:
+        notification["sound"] = android_sound
     payload: dict = {
         "to": device_token,
         "notification": notification,
@@ -276,13 +305,27 @@ def _send_once_sync(
     body: str,
     data: dict[str, str] | None,
     priority: str = "high",
+    android_channel_id: str | None = None,
+    android_sound: str | None = None,
 ) -> FcmResult:
     if _service_account_path() is not None:
         return _send_once_v1(
-            device_token, title=title, body=body, data=data, priority=priority
+            device_token,
+            title=title,
+            body=body,
+            data=data,
+            priority=priority,
+            android_channel_id=android_channel_id,
+            android_sound=android_sound,
         )
     return _send_once_legacy(
-        device_token, title=title, body=body, data=data, priority=priority
+        device_token,
+        title=title,
+        body=body,
+        data=data,
+        priority=priority,
+        android_channel_id=android_channel_id,
+        android_sound=android_sound,
     )
 
 
@@ -293,13 +336,21 @@ def send_push_sync(
     body: str,
     data: dict[str, str] | None = None,
     priority: str = "high",
+    android_channel_id: str | None = None,
+    android_sound: str | None = None,
     max_attempts: int = 3,
 ) -> FcmResult:
     """Send with retries (DISPATCH_FLOW: 2 retries = 3 attempts total)."""
     last = FcmResult(outcome=FcmOutcome.FAILED, error="not_attempted")
     for attempt in range(1, max_attempts + 1):
         last = _send_once_sync(
-            device_token, title=title, body=body, data=data, priority=priority
+            device_token,
+            title=title,
+            body=body,
+            data=data,
+            priority=priority,
+            android_channel_id=android_channel_id,
+            android_sound=android_sound,
         )
         if last.outcome in (FcmOutcome.SENT, FcmOutcome.UNREGISTERED, FcmOutcome.SKIPPED):
             return last

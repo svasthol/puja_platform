@@ -136,14 +136,14 @@ Tasks trace to `spec/API_CONTRACTS.md` §Customer app unless marked SPEC_AMENDME
 
 **Flutter (`C-FLUTTER-CUSTOMER` — IN_PROGRESS):**
 
-- [x] Browse catalogue — categories, list, detail (`C-FLUTTER-CATALOG`; checkout CTA stub)
-- [ ] Pick area + pin address → hold (broadcast) → pay → track booking
-- [ ] While `requested`: "Finding your pujari…" UX (immediate dispatch on payment, §21.6.C)
-- [ ] Night slot (00:00–05:59) → clear "not available yet" message on the 422 (§21.6.A); read `GET /v1/app-config` + `gate_warnings` on holds — blocks **all** night slots at launch, not instant-only
-- [ ] After Razorpay success → `payment_pending` "Confirming payment…" until `requested`
-- [ ] Tracking UX branches on **`booking_class`** (instant radar vs advance calm state)
-- [ ] After confirm: pujari name + RM — no direct phone
-- [ ] Address CRUD with mandatory `service_area_id`
-- [ ] Booking list + full detail
-- [ ] Idempotent double-submit returns 409 + same `razorpay_order_id`
-- [ ] `advance_balance` refund copy states offline portion not refunded via platform
+- [x] Browse catalogue — categories, list, detail (`C-FLUTTER-CATALOG`; detail CTA → checkout)
+- [x] Pick area + pin address → hold (broadcast) → pay → track booking (`C-FLUTTER-ADDR`, `C-FLUTTER-CHECKOUT`, `C-FLUTTER-BOOKINGS`; device 2026-08-06)
+- [x] While `requested`: "Finding your pujari…" UX (immediate dispatch on payment, §21.6.C)
+- [x] Night slot (00:00–05:59) → clear "not available yet" message on the 422 (§21.6.A); read `GET /v1/app-config` + `gate_warnings` on holds — blocks **all** night slots at launch, not instant-only
+- [x] After Razorpay success → `payment_pending` "Confirming payment…" until `requested`
+- [x] Tracking UX branches on **`booking_class`** (instant radar vs advance calm state)
+- [x] After confirm: pujari name + RM — no direct phone
+- [x] Address CRUD with mandatory `service_area_id`
+- [x] Booking list + full detail
+- [x] Idempotent double-submit returns 409 + same `razorpay_order_id`
+- [x] `advance_balance` refund copy states offline portion not refunded via platform

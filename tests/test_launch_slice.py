@@ -226,6 +226,29 @@ async def test_list_offers_excludes_customer_cancelled_booking(session, seed, un
 
 
 @pytest.mark.asyncio
+async def test_customer_cancel_enqueues_offer_withdrawn_notification(session, seed, uniq, monkeypatch):
+    bid, _aid = await _make_live_offer(session, uniq)
+    sent: list[tuple] = []
+    monkeypatch.setattr(
+        "app.workers.celery_app.celery_app.send_task",
+        lambda name, args=None, **kw: sent.append((name, args)),
+    )
+    from app.services.cancellation_service import (
+        cancel_booking,
+        enqueue_offer_withdrawn_notification,
+    )
+
+    await cancel_booking(session, user_id=CUSTOMER, booking_id=uuid.UUID(bid))
+    await session.commit()
+    enqueue_offer_withdrawn_notification(bid)
+
+    assert (
+        "app.workers.notifications.notify_offer_withdrawn",
+        [bid],
+    ) in sent
+
+
+@pytest.mark.asyncio
 async def test_pujari_bookings_list_after_confirm(session, seed, uniq):
     bid, aid = await _make_live_offer(session, uniq)
     await _confirm_booking(session, aid, bid)

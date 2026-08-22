@@ -61,15 +61,16 @@ not a plan reference.
 | Endpoint / field | STATUS task | State | Mobile may bind? |
 |------------------|-------------|-------|------------------|
 | `GET /v1/app-config` | `P-APP-CONFIG` | LIVE | Yes |
-| `GET /v1/panchangam` | `P-PANCHANGAM-API` | LIVE (contract) | Yes¹ (ribbon UI **HOLD** — `C-PANCHANGAM-UI`) |
+| `GET /v1/panchangam` | `P-PANCHANGAM-API` | LIVE (contract) | Yes¹ (ribbon UI **IN_PROGRESS** — `C-PANCHANGAM-UI`) |
 | `booking_class` (C-GET/list/create) | `P-FLUTTER-CONTRACT` | LIVE | Yes |
 | `POST /v1/pujari/bookings/{id}/reconfirm` | `P-RECONFIRM-API` | LIVE | Yes |
 | `spec/openapi.json` codegen | `P-OPENAPI-ARTIFACT` | LIVE | Yes |
-| Partner KYC / register UI | `B-REGISTER`, `B-KYC` | PLANNED (Phase 0.5) | **No** |
-| Razorpay / earnings money | Phase 3 tasks | PLANNED | **No** |
+| Partner KYC / register UI | `B-REGISTER`, `B-KYC` | COMPLETED (backend E2E) | **Yes** — implement `P-FLUTTER-REGISTER` + `P-FLUTTER-KYC` |
+| Phase 3 tax / splits / payout UI | Phase 3 tasks | PLANNED | **No** |
 
-¹ **Panchangam:** API + vendor cache COMPLETED. Customer ribbon scaffold exists but
-`C-PANCHANGAM-UI` = **HOLD** until `C-FLUTTER-CUSTOMER` starts (partner-only work now).
+¹ **Panchangam:** API + vendor cache COMPLETED. Customer ribbon implemented in Flutter;
+`C-PANCHANGAM-UI` / `C-FLUTTER-PANCHANGAM` = **IN_PROGRESS** — device QA vs design 01
+before COMPLETED in `STATUS.md`.
 Regenerate client after `openapi.json` changes: `mana_guruji_mobile/tool/sync_openapi.ps1`.
 
 ---
@@ -106,7 +107,7 @@ From [`API_CONTRACTS.md`](./API_CONTRACTS.md) + [`PARTNER.md`](./plans/PARTNER.m
 | 410 | Expired / unavailable / customer cancelled | "Expired" or offer-unavailable string; **refresh inbox** (`refreshFromPush`) |
 
 **Customer cancel → partner inbox:** Poll (20s) + 410 refresh are shipped. Real-time removal
-via FCM (`P-FCM-CUSTOMER-CANCEL` — **IN_PROGRESS** in `STATUS.md`).
+via FCM `offer_withdrawn` (`P-FCM-CUSTOMER-CANCEL` — **COMPLETED** 2026-08-12).
 
 ### Customer cancel (`C-FLUTTER-CANCEL` — COMPLETED 2026-08-09)
 
@@ -151,8 +152,8 @@ Scaffold: `lib/features/customer/customer_home_screen.dart`,
 
 Screens: home categories + popular list (`customer_home_screen.dart`), full catalogue
 (`customer_catalog_screen.dart` → design 02), puja detail (`customer_puja_detail_screen.dart`
-→ design 03). APIs: `GET /v1/pujas` (with `category_id`), `GET /v1/pujas/{id}`. Checkout CTA
-stub until Wave 4.
+→ design 03). APIs: `GET /v1/pujas` (with `category_id`), `GET /v1/pujas/{id}`. Detail CTA →
+slot picker + checkout (`C-FLUTTER-CHECKOUT` **COMPLETED** 2026-08-06).
 
 ---
 
@@ -196,8 +197,9 @@ python mana_guruji_mobile/tool/check_stack_versions_sync.py
 | **A** | Flavors, OTP, FCM, partner heartbeat/offers/bookings list | Done |
 | **B** | Design system, partner shell, customer catalogue + checkout + bookings | **IN_PROGRESS** |
 | **B shipped** | Catalogue, address, checkout E2E, booking list/detail, **customer + partner cancel UX** | Done (2026-08-09) |
-| **B next** | Customer FCM (`C-FLUTTER-FCM`); partner FCM sound QA; **`P-FCM-CUSTOMER-CANCEL`** | **IN_PROGRESS** |
-| **Blocked** | KYC UI (`B-REGISTER`+`B-KYC`), Razorpay tax UI (Phase 3), earnings strip | HOLD |
+| **B next** | Customer FCM (`C-FLUTTER-FCM`); partner FCM sound QA | **IN_PROGRESS** |
+| **B shipped** | Partner register + KYC onboarding UI (`P-FLUTTER-REGISTER`, `P-FLUTTER-KYC`) — device QA pending |
+| **Blocked** | Razorpay tax UI (Phase 3), earnings strip | HOLD |
 
 Track mobile tasks only in [`STATUS.md`](./plans/STATUS.md) (`C-FLUTTER-*`, `P-FLUTTER-*`).
 
@@ -214,7 +216,6 @@ Track mobile tasks only in [`STATUS.md`](./plans/STATUS.md) (`C-FLUTTER-*`, `P-F
 
 ## Do not build yet
 
-- Partner KYC / register screens (Phase 0.5 backend)
 - Earnings / payout money UI (Phase 3)
-- Razorpay checkout (Phase 3)
+- Phase 3 tax snapshot / Razorpay Route settlement UI (basic checkout is **shipped** — `C-FLUTTER-CHECKOUT`)
 - `google_maps_flutter` until booking-detail maps slice (see STACK_VERSIONS PLANNED)

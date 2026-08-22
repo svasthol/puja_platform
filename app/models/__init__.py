@@ -34,6 +34,7 @@ from app.models.identity import (  # noqa: F401
     User,
     UserRole,
 )
+from app.models.kyc import KycConsent, KycIdentityRegistry, KycVerificationRequest  # noqa: F401
 from app.models.lookups import (  # noqa: F401
     CancellationPolicy,
     PlatformSetting,
