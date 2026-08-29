@@ -353,6 +353,8 @@ platform cannot refund money it never collected.
 
 ## The do-not-break list (each fixed a real bug found in review)
 
+**Performance review:** Pass 1 audits diff every proposed DB/query change against this table (`spec/plans/CURSOR_PERFORMANCE_REVIEW_PROMPT.md` Layer 1; task `P-PERF-REVIEW-PASS1` in `STATUS.md`). A "performance fix" that weakens any row below is a defect.
+
 | Object | Why it exists |
 |---|---|
 | `ux_slot_holds_active` — partial unique `WHERE released_at IS NULL` | Flat unique would permanently lock a slot after first use. Partial = only ACTIVE holds conflict. NULL `pujari_id` ("any pujari") holds never conflict — intended. |
@@ -533,3 +535,14 @@ Canonical file: **`db/migration_018.sql`** (chains after 017). Idempotent.
 | `panchangam_daily.yama_gandam JSONB` | Yamagandam window `{start, end}` |
 | `panchangam_daily.sunrise TEXT` | Sunrise ISO 8601 local datetime |
 | `panchangam_daily.sunset TEXT` | Sunset ISO 8601 local datetime |
+
+### Migration 021 — catalogue addon media + seed idempotency (SPEC_AMENDMENTS §20.5)
+
+Canonical file: **`db/migration_021.sql`** (chains after 020). Apply via `scripts/apply_migration_021.py`.
+
+| Change | Purpose |
+|--------|---------|
+| `puja_addons.image_media_id` | Optional FK → `puja_media` `ON DELETE SET NULL` |
+| `puja_media.entity_type` CHECK | Adds `'addon'` |
+| `uq_puja_addons_puja_name` | Idempotent addon seed upsert |
+| `uq_puja_content_items_puja_kind_pos` | Content seed upsert safety |

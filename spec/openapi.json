@@ -686,6 +686,18 @@
               ],
               "title": "Category Id"
             }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["te", "en"],
+              "default": "te",
+              "title": "Locale"
+            },
+            "description": "Catalogue language — te (Telugu) or en (English)."
           }
         ],
         "responses": {
@@ -735,6 +747,18 @@
               "format": "uuid",
               "title": "Puja Id"
             }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["te", "en"],
+              "default": "te",
+              "title": "Locale"
+            },
+            "description": "Catalogue language — te (Telugu) or en (English)."
           }
         ],
         "responses": {
@@ -7688,6 +7712,17 @@
           "display_order": {
             "type": "integer",
             "title": "Display Order"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
           }
         },
         "type": "object",
@@ -8872,7 +8907,8 @@
             "enum": [
               "puja",
               "category",
-              "gallery"
+              "gallery",
+              "addon"
             ],
             "title": "Entity Type"
           },
@@ -8992,7 +9028,8 @@
             "enum": [
               "puja",
               "category",
-              "gallery"
+              "gallery",
+              "addon"
             ],
             "title": "Entity Type"
           },
@@ -9618,6 +9655,18 @@
           "is_active": {
             "type": "boolean",
             "title": "Is Active"
+          },
+          "image_media_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Media Id"
           }
         },
         "type": "object",
@@ -9682,6 +9731,18 @@
               }
             ],
             "title": "Is Active"
+          },
+          "image_media_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Media Id"
           },
           "change_reason": {
             "anyOf": [

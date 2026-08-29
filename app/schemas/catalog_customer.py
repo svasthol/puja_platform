@@ -49,6 +49,7 @@ class CustomerAddon(BaseModel):
     description: str | None = None
     price: Decimal
     display_order: int
+    image_url: str | None = None
 
 
 class CustomerGalleryImage(BaseModel):

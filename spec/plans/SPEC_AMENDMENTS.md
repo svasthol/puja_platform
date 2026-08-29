@@ -673,6 +673,21 @@ direct-mode checkout so quote matches charge.
 Until `C-HOLD` ships: admin **impact** endpoints + UI must warn on price/duration changes when
 active unreleased holds exist.
 
+### §20.5 — Addon media + seed idempotency (migration **021**)
+
+**Added:** Hyderabad launch catalogue MVP — addon images, bootstrap seed safety.
+
+| Change | Detail |
+|---|---|
+| `puja_addons.image_media_id` | Optional FK → `puja_media(id)` `ON DELETE SET NULL` |
+| `puja_media.entity_type` | CHECK extended with `'addon'`; S3 key `catalog/addon/{uuid}.ext` |
+| Customer API | `CustomerAddon.image_url` via `media_urls_by_ids()` — `upload_status='ready'` AND `is_active=true` only |
+| `UNIQUE (puja_id, name)` on `puja_addons` | Idempotent seed upsert; preserves `id` for `booking_addons` FK — **never DELETE addons in seed** |
+| `UNIQUE (puja_id, kind, position)` on `puja_content_items` | Content seed upsert safety |
+| Apply path | `spec/db/migration_021.sql` + `scripts/apply_migration_021.py` (not Alembic `021`) |
+
+**Ops:** soft-disabled addon blocks re-create with same name (`UNIQUE`). Addon `display_order` set at create only (reorder API deferred).
+
 ### Migration numbering (Wave-0)
 
 | Migration | Scope |

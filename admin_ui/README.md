@@ -88,6 +88,19 @@ Open **http://localhost:3000** → redirects to `/console` (login if no session)
 
 Catalogue writes require `admin` role. Media uploads use API proxy `PUT /v1/admin/catalog/media/{id}/upload`.
 
+#### Catalogue ops runbook (Hyderabad launch)
+
+1. Apply migrations **021** + **022**: `python scripts/apply_migration_021.py` then `python scripts/apply_migration_022.py`.
+2. Bootstrap catalogue: `python scripts/bootstrap_catalog.py --force --deactivate-legacy` (seeds **en + te** i18n rows).
+3. **Supply co-gate:** ≥1 verified pujari, then `python scripts/sync_active_puja_pricing.py`.
+4. Assert customer catalogue: `GET /v1/pujas?limit=50` returns **22** active pujas after seed+sync (6 categories).
+5. **Re-run bootstrap** updates names, prices, content and addons for seed slugs (`ON CONFLICT DO UPDATE`). Legacy slugs: deactivate with `--deactivate-legacy` or Admin UI.
+6. **Active puja without verified pricing** → hidden from customer `GET /v1/pujas` (working as designed).
+7. **`is_muhurat_bound`** is set in seed SQL only (Admin UI does not expose it yet) — affects dispatch reconfirmation.
+8. **Addon prices** are live until `C-HOLD` ships (§20.4); soft-disabled addon blocks re-create with same name (`UNIQUE (puja_id, name)`).
+
+See `spec/plans/CATALOG_SYNC.md` for the full Admin ↔ Customer sync matrix.
+
 ### Sprint 4B — Partners & pricing
 
 | Screen | API |

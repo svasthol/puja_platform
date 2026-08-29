@@ -1,0 +1,29 @@
+entity_type,category_slug,slug,name,default_price,price_max,duration_minutes,is_muhurat_bound,tagline
+category,,vratams,Vratams (వ్రతాలు),,,,,"Observances with vow, fasting and katha"
+category,,griha-pravesh-vastu,Griha Pravesh & Vastu (గృహప్రవేశం & వాస్తు),,,,,"New home entry and site energy correction"
+category,,sanskaras,Sanskaras (సంస్కారాలు),,,,,"Vedic life-milestone ceremonies"
+category,,homams,Homams (హోమాలు),,,,,"Agni-based rituals with mantra ahuti"
+category,,daily-special,Daily & Special (నిత్య & విశేష పూజలు),,,,,"Shorter pujas for daily and occasional needs"
+category,,pitru-karyam,Pitru Karyam (పితృ కార్యం),,,,,"Ancestral rites — Taddinam, Masikam, Abdikam, Tarpanam"
+puja,vratams,satyanarayana-vratam,Satyanarayana Vratam (సత్యనారాయణ వ్రతం),1800,6500,120,true,Purnima vratam for prosperity and vow fulfilment
+puja,vratams,varalakshmi-vratam,Varalakshmi Vratam (వరలక్ష్మి వ్రతం),1900,4500,90,true,Sravana masam vratam for family wellbeing
+puja,vratams,satyanarayana-compact,Satyanarayana Puja — Compact (సత్యనారాయణ పూజ — సంక్షిప్త),1100,2500,60,false,Shorter one-priest version for apartments and weekdays
+puja,griha-pravesh-vastu,griha-pravesham,Griha Pravesham (గృహప్రవేశం),4200,12000,180,true,Auspicious first entry into a new home
+puja,griha-pravesh-vastu,vastu-shanti,Vastu Shanti (వాస్తు శాంతి),3300,8000,150,true,Correction of directional and structural dosha
+puja,sanskaras,namakaranam,Namakaranam — Barasala (నామకరణం — బారసాల),1900,4500,90,true,Naming ceremony on the 11th or 21st day
+puja,sanskaras,annaprashana,Annaprashana (అన్నప్రాశన),1600,3500,60,true,First solid food ceremony for the infant
+puja,sanskaras,seemantham,Seemantham (సీమంతం),1900,4500,90,true,Baby shower blessing for mother and child
+puja,sanskaras,upanayanam,Upanayanam (ఉపనయనం),6000,18000,180,true,Sacred thread and Gayatri initiation
+puja,sanskaras,shashti-poorthi,Shashti Poorthi (షష్ఠి పూర్తి),12000,30000,240,true,60th year with Ugra Ratha Shanti
+puja,homams,ganapathi-homam,Ganapathi Homam (గణపతి హోమం),3000,8000,90,false,Obstacle removal before any new beginning
+puja,homams,navagraha-homam,Navagraha Homam (నవగ్రహ హోమం),3800,9000,120,false,Pacification of the nine planetary influences
+puja,homams,rudrabhishekam,Rudrabhishekam (రుద్రాభిషేకం),4000,16000,120,false,Shaiva abhishekam with Rudri parayanam
+puja,homams,ayushya-homam,Ayushya Homam (ఆయుష్య హోమం),4200,14000,90,false,Longevity and health homam on birthdays
+puja,homams,lakshmi-kubera-puja,Lakshmi Kubera Puja (లక్ష్మీ కుబేర పూజ),2100,5500,90,false,Wealth flow and financial stability
+puja,homams,sudarshana-homam,Sudarshana Homam (సుదర్శన హోమం),5700,15000,150,false,Protection from negativity litigation and illness
+puja,homams,chandi-homam,Chandi Homam (చండీ హోమం),25000,105000,240,false,Durga invocation for protection and victory
+puja,daily-special,vahana-puja,Vahana Puja (వాహన పూజ),600,1500,30,false,Blessing for a new vehicle
+puja,daily-special,saraswati-puja,Saraswati Puja (సరస్వతి పూజ),1600,3800,75,false,Blessing for learning arts and examinations
+puja,pitru-karyam,taddinam-abdikam,Taddinam / Abdikam (తద్దినం / ఆబ్దికం),2000,5500,120,true,Annual shraddha on the death tithi
+puja,pitru-karyam,masikam,Masikam (మాసికం),2000,5500,90,true,Monthly ancestral rite on the death tithi
+puja,pitru-karyam,tarpanam,Tarpanam (తర్పణం),1200,2000,45,true,Water offering to ancestors

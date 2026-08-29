@@ -19,6 +19,7 @@ alwaysApply: true
 10. `spec/MOBILE_FIREBASE.md` — Firebase project + Android package names (`com.managuruji.customer` / `.partner`); **read before any Flutter or FCM mobile work**
 11. `spec/MOBILE_FLUTTER.md` — Flutter implementation contract (mobile repo: `mana_guruji_mobile`)
 12. `spec/plans/CATALOG_SYNC.md` — catalogue visibility matrix (admin ↔ `GET /v1/pujas` ↔ customer UI); read before catalog Flutter or admin catalogue work
+13. `spec/plans/CURSOR_PERFORMANCE_REVIEW_PROMPT.md` — pre-launch performance review (Pass 1 read-only audit); task `P-PERF-REVIEW-PASS1` in `STATUS.md`; deliverable `PERFORMANCE_REVIEW.md`
 
 ## Puja MVP launch policy (SPEC_AMENDMENTS §21) — normative
 

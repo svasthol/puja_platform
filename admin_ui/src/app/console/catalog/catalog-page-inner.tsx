@@ -23,6 +23,8 @@ import {
   fetchCategories,
   fetchMedia,
   fetchPujas,
+  reorderCategories,
+  reorderPujas,
   updateCategory,
 } from "@/lib/api/catalog";
 import { categoryEntityUuid } from "@/lib/catalog/entity-id";
@@ -42,6 +44,8 @@ export default function CatalogPageInner() {
   const [catDesc, setCatDesc] = useState("");
   const [pujaName, setPujaName] = useState("");
   const [pujaPrice, setPujaPrice] = useState("1500");
+  const [pujaPriceMax, setPujaPriceMax] = useState("2000");
+  const [pujaDuration, setPujaDuration] = useState("90");
   const [message, setMessage] = useState<string | null>(null);
 
   const { data: catData, isLoading: catsLoading } = useQuery({
@@ -109,8 +113,8 @@ export default function CatalogPageInner() {
         category_id: activeCat!,
         name: pujaName.trim(),
         default_price: pujaPrice,
-        price_max: String(Number(pujaPrice) + 500),
-        duration_minutes: 90,
+        price_max: pujaPriceMax || String(Number(pujaPrice) + 500),
+        duration_minutes: Number(pujaDuration) || 90,
         change_reason: "admin-ui",
       }),
     onSuccess: async (puja) => {
@@ -130,6 +134,72 @@ export default function CatalogPageInner() {
   });
 
   const activePujasInCategory = (pujaData?.pujas ?? []).filter((p) => p.is_active).length;
+
+  const pujaThumbKey = (pujaData?.pujas ?? []).map((p) => `${p.id}:${p.hero_media_id ?? ""}`).join(",");
+  const { data: pujaThumbUrls } = useQuery({
+    queryKey: ["admin", "catalog", "puja-thumbs", pujaThumbKey],
+    queryFn: async () => {
+      const pujas = pujaData?.pujas ?? [];
+      const entries = await Promise.all(
+        pujas
+          .filter((p) => p.hero_media_id)
+          .map(async (p) => {
+            const media = await fetchMedia("puja", p.id);
+            const url =
+              media.items.find(
+                (m) => m.id === p.hero_media_id && m.upload_status === "ready",
+              )?.public_url ?? null;
+            return [p.id, url] as const;
+          }),
+      );
+      return Object.fromEntries(entries) as Record<string, string | null>;
+    },
+    enabled: (pujaData?.pujas?.length ?? 0) > 0,
+    staleTime: 60_000,
+  });
+
+  const reorderCatMutation = useMutation({
+    mutationFn: (ordered_ids: number[]) =>
+      reorderCategories({ ordered_ids, change_reason: "admin-ui" }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["admin", "catalog", "categories"] });
+    },
+  });
+
+  const reorderPujaMutation = useMutation({
+    mutationFn: (ordered_ids: string[]) =>
+      reorderPujas({
+        category_id: activeCat!,
+        ordered_ids,
+        change_reason: "admin-ui",
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["admin", "catalog", "pujas"] });
+    },
+  });
+
+  const moveCategory = (catId: number, direction: "up" | "down") => {
+    const ids = categories.map((c) => c.id);
+    const idx = ids.indexOf(catId);
+    if (idx < 0) return;
+    const swap = direction === "up" ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= ids.length) return;
+    const next = [...ids];
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    reorderCatMutation.mutate(next);
+  };
+
+  const movePuja = (pujaId: string, direction: "up" | "down") => {
+    const pujas = pujaData?.pujas ?? [];
+    const ids = pujas.map((p) => p.id);
+    const idx = ids.indexOf(pujaId);
+    if (idx < 0) return;
+    const swap = direction === "up" ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= ids.length) return;
+    const next = [...ids];
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    reorderPujaMutation.mutate(next);
+  };
 
   const requestDisableCategory = () => {
     if (!selectedCategory) return;
@@ -186,11 +256,11 @@ export default function CatalogPageInner() {
               {catsLoading && <p className="p-5 text-sm text-ink-muted">Loading…</p>}
               <ul className="max-h-[min(420px,50vh)] divide-y divide-surface-border overflow-y-auto">
                 {categories.map((cat) => (
-                  <li key={cat.id}>
+                  <li key={cat.id} className="flex items-stretch">
                     <button
                       type="button"
                       onClick={() => router.push(`/console/catalog?cat=${cat.id}`)}
-                      className={`flex w-full items-start justify-between gap-2 px-5 py-3 text-left transition hover:bg-surface ${
+                      className={`flex min-w-0 flex-1 items-start justify-between gap-2 px-5 py-3 text-left transition hover:bg-surface ${
                         activeCat === cat.id
                           ? "border-l-2 border-brand bg-brand/5"
                           : "border-l-2 border-transparent"
@@ -204,6 +274,26 @@ export default function CatalogPageInner() {
                         {cat.is_active ? "On" : "Off"}
                       </Badge>
                     </button>
+                    {canEdit && (
+                      <div className="flex flex-col border-l border-surface-border">
+                        <button
+                          type="button"
+                          className="px-2 text-xs text-ink-muted hover:bg-surface"
+                          onClick={() => moveCategory(cat.id, "up")}
+                          aria-label="Move category up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 text-xs text-ink-muted hover:bg-surface"
+                          onClick={() => moveCategory(cat.id, "down")}
+                          aria-label="Move category down"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -330,13 +420,13 @@ export default function CatalogPageInner() {
                   <Card>
                     <CardTitle className="text-base">New puja</CardTitle>
                     <form
-                      className="mt-4 grid gap-4 sm:grid-cols-[1fr_140px_auto]"
+                      className="mt-4 grid gap-4 sm:grid-cols-2"
                       onSubmit={(e) => {
                         e.preventDefault();
                         createPujaMutation.mutate();
                       }}
                     >
-                      <div>
+                      <div className="sm:col-span-2">
                         <Label htmlFor="puja-name">Name</Label>
                         <Input
                           id="puja-name"
@@ -357,7 +447,29 @@ export default function CatalogPageInner() {
                           className="mt-1.5"
                         />
                       </div>
-                      <div className="flex items-end">
+                      <div>
+                        <Label htmlFor="puja-price-max">Price max (₹)</Label>
+                        <Input
+                          id="puja-price-max"
+                          type="number"
+                          min={1}
+                          value={pujaPriceMax}
+                          onChange={(e) => setPujaPriceMax(e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="puja-duration">Duration (minutes)</Label>
+                        <Input
+                          id="puja-duration"
+                          type="number"
+                          min={1}
+                          value={pujaDuration}
+                          onChange={(e) => setPujaDuration(e.target.value)}
+                          className="mt-1.5"
+                        />
+                      </div>
+                      <div className="flex items-end sm:col-span-2">
                         <Button type="submit" className="w-full sm:w-auto" disabled={createPujaMutation.isPending}>
                           Create & edit
                         </Button>
@@ -377,13 +489,27 @@ export default function CatalogPageInner() {
                         No pujas yet — create one above.
                       </li>
                     )}
-                    {(pujaData?.pujas ?? []).map((puja) => (
-                      <li key={puja.id}>
+                    {(pujaData?.pujas ?? []).map((puja, idx) => (
+                      <li key={puja.id} className="flex items-stretch">
                         <Link
                           href={`/console/catalog/pujas/${puja.id}`}
-                          className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-surface"
+                          className="flex min-w-0 flex-1 items-center gap-4 px-5 py-4 transition hover:bg-surface"
                         >
-                          <div className="min-w-0">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-surface-border bg-gradient-to-br from-brand/20 to-brand/5">
+                            {pujaThumbUrls?.[puja.id] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={pujaThumbUrls[puja.id]!}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs text-ink-faint">
+                                —
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
                             <p className="font-medium text-ink">{puja.name}</p>
                             <p className="text-xs text-ink-faint">
                               ₹{puja.default_price}
@@ -398,6 +524,28 @@ export default function CatalogPageInner() {
                             <span className="text-sm text-brand-glow">Edit →</span>
                           </div>
                         </Link>
+                        {canEdit && (
+                          <div className="flex flex-col border-l border-surface-border">
+                            <button
+                              type="button"
+                              className="px-2 text-xs text-ink-muted hover:bg-surface disabled:opacity-30"
+                              disabled={idx === 0}
+                              onClick={() => movePuja(puja.id, "up")}
+                              aria-label="Move puja up"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className="px-2 text-xs text-ink-muted hover:bg-surface disabled:opacity-30"
+                              disabled={idx === (pujaData?.pujas.length ?? 0) - 1}
+                              onClick={() => movePuja(puja.id, "down")}
+                              aria-label="Move puja down"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
