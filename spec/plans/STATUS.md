@@ -227,6 +227,7 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | P-ADMIN-AUTH | COMPLETED | 4-0 | TOTP login `POST /v1/admin/auth/login` (stdlib RFC 6238), admin-vouched provisioning `POST /v1/admin/users/{id}/credential`, Fernet-encrypted secrets, replay guard, per-context short TTL; live-smoke + unit tests green |
 | P-EXC-ADMIN-PATHS | COMPLETED | 4C | Admin 409 vs webhook 200 for refund overlap + reassign copy |
 | P-PGBOUNCER | PENDING | — | prepare_threshold=None |
+| P-PERF-REVIEW-PASS1 | PENDING | Launch | Pre-launch performance review Pass 1 (read-only); prompt `spec/plans/CURSOR_PERFORMANCE_REVIEW_PROMPT.md`; deliverable `PERFORMANCE_REVIEW.md` at repo root; Pass 2 one-finding-at-a-time after human approval |
 | P-MONITOR | COMPLETED | 5 | M0 foundation — `app/monitoring/`; Phase 7 extends via `M-*` tasks |
 | P-GST-MODEL | BLOCKED | 3 | blocked_by: CA memo → `advisor_signoff_ref` |
 | P-SPLIT-CONFIG | PENDING | 3 | `tax_*_config` tables — schema unblocked; seed needs memo |
@@ -319,9 +320,11 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | A-CAT-CATEGORIES | COMPLETED | 4B | `GET/POST/PUT /v1/admin/catalog/categories` + `PATCH .../categories/reorder`; slug/order/description; `catalog_admin.py`; `test_sprint4b_catalog.py` + `test_admin_catalog.py` |
 | A-CAT-PUJAS | COMPLETED | 4B | `GET/POST/PUT /v1/admin/catalog/pujas` + `GET .../impact` + `PATCH .../reorder`; price_max guard; audit |
 | A-CAT-ADDONS | COMPLETED | 4B | `GET/POST /pujas/{id}/addons` + `PUT /addons/{id}` |
+| A-CAT-ADDON-MEDIA | COMPLETED | 4B | migration **021**; `puja_addons.image_media_id`; `entity_type=addon`; customer `image_url`; admin addon image upload |
+| A-CAT-SEED-HYD | COMPLETED | 4B | `scripts/bootstrap_catalog.py` + `scripts/catalog_hyderabad_data.py` + `spec/catalog/hyderabad_launch_mdm.csv`; **6 categories / 22 pujas**; priest-only + Samagri Kit addon pricing; supply co-gate via `sync_active_puja_pricing.py` |
 | A-CAT-CONTENT | COMPLETED | 4B | `GET/PUT /pujas/{id}/content` — replace-all per `kind` |
 | A-CAT-MEDIA | COMPLETED | 4B | `POST /media/presign` + `PUT .../upload` (proxy) + `POST .../confirm` + `GET /media`; `catalog_media.py` |
-| A-CAT-UI | COMPLETED | 4B | `admin_ui` catalogue builder — `/console/catalog`, `/console/catalog/pujas/[id]` |
+| A-CAT-UI | COMPLETED | 4B | `admin_ui` catalogue builder — gallery fix, addon edit/image, FAQ pairs, reorder, thumbnails |
 | C-CAT-READ | COMPLETED | 4B | Wave 4 customer read — `catalog_read.py`, `catalog_customer.py` schemas |
 | A-PUJARI-PRICING | COMPLETED | 4B | `GET/PUT /v1/admin/pujaris/{id}/pricing` + Partners UI; replace-all matrix; audited |
 | A-PUJARI-SEARCH | COMPLETED | 4B | `GET /v1/admin/pujaris` — phone/name/verification/area search + cursor |

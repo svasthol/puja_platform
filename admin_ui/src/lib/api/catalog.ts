@@ -10,6 +10,7 @@ import {
   pujaCategoryListSchema,
   pujaCategorySchema,
   pujaImpactSchema,
+  pujaI18nSchema,
   pujaListSchema,
   pujaSchema,
   type ContentKind,
@@ -75,6 +76,29 @@ export async function createPuja(input: {
   });
 }
 
+export async function fetchPujaI18n(pujaId: string, locale: "te" | "en") {
+  return apiFetch(`/admin/catalog/pujas/${pujaId}/i18n/${locale}`, {
+    schema: pujaI18nSchema,
+  });
+}
+
+export async function upsertPujaI18n(
+  pujaId: string,
+  locale: "te" | "en",
+  input: {
+    name: string;
+    tagline?: string | null;
+    description?: string | null;
+    change_reason?: string;
+  },
+) {
+  return apiFetch(`/admin/catalog/pujas/${pujaId}/i18n/${locale}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+    schema: pujaI18nSchema,
+  });
+}
+
 export async function updatePuja(
   id: string,
   input: {
@@ -101,8 +125,12 @@ export async function fetchPujaImpact(pujaId: string) {
 }
 
 // ---- Content ---------------------------------------------------------------
-export async function fetchContent(pujaId: string, kind: ContentKind) {
-  return apiFetch(`/admin/catalog/pujas/${pujaId}/content?kind=${kind}`, {
+export async function fetchContent(
+  pujaId: string,
+  kind: ContentKind,
+  locale: "te" | "en" = "en",
+) {
+  return apiFetch(`/admin/catalog/pujas/${pujaId}/content?kind=${kind}&locale=${locale}`, {
     schema: contentListSchema,
   });
 }
@@ -114,8 +142,9 @@ export async function replaceContent(
     items: { text: string; position: number }[];
     change_reason?: string;
   },
+  locale: "te" | "en" = "en",
 ) {
-  return apiFetch(`/admin/catalog/pujas/${pujaId}/content`, {
+  return apiFetch(`/admin/catalog/pujas/${pujaId}/content?locale=${locale}`, {
     method: "PUT",
     body: JSON.stringify(input),
     schema: contentListSchema,
@@ -138,6 +167,29 @@ export async function createAddon(
   });
 }
 
+export async function reorderCategories(input: {
+  ordered_ids: number[];
+  change_reason?: string;
+}) {
+  return apiFetch("/admin/catalog/categories/reorder", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+    schema: pujaCategoryListSchema,
+  });
+}
+
+export async function reorderPujas(input: {
+  category_id: number;
+  ordered_ids: string[];
+  change_reason?: string;
+}) {
+  return apiFetch("/admin/catalog/pujas/reorder", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+    schema: pujaListSchema,
+  });
+}
+
 export async function updateAddon(
   addonId: string,
   input: {
@@ -145,6 +197,7 @@ export async function updateAddon(
     description?: string | null;
     price?: string;
     is_active?: boolean;
+    image_media_id?: string | null;
     change_reason?: string;
   },
 ): Promise<PujaAddon> {
@@ -164,7 +217,7 @@ export async function fetchMedia(entityType: string, entityId: string) {
 }
 
 export async function presignMedia(input: {
-  entity_type: "puja" | "category" | "gallery";
+  entity_type: "puja" | "category" | "gallery" | "addon";
   entity_id: string;
   content_type: string;
   content_length: number;
@@ -211,7 +264,7 @@ export async function confirmMedia(mediaId: string) {
 
 /** Presign → API proxy upload → confirm (Wave 2). */
 export async function uploadCatalogImage(
-  entityType: "puja" | "category" | "gallery",
+  entityType: "puja" | "category" | "gallery" | "addon",
   entityId: string,
   file: File,
   altText?: string,

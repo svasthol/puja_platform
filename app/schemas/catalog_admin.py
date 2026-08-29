@@ -115,6 +115,26 @@ class PujaImpactResponse(BaseModel):
     )
 
 
+CatalogLocale = Literal["te", "en"]
+
+
+class PujaI18nResponse(BaseModel):
+    puja_id: uuid.UUID
+    locale: CatalogLocale
+    name: str
+    tagline: str | None = None
+    description: str | None = None
+
+
+class PujaI18nUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=150)
+    tagline: str | None = Field(default=None, max_length=200)
+    description: str | None = None
+    change_reason: str | None = Field(default=None, max_length=300)
+
+
 # ---- Content ----------------------------------------------------------------
 class ContentItemInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -151,6 +171,7 @@ class PujaAddonResponse(BaseModel):
     price: Decimal
     display_order: int
     is_active: bool
+    image_media_id: uuid.UUID | None = None
 
 
 class PujaAddonListResponse(BaseModel):
@@ -173,11 +194,12 @@ class PujaAddonUpdate(BaseModel):
     description: str | None = None
     price: Decimal | None = Field(default=None, ge=0)
     is_active: bool | None = None
+    image_media_id: uuid.UUID | None = None
     change_reason: str | None = Field(default=None, max_length=300)
 
 
 # ---- Media (Wave 2 — §20.2) -------------------------------------------------
-MediaEntityType = Literal["puja", "category", "gallery"]
+MediaEntityType = Literal["puja", "category", "gallery", "addon"]
 
 
 class MediaPresignRequest(BaseModel):

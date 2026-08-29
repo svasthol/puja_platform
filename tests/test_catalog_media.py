@@ -264,3 +264,47 @@ async def test_presign_unknown_puja_404(session):
                 db=session,
             )
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_presign_addon_media(session):
+    from app.schemas.catalog_admin import PujaAddonCreate
+
+    actor = await _mk_user(session, "+91966" + uuid.uuid4().hex[:7])
+    await session.commit()
+    cat_id = await _category_id(session)
+
+    puja = await cat_ep.create_puja(
+        PujaCreate(category_id=cat_id, name=f"P-{uuid.uuid4().hex[:6]}", default_price=500),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    addon = await cat_ep.create_addon(
+        puja.id,
+        PujaAddonCreate(name="Samagri pack", price=300),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    await session.commit()
+
+    with patch(
+        "app.api.v1.endpoints.admin_catalog.presign_catalog_put",
+        return_value=("https://s3.example/upload", 600),
+    ):
+        presign = await cat_ep.presign_media(
+            MediaPresignRequest(
+                entity_type="addon",
+                entity_id=addon.id,
+                content_type="image/webp",
+                content_length=2048,
+                alt_text="Addon thumb",
+            ),
+            _FakeRequest(),
+            p=_admin(actor),
+            db=session,
+        )
+    await session.commit()
+
+    assert presign.s3_key.startswith("catalog/addon/")

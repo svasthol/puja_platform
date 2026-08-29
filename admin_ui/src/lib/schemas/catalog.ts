@@ -49,6 +49,16 @@ export const pujaImpactSchema = z.object({
   note: z.string().optional(),
 });
 
+export const catalogLocaleSchema = z.enum(["te", "en"]);
+
+export const pujaI18nSchema = z.object({
+  puja_id: z.string().uuid(),
+  locale: catalogLocaleSchema,
+  name: z.string(),
+  tagline: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+});
+
 export const contentItemSchema = z.object({
   id: z.string().uuid(),
   kind: contentKindSchema,
@@ -70,6 +80,7 @@ export const pujaAddonSchema = z.object({
   price: z.string(),
   display_order: z.number(),
   is_active: z.boolean(),
+  image_media_id: z.string().uuid().nullable().optional(),
 });
 
 export const pujaAddonListSchema = z.object({
@@ -78,7 +89,7 @@ export const pujaAddonListSchema = z.object({
 
 export const mediaSchema = z.object({
   id: z.string().uuid(),
-  entity_type: z.enum(["puja", "category", "gallery"]),
+  entity_type: z.enum(["puja", "category", "gallery", "addon"]),
   entity_id: z.string().uuid(),
   s3_key: z.string(),
   alt_text: z.string().nullable().optional(),

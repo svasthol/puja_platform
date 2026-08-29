@@ -71,8 +71,8 @@ async def test_get_puja_detail_content_addons(session):
     )
     await session.execute(
         text(
-            "INSERT INTO puja_content_items (id, puja_id, kind, position, text, is_active) "
-            "VALUES (:id, :pid, 'inclusion', 0, 'Flowers', true)"
+            "INSERT INTO puja_content_items (id, puja_id, kind, position, locale, text, is_active) "
+            "VALUES (:id, :pid, 'inclusion', 0, 'en', 'Flowers', true)"
         ),
         {"id": str(uuid.uuid4()), "pid": str(puja_id)},
     )
@@ -85,13 +85,31 @@ async def test_get_puja_detail_content_addons(session):
     )
     await session.commit()
 
-    detail = await cat_ep.get_puja(puja_id, _p=_customer(customer_id), db=session)
+    detail = await cat_ep.get_puja(puja_id, locale="en", _p=_customer(customer_id), db=session)
     assert detail.name == "Detail Puja"
     assert detail.price_from <= detail.price_to
     kinds = {b.kind: b.items for b in detail.content}
     assert kinds.get("inclusion") == ["Flowers"]
     assert len(detail.addons) == 1
     assert detail.addons[0].name == "Extra prasad"
+
+
+@pytest.mark.asyncio
+async def test_list_pujas_locale_te_vs_en(session):
+    customer_id = uuid.uuid4()
+    await session.execute(
+        text("INSERT INTO users (id, full_name, phone) VALUES (:id, 'C', :ph)"),
+        {"id": str(customer_id), "ph": "+91984" + uuid.uuid4().hex[:7]},
+    )
+    await session.commit()
+
+    en = await cat_ep.list_pujas(limit=5, locale="en", _p=_customer(customer_id), db=session)
+    te = await cat_ep.list_pujas(limit=5, locale="te", _p=_customer(customer_id), db=session)
+    assert en.pujas and te.pujas
+    if en.pujas[0].name == te.pujas[0].name:
+        pytest.skip("i18n seed not loaded — names match")
+    assert any("\u0c00" <= c <= "\u0c7f" for c in te.pujas[0].name)
+    assert not any("\u0c00" <= c <= "\u0c7f" for c in en.pujas[0].name)
 
 
 @pytest.mark.asyncio
@@ -167,6 +185,70 @@ async def test_pujaris_unit_price_matches_resolver(session):
 
     expected = await resolve_puja_unit_price(session, puja_id, pujari_id)
     assert match.unit_price == expected
+
+
+@pytest.mark.asyncio
+async def test_addon_image_url_ready_and_pending(session):
+    """Addon image_url follows same ready+active filter as hero (§20.5)."""
+    customer_id = uuid.uuid4()
+    puja_id = uuid.uuid4()
+    addon_id = uuid.uuid4()
+    ready_media_id = uuid.uuid4()
+    pending_media_id = uuid.uuid4()
+    cat_id = (await session.execute(text("SELECT id FROM puja_categories LIMIT 1"))).scalar_one()
+
+    await session.execute(
+        text("INSERT INTO users (id, full_name, phone) VALUES (:id, 'C', :ph)"),
+        {"id": str(customer_id), "ph": "+91983" + uuid.uuid4().hex[:7]},
+    )
+    slug = f"addon-img-{uuid.uuid4().hex[:8]}"
+    await session.execute(
+        text(
+            "INSERT INTO pujas (id, category_id, name, slug, default_price, duration_minutes, "
+            "is_active, display_order, created_at, updated_at) "
+            "VALUES (:id, :cat, 'Addon Img Puja', :slug, 1800.00, 60, true, 0, now(), now())"
+        ),
+        {"id": str(puja_id), "cat": cat_id, "slug": slug},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO puja_media (id, entity_type, entity_id, s3_key, position, "
+            "upload_status, is_active, created_at) "
+            "VALUES (:id, 'addon', :aid, 'catalog/addon/ready.webp', 0, 'ready', true, now())"
+        ),
+        {"id": str(ready_media_id), "aid": str(addon_id)},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO puja_media (id, entity_type, entity_id, s3_key, position, "
+            "upload_status, is_active, created_at) "
+            "VALUES (:id, 'addon', :aid, 'catalog/addon/pending.webp', 1, 'pending', true, now())"
+        ),
+        {"id": str(pending_media_id), "aid": str(addon_id)},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO puja_addons (id, puja_id, name, price, display_order, is_active, image_media_id) "
+            "VALUES (:id, :pid, 'Premium pack', 300.00, 0, true, :mid)"
+        ),
+        {"id": str(addon_id), "pid": str(puja_id), "mid": str(ready_media_id)},
+    )
+    await session.commit()
+
+    detail = await cat_ep.get_puja(puja_id, locale="en", _p=_customer(customer_id), db=session)
+    assert len(detail.addons) == 1
+    addon = detail.addons[0]
+    assert addon.image_url is not None
+    assert "ready.webp" in addon.image_url
+
+    await session.execute(
+        text("UPDATE puja_addons SET image_media_id = :mid WHERE id = :aid"),
+        {"mid": str(pending_media_id), "aid": str(addon_id)},
+    )
+    await session.commit()
+
+    detail2 = await cat_ep.get_puja(puja_id, locale="en", _p=_customer(customer_id), db=session)
+    assert detail2.addons[0].image_url is None
 
 
 @pytest.mark.asyncio

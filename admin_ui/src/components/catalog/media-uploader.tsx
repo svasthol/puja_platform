@@ -12,13 +12,15 @@ export function MediaUploader({
   entityId,
   disabled,
   label = "Upload image",
+  altText,
   previewUrl,
   onUploaded,
 }: {
-  entityType: "puja" | "category" | "gallery";
+  entityType: "puja" | "category" | "gallery" | "addon";
   entityId: string;
   disabled?: boolean;
   label?: string;
+  altText?: string;
   previewUrl?: string | null;
   onUploaded: (media: MediaItem) => void;
 }) {
@@ -31,7 +33,7 @@ export function MediaUploader({
     setError(null);
     setBusy(true);
     try {
-      const media = await uploadCatalogImage(entityType, entityId, file);
+      const media = await uploadCatalogImage(entityType, entityId, file, altText);
       onUploaded(media);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");

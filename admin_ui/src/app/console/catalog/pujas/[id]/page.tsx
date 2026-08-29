@@ -23,10 +23,12 @@ import {
   fetchAddons,
   fetchContent,
   fetchMedia,
+  fetchPujaI18n,
   fetchPujaImpact,
   fetchPujas,
   replaceContent,
   updateAddon,
+  upsertPujaI18n,
   updatePuja,
 } from "@/lib/api/catalog";
 import { canEditCatalog } from "@/lib/auth/roles";
@@ -47,6 +49,7 @@ export default function PujaBuilderPage() {
   const canEdit = canEditCatalog(me);
 
   const [tab, setTab] = useState<TabId>("details");
+  const [editLocale, setEditLocale] = useState<"en" | "te">("en");
   const [message, setMessage] = useState<string | null>(null);
   const [contentKind, setContentKind] = useState<ContentKind>("inclusion");
   const [contentLines, setContentLines] = useState("");
@@ -64,9 +67,15 @@ export default function PujaBuilderPage() {
   });
 
   const { data: contentData, refetch: refetchContent } = useQuery({
-    queryKey: ["admin", "catalog", "content", pujaId, contentKind],
-    queryFn: () => fetchContent(pujaId, contentKind),
+    queryKey: ["admin", "catalog", "content", pujaId, contentKind, editLocale],
+    queryFn: () => fetchContent(pujaId, contentKind, editLocale),
     enabled: tab === "content" && !!puja,
+  });
+
+  const { data: i18nData, refetch: refetchI18n } = useQuery({
+    queryKey: ["admin", "catalog", "puja-i18n", pujaId, editLocale],
+    queryFn: () => fetchPujaI18n(pujaId, editLocale),
+    enabled: tab === "details" && !!puja,
   });
 
   const { data: addonsData, refetch: refetchAddons } = useQuery({
@@ -81,6 +90,12 @@ export default function PujaBuilderPage() {
     enabled: !!puja,
   });
 
+  const { data: galleryMediaData, refetch: refetchGalleryMedia } = useQuery({
+    queryKey: ["admin", "catalog", "media", "gallery", pujaId],
+    queryFn: () => fetchMedia("gallery", pujaId),
+    enabled: tab === "media" && !!puja,
+  });
+
   const heroUrl =
     mediaData?.items.find((m) => m.upload_status === "ready" && m.id === puja?.hero_media_id)
       ?.public_url ??
@@ -89,24 +104,32 @@ export default function PujaBuilderPage() {
     null;
 
   const galleryItems =
-    mediaData?.items.filter((m) => m.upload_status === "ready" && m.entity_type === "gallery") ??
-    [];
+    galleryMediaData?.items.filter((m) => m.upload_status === "ready") ?? [];
 
   const [form, setForm] = useState<Partial<Puja>>({});
 
   useEffect(() => {
     if (puja) {
-      setForm({
-        name: puja.name,
-        tagline: puja.tagline ?? "",
-        description: puja.description ?? "",
+      setForm((prev) => ({
+        ...prev,
         duration_minutes: puja.duration_minutes ?? undefined,
         default_price: puja.default_price,
         price_max: puja.price_max ?? "",
         is_active: puja.is_active,
-      });
+      }));
     }
   }, [puja]);
+
+  useEffect(() => {
+    if (i18nData) {
+      setForm((prev) => ({
+        ...prev,
+        name: i18nData.name,
+        tagline: i18nData.tagline ?? "",
+        description: i18nData.description ?? "",
+      }));
+    }
+  }, [i18nData, editLocale]);
 
   useEffect(() => {
     if (contentData) {
@@ -115,20 +138,27 @@ export default function PujaBuilderPage() {
   }, [contentData, contentKind]);
 
   const savePujaMutation = useMutation({
-    mutationFn: () =>
-      updatePuja(pujaId, {
-        name: form.name,
+    mutationFn: async () => {
+      await upsertPujaI18n(pujaId, editLocale, {
+        name: form.name ?? "",
         tagline: form.tagline || null,
         description: form.description || null,
-        duration_minutes: form.duration_minutes ?? null,
-        default_price: form.default_price,
-        price_max: form.price_max || null,
-        is_active: form.is_active,
         change_reason: "admin-ui",
-      }),
+      });
+      if (editLocale === "en") {
+        await updatePuja(pujaId, {
+          duration_minutes: form.duration_minutes ?? null,
+          default_price: form.default_price,
+          price_max: form.price_max || null,
+          is_active: form.is_active,
+          change_reason: "admin-ui",
+        });
+      }
+    },
     onSuccess: async () => {
-      setMessage("Puja saved.");
+      setMessage(`Puja saved (${editLocale.toUpperCase()}).`);
       await qc.invalidateQueries({ queryKey: ["admin", "catalog", "pujas"] });
+      await refetchI18n();
     },
     onError: (e: Error) => setMessage(e.message),
   });
@@ -157,11 +187,15 @@ export default function PujaBuilderPage() {
         .map((t) => t.trim())
         .filter(Boolean)
         .map((text, position) => ({ text, position }));
-      return replaceContent(pujaId, {
-        kind: contentKind,
-        items,
-        change_reason: "admin-ui",
-      });
+      return replaceContent(
+        pujaId,
+        {
+          kind: contentKind,
+          items,
+          change_reason: "admin-ui",
+        },
+        editLocale,
+      );
     },
     onSuccess: async () => {
       setMessage("Content saved.");
@@ -172,12 +206,91 @@ export default function PujaBuilderPage() {
 
   const [addonName, setAddonName] = useState("");
   const [addonPrice, setAddonPrice] = useState("99");
+  const [addonDesc, setAddonDesc] = useState("");
+  const [editingAddonId, setEditingAddonId] = useState<string | null>(null);
+  const [editAddonName, setEditAddonName] = useState("");
+  const [editAddonPrice, setEditAddonPrice] = useState("");
+  const [editAddonDesc, setEditAddonDesc] = useState("");
+
+  const { data: faqQData } = useQuery({
+    queryKey: ["admin", "catalog", "content", pujaId, "faq_q", editLocale],
+    queryFn: () => fetchContent(pujaId, "faq_q", editLocale),
+    enabled: tab === "content" && !!puja,
+  });
+  const { data: faqAData } = useQuery({
+    queryKey: ["admin", "catalog", "content", pujaId, "faq_a", editLocale],
+    queryFn: () => fetchContent(pujaId, "faq_a", editLocale),
+    enabled: tab === "content" && !!puja,
+  });
+  const [faqPairs, setFaqPairs] = useState<{ q: string; a: string }[]>([]);
+
+  useEffect(() => {
+    const qs = faqQData?.items.map((i) => i.text) ?? [];
+    const as = faqAData?.items.map((i) => i.text) ?? [];
+    const len = Math.max(qs.length, as.length);
+    if (len === 0) {
+      setFaqPairs([]);
+      return;
+    }
+    setFaqPairs(
+      Array.from({ length: len }, (_, i) => ({
+        q: qs[i] ?? "",
+        a: as[i] ?? "",
+      })),
+    );
+  }, [faqQData, faqAData]);
+
+  const saveFaqMutation = useMutation({
+    mutationFn: async () => {
+      const pairs = faqPairs.filter((p) => p.q.trim() || p.a.trim());
+      await replaceContent(
+        pujaId,
+        {
+          kind: "faq_q",
+          items: pairs.map((p, position) => ({ text: p.q.trim(), position })),
+          change_reason: "admin-ui",
+        },
+        editLocale,
+      );
+      await replaceContent(
+        pujaId,
+        {
+          kind: "faq_a",
+          items: pairs.map((p, position) => ({ text: p.a.trim(), position })),
+          change_reason: "admin-ui",
+        },
+        editLocale,
+      );
+    },
+    onSuccess: async () => {
+      setMessage("FAQ pairs saved.");
+      await qc.invalidateQueries({ queryKey: ["admin", "catalog", "content", pujaId] });
+    },
+    onError: (e: Error) => setMessage(e.message),
+  });
+
+  const saveAddonEditMutation = useMutation({
+    mutationFn: () =>
+      updateAddon(editingAddonId!, {
+        name: editAddonName.trim(),
+        description: editAddonDesc.trim() || null,
+        price: editAddonPrice,
+        change_reason: "admin-ui",
+      }),
+    onSuccess: async () => {
+      setEditingAddonId(null);
+      await refetchAddons();
+      setMessage("Addon updated.");
+    },
+    onError: (e: Error) => setMessage(e.message),
+  });
 
   const createAddonMutation = useMutation({
     mutationFn: () =>
       createAddon(pujaId, {
         name: addonName.trim(),
         price: addonPrice,
+        description: addonDesc.trim() || undefined,
         change_reason: "admin-ui",
       }),
     onSuccess: async () => {
@@ -255,7 +368,27 @@ export default function PujaBuilderPage() {
         {tab === "details" && (
           <Card>
             <CardTitle>Puja details</CardTitle>
-            <CardDescription>Core fields shown to customers via GET /v1/pujas.</CardDescription>
+            <CardDescription>
+              Text fields are locale-specific (EN / TE). Prices and duration are shared.
+            </CardDescription>
+            <div className="mt-4 flex gap-2">
+              <Button
+                type="button"
+                variant={editLocale === "en" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setEditLocale("en")}
+              >
+                English
+              </Button>
+              <Button
+                type="button"
+                variant={editLocale === "te" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setEditLocale("te")}
+              >
+                Telugu
+              </Button>
+            </div>
             <form
               className="mt-6 grid gap-4 sm:grid-cols-2"
               onSubmit={(e) => {
@@ -307,7 +440,7 @@ export default function PujaBuilderPage() {
                       duration_minutes: e.target.value ? Number(e.target.value) : undefined,
                     }))
                   }
-                  disabled={!canEdit}
+                  disabled={!canEdit || editLocale !== "en"}
                   className="mt-1.5"
                 />
               </div>
@@ -316,7 +449,7 @@ export default function PujaBuilderPage() {
                 <Select
                   id="puja-status"
                   value={form.is_active ? "1" : "0"}
-                  disabled={!canEdit}
+                  disabled={!canEdit || editLocale !== "en"}
                   onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.value === "1" }))}
                   className="mt-1.5"
                 >
@@ -330,7 +463,7 @@ export default function PujaBuilderPage() {
                   id="puja-price"
                   value={form.default_price ?? ""}
                   onChange={(e) => setForm((f) => ({ ...f, default_price: e.target.value }))}
-                  disabled={!canEdit}
+                  disabled={!canEdit || editLocale !== "en"}
                   className="mt-1.5"
                 />
               </div>
@@ -340,7 +473,7 @@ export default function PujaBuilderPage() {
                   id="puja-price-max"
                   value={form.price_max ?? ""}
                   onChange={(e) => setForm((f) => ({ ...f, price_max: e.target.value }))}
-                  disabled={!canEdit}
+                  disabled={!canEdit || editLocale !== "en"}
                   className="mt-1.5"
                 />
               </div>
@@ -358,7 +491,25 @@ export default function PujaBuilderPage() {
         {tab === "content" && (
           <Card>
             <CardTitle>Content items</CardTitle>
-            <CardDescription>One line per item — replace-all per kind.</CardDescription>
+            <CardDescription>One line per item — replace-all per kind and locale.</CardDescription>
+            <div className="mt-4 flex gap-2">
+              <Button
+                type="button"
+                variant={editLocale === "en" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setEditLocale("en")}
+              >
+                English
+              </Button>
+              <Button
+                type="button"
+                variant={editLocale === "te" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setEditLocale("te")}
+              >
+                Telugu
+              </Button>
+            </div>
             <div className="mt-6 space-y-4">
               <div className="max-w-xs">
                 <Label htmlFor="content-kind">Kind</Label>
@@ -397,6 +548,67 @@ export default function PujaBuilderPage() {
                 </Button>
               )}
             </div>
+            <div className="mt-8 border-t border-surface-border pt-6">
+              <CardTitle className="text-base">FAQ pairs</CardTitle>
+              <CardDescription className="!mt-1">
+                Question and answer pairs saved as faq_q / faq_a content kinds.
+              </CardDescription>
+              <div className="mt-4 space-y-4">
+                {faqPairs.map((pair, idx) => (
+                  <div
+                    key={idx}
+                    className="grid gap-3 rounded-lg border border-surface-border p-4 sm:grid-cols-2"
+                  >
+                    <div>
+                      <Label htmlFor={`faq-q-${idx}`}>Question {idx + 1}</Label>
+                      <Input
+                        id={`faq-q-${idx}`}
+                        value={pair.q}
+                        disabled={!canEdit}
+                        onChange={(e) =>
+                          setFaqPairs((pairs) =>
+                            pairs.map((p, i) => (i === idx ? { ...p, q: e.target.value } : p)),
+                          )
+                        }
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`faq-a-${idx}`}>Answer {idx + 1}</Label>
+                      <Input
+                        id={`faq-a-${idx}`}
+                        value={pair.a}
+                        disabled={!canEdit}
+                        onChange={(e) =>
+                          setFaqPairs((pairs) =>
+                            pairs.map((p, i) => (i === idx ? { ...p, a: e.target.value } : p)),
+                          )
+                        }
+                        className="mt-1.5"
+                      />
+                    </div>
+                  </div>
+                ))}
+                {canEdit && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setFaqPairs((p) => [...p, { q: "", a: "" }])}
+                    >
+                      Add FAQ pair
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => saveFaqMutation.mutate()}
+                      disabled={saveFaqMutation.isPending}
+                    >
+                      Save FAQ pairs
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
           </Card>
         )}
 
@@ -406,7 +618,7 @@ export default function PujaBuilderPage() {
               <Card>
                 <CardTitle>New addon</CardTitle>
                 <form
-                  className="mt-4 grid gap-4 sm:grid-cols-[1fr_140px_auto]"
+                  className="mt-4 grid gap-4 sm:grid-cols-2"
                   onSubmit={(e) => {
                     e.preventDefault();
                     createAddonMutation.mutate();
@@ -433,7 +645,17 @@ export default function PujaBuilderPage() {
                       className="mt-1.5"
                     />
                   </div>
-                  <div className="flex items-end">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="addon-desc">Description</Label>
+                    <Textarea
+                      id="addon-desc"
+                      value={addonDesc}
+                      onChange={(e) => setAddonDesc(e.target.value)}
+                      rows={2}
+                      className="mt-1.5"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
                     <Button type="submit" disabled={createAddonMutation.isPending}>
                       Add addon
                     </Button>
@@ -450,33 +672,117 @@ export default function PujaBuilderPage() {
               </div>
               <ul className="divide-y divide-surface-border">
                 {(addonsData?.addons ?? []).map((addon) => (
-                  <li
-                    key={addon.id}
-                    className="flex items-center justify-between gap-4 px-5 py-4"
-                  >
-                    <div>
-                      <p className="font-medium text-ink">{addon.name}</p>
-                      <p className="text-sm text-ink-muted">₹{addon.price}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge tone={addon.is_active ? "success" : "warning"}>
-                        {addon.is_active ? "On" : "Off"}
-                      </Badge>
-                      {canEdit && (
-                        <Button
-                          variant="secondary"
-                          className="text-xs"
-                          onClick={() =>
-                            updateAddon(addon.id, {
-                              is_active: !addon.is_active,
-                              change_reason: "toggle",
-                            }).then(() => refetchAddons())
-                          }
-                        >
-                          {addon.is_active ? "Disable" : "Enable"}
-                        </Button>
-                      )}
-                    </div>
+                  <li key={addon.id} className="px-5 py-4">
+                    {editingAddonId === addon.id ? (
+                      <div className="space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <Label htmlFor={`edit-addon-name-${addon.id}`}>Name</Label>
+                            <Input
+                              id={`edit-addon-name-${addon.id}`}
+                              value={editAddonName}
+                              onChange={(e) => setEditAddonName(e.target.value)}
+                              className="mt-1.5"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`edit-addon-price-${addon.id}`}>Price (₹)</Label>
+                            <Input
+                              id={`edit-addon-price-${addon.id}`}
+                              type="number"
+                              value={editAddonPrice}
+                              onChange={(e) => setEditAddonPrice(e.target.value)}
+                              className="mt-1.5"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <Label htmlFor={`edit-addon-desc-${addon.id}`}>Description</Label>
+                            <Textarea
+                              id={`edit-addon-desc-${addon.id}`}
+                              value={editAddonDesc}
+                              onChange={(e) => setEditAddonDesc(e.target.value)}
+                              rows={2}
+                              className="mt-1.5"
+                            />
+                          </div>
+                        </div>
+                        {canEdit && (
+                          <MediaUploader
+                            entityType="addon"
+                            entityId={addon.id}
+                            label="Addon image (400×400 WebP)"
+                            altText={addon.name}
+                            onUploaded={async (media) => {
+                              await updateAddon(addon.id, {
+                                image_media_id: media.id,
+                                change_reason: "addon image",
+                              });
+                              await refetchAddons();
+                              setMessage("Addon image set.");
+                            }}
+                          />
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => saveAddonEditMutation.mutate()}
+                            disabled={saveAddonEditMutation.isPending}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setEditingAddonId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-ink">{addon.name}</p>
+                          {addon.description && (
+                            <p className="text-sm text-ink-muted">{addon.description}</p>
+                          )}
+                          <p className="text-sm text-ink-muted">₹{addon.price}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge tone={addon.is_active ? "success" : "warning"}>
+                            {addon.is_active ? "On" : "Off"}
+                          </Badge>
+                          {canEdit && (
+                            <>
+                              <Button
+                                variant="secondary"
+                                className="text-xs"
+                                onClick={() => {
+                                  setEditingAddonId(addon.id);
+                                  setEditAddonName(addon.name);
+                                  setEditAddonPrice(addon.price);
+                                  setEditAddonDesc(addon.description ?? "");
+                                }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                className="text-xs"
+                                onClick={() =>
+                                  updateAddon(addon.id, {
+                                    is_active: !addon.is_active,
+                                    change_reason: "toggle",
+                                  }).then(() => refetchAddons())
+                                }
+                              >
+                                {addon.is_active ? "Disable" : "Enable"}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
                 {(addonsData?.addons ?? []).length === 0 && (
@@ -498,6 +804,7 @@ export default function PujaBuilderPage() {
                     entityType="puja"
                     entityId={pujaId}
                     previewUrl={heroUrl}
+                    altText={`${puja.name} hero`}
                     onUploaded={async (media) => {
                       await updatePuja(pujaId, {
                         hero_media_id: media.id,
@@ -520,8 +827,9 @@ export default function PujaBuilderPage() {
                     entityType="gallery"
                     entityId={pujaId}
                     label="Upload gallery image"
+                    altText={`${puja.name} gallery`}
                     onUploaded={async () => {
-                      await refetchMedia();
+                      await refetchGalleryMedia();
                       setMessage("Gallery image uploaded.");
                     }}
                   />

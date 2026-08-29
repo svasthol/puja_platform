@@ -31,8 +31,8 @@ Admin UI  ──write──►  /admin/catalog/*  ──►  pujas, puja_categor
 | Puja `is_active=false` | Shown (Off badge) | **Hidden** | N/A (not in customer catalogue) |
 | Category `is_active=true` | Shown | In `categories` array | N/A |
 | Category `is_active=false` | Shown | **Hidden** from `categories` | N/A |
-| Content / addons | Full CRUD | Detail only (`inclusion`, `exclusion`, …) | N/A |
-| Media | Upload + assign hero | `hero_image_url` when `upload_status=ready` | N/A |
+| Content / addons | Full CRUD | Detail only (`inclusion`, `exclusion`, …); addon `image_url` when media `ready` | N/A |
+| Media | Upload + assign hero | `hero_image_url` when `upload_status=ready`; addon thumbnails via `image_url` | N/A |
 
 **Create defaults (admin API):** new category and puja are created with `is_active=true`.
 

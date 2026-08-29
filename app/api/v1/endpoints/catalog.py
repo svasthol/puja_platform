@@ -32,11 +32,12 @@ async def list_pujas(
     cursor: str | None = None,
     limit: int = Query(20, ge=1, le=50),
     category_id: int | None = None,
+    locale: str = Query("te", pattern="^(te|en)$"),
     _p: Principal = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
     """Active catalogue with categories, price ranges, and hero images."""
-    categories = await list_customer_categories(db)
+    categories = await list_customer_categories(db, locale=locale)
 
     params: dict = {"lim": limit + 1}
     filters = (
@@ -83,7 +84,7 @@ async def list_pujas(
         last = page_rows[-1]
         next_cursor = encode_cursor(last["display_order"], last["id"])
 
-    pujas = await build_puja_summaries(db, page_rows)
+    pujas = await build_puja_summaries(db, page_rows, locale=locale)
     return CustomerPujaListResponse(
         categories=categories,
         pujas=pujas,
@@ -94,11 +95,12 @@ async def list_pujas(
 @router.get("/pujas/{puja_id}", response_model=CustomerPujaDetail)
 async def get_puja(
     puja_id: uuid.UUID,
+    locale: str = Query("te", pattern="^(te|en)$"),
     _p: Principal = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
     """Puja detail — content blocks, addons, and gallery (ready media only)."""
-    detail = await build_puja_detail(db, puja_id)
+    detail = await build_puja_detail(db, puja_id, locale=locale)
     if detail is None:
         raise HTTPException(http.HTTP_404_NOT_FOUND, "Puja not found.")
     return CustomerPujaDetail(**detail)

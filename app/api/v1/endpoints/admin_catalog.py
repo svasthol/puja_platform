@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import Principal, require_admin, require_admin_role
 from app.db.engine import get_db, get_db_txn
-from app.models.catalog import Puja, PujaAddon, PujaContentItem, PujaMedia
+from app.models.catalog import Puja, PujaAddon, PujaContentItem, PujaI18n, PujaMedia
 from app.models.lookups import PujaCategory
 from app.schemas.catalog_admin import (
     ContentListResponse,
@@ -30,6 +30,8 @@ from app.schemas.catalog_admin import (
     PujaCategoryUpdate,
     PujaCreate,
     PujaImpactResponse,
+    PujaI18nResponse,
+    PujaI18nUpdate,
     PujaListResponse,
     PujaReorderRequest,
     PujaResponse,
@@ -99,6 +101,7 @@ def _addon_response(a: PujaAddon) -> PujaAddonResponse:
         price=Decimal(str(a.price)),
         display_order=a.display_order,
         is_active=a.is_active,
+        image_media_id=a.image_media_id,
     )
 
 
@@ -430,6 +433,93 @@ async def update_puja(
     return _puja_response(puja)
 
 
+@router.get("/pujas/{puja_id}/i18n/{locale}", response_model=PujaI18nResponse)
+async def get_puja_i18n(
+    puja_id: uuid.UUID,
+    locale: str,
+    _p: Principal = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if locale not in ("te", "en"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "locale must be te or en.")
+    puja = await _require_puja(db, puja_id)
+    row = (
+        await db.execute(
+            select(PujaI18n).where(PujaI18n.puja_id == puja_id, PujaI18n.locale == locale)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return PujaI18nResponse(
+            puja_id=puja_id,
+            locale=locale,  # type: ignore[arg-type]
+            name=puja.name,
+            tagline=puja.tagline,
+            description=puja.description,
+        )
+    return PujaI18nResponse(
+        puja_id=puja_id,
+        locale=locale,  # type: ignore[arg-type]
+        name=row.name,
+        tagline=row.tagline,
+        description=row.description,
+    )
+
+
+@router.put("/pujas/{puja_id}/i18n/{locale}", response_model=PujaI18nResponse)
+async def upsert_puja_i18n(
+    puja_id: uuid.UUID,
+    locale: str,
+    payload: PujaI18nUpdate,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    if locale not in ("te", "en"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "locale must be te or en.")
+    puja = await _require_puja(db, puja_id)
+    row = (
+        await db.execute(
+            select(PujaI18n).where(PujaI18n.puja_id == puja_id, PujaI18n.locale == locale)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        row = PujaI18n(
+            puja_id=puja_id,
+            locale=locale,
+            name=payload.name,
+            tagline=payload.tagline,
+            description=payload.description,
+        )
+        db.add(row)
+    else:
+        row.name = payload.name
+        row.tagline = payload.tagline
+        row.description = payload.description
+    if locale == "en":
+        puja.name = payload.name
+        puja.tagline = payload.tagline
+        puja.description = payload.description
+        puja.updated_at = dt.datetime.now(dt.UTC)
+    await db.flush()
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="i18n_update",
+        entity_type="puja_i18n",
+        entity_id=f"{puja_id}:{locale}",
+        after={"name": payload.name, "locale": locale},
+        change_reason=payload.change_reason,
+        ip=_client_ip(request),
+    )
+    return PujaI18nResponse(
+        puja_id=puja_id,
+        locale=locale,  # type: ignore[arg-type]
+        name=row.name,
+        tagline=row.tagline,
+        description=row.description,
+    )
+
+
 @router.get("/pujas/{puja_id}/impact", response_model=PujaImpactResponse)
 async def puja_impact(
     puja_id: uuid.UUID,
@@ -506,6 +596,7 @@ async def reorder_pujas(
 async def list_content(
     puja_id: uuid.UUID,
     kind: str = Query(...),
+    locale: str = Query("en", pattern="^(te|en)$"),
     _p: Principal = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -516,6 +607,7 @@ async def list_content(
             .where(
                 PujaContentItem.puja_id == puja_id,
                 PujaContentItem.kind == kind,
+                PujaContentItem.locale == locale,
                 PujaContentItem.is_active.is_(True),
             )
             .order_by(PujaContentItem.position, PujaContentItem.id)
@@ -539,6 +631,7 @@ async def replace_content(
     puja_id: uuid.UUID,
     payload: ContentReplaceRequest,
     request: Request,
+    locale: str = Query("en", pattern="^(te|en)$"),
     p: Principal = Depends(require_admin_role),
     db: AsyncSession = Depends(get_db_txn),
 ):
@@ -547,6 +640,7 @@ async def replace_content(
         delete(PujaContentItem).where(
             PujaContentItem.puja_id == puja_id,
             PujaContentItem.kind == payload.kind,
+            PujaContentItem.locale == locale,
         )
     )
     for item in payload.items:
@@ -556,6 +650,7 @@ async def replace_content(
                 puja_id=puja_id,
                 kind=payload.kind,
                 position=item.position,
+                locale=locale,
                 text=item.text,
                 is_active=True,
             )
@@ -568,11 +663,11 @@ async def replace_content(
         action="content_replace",
         entity_type="puja_content_items",
         entity_id=str(puja_id),
-        after={"kind": payload.kind, "count": len(payload.items)},
+        after={"kind": payload.kind, "locale": locale, "count": len(payload.items)},
         change_reason=payload.change_reason,
         ip=_client_ip(request),
     )
-    return await list_content(puja_id, payload.kind, _p=p, db=db)
+    return await list_content(puja_id, payload.kind, locale=locale, _p=p, db=db)
 
 
 # --------------------------------------------------------------------------- #
@@ -687,6 +782,13 @@ async def _validate_media_entity(
         ).scalar_one_or_none()
         if cat is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found.")
+        return
+    if entity_type == "addon":
+        addon = (
+            await db.execute(select(PujaAddon.id).where(PujaAddon.id == entity_id))
+        ).scalar_one_or_none()
+        if addon is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Add-on not found.")
         return
     raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid entity_type.")
 
@@ -920,7 +1022,16 @@ async def update_addon(
     if addon is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Add-on not found.")
 
-    if all(v is None for v in (payload.name, payload.description, payload.price, payload.is_active)):
+    if all(
+        v is None
+        for v in (
+            payload.name,
+            payload.description,
+            payload.price,
+            payload.is_active,
+            payload.image_media_id,
+        )
+    ):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "No fields to update.")
 
     before = _addon_response(addon).model_dump(mode="json")
@@ -932,6 +1043,8 @@ async def update_addon(
         addon.price = payload.price
     if payload.is_active is not None:
         addon.is_active = payload.is_active
+    if "image_media_id" in payload.model_fields_set:
+        addon.image_media_id = payload.image_media_id
     await db.flush()
 
     await record_admin_action(
