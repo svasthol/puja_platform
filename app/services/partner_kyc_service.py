@@ -45,7 +45,7 @@ settings = get_settings()
 
 _TERMINAL_STATUSES = frozenset({"success", "failed", "expired"})
 _NON_TERMINAL_STATUSES = frozenset({"created", "authenticated"})
-_FINALIZE_LOCK_SECONDS = 120
+_FINALIZE_LOCK_SECONDS = 180
 
 
 class PartnerKycError(Exception):
@@ -195,6 +195,13 @@ async def _lazy_expire_stale(db: AsyncSession, pujari_id: uuid.UUID) -> None:
     )
 
 
+def _partner_visible_doc_status(status: str | None) -> str | None:
+    """Hide in-flight selfie uploads from partner status (admin queue uses DB status)."""
+    if status == "uploading":
+        return None
+    return status
+
+
 async def _get_live_request(
     db: AsyncSession, pujari_id: uuid.UUID
 ) -> KycVerificationRequest | None:
@@ -239,7 +246,12 @@ async def _resume_or_clear_live(
         raise PartnerKycError("KYC vendor unavailable.", status_code=502) from exc
     if vendor_status.url:
         return live, vendor_status.url
-    raise PartnerKycError("A live DigiLocker request already exists.", status_code=409)
+    if vendor_status.status == "authenticated":
+        return live, ""
+    if live.expires_at < _now():
+        await _expire_request(db, live.id)
+        return None
+    return live, ""
 
 
 async def start_digilocker(
@@ -449,6 +461,7 @@ async def _upsert_document(
     file_url: str,
     vendor_request_id: str,
     document_id: uuid.UUID | None = None,
+    doc_status: str = "pending",
 ) -> uuid.UUID:
     existing = (
         await db.execute(
@@ -491,7 +504,7 @@ async def _upsert_document(
         file_url=file_url,
         version=int(version),
         is_current=True,
-        status="pending",
+        status=doc_status,
         uploaded_at=_now(),
     )
     db.add(doc)
@@ -738,6 +751,7 @@ async def poll_and_finalize(
     request_id: uuid.UUID,
     pujari_id: uuid.UUID,
 ) -> tuple[KycVerificationRequest, list[str]]:
+    await _lazy_expire_stale(db, pujari_id)
     row = (
         await db.execute(
             select(KycVerificationRequest).where(
@@ -807,6 +821,7 @@ async def presign_selfie(
         file_url=s3_key,
         vendor_request_id=str(doc_id),
         document_id=doc_id,
+        doc_status="uploading",
     )
     return doc_id, url, expires, s3_key
 
@@ -830,6 +845,11 @@ async def confirm_selfie(
     ).scalar_one_or_none()
     if doc is None:
         raise PartnerKycError("Selfie document not found.", status_code=404)
+    if doc.status not in ("uploading", "pending"):
+        raise PartnerKycError(
+            f"Selfie document is already {doc.status}.",
+            status_code=409,
+        )
 
     try:
         body, content_type = fetch_kyc_bytes(doc.file_url)
@@ -862,12 +882,19 @@ async def confirm_selfie(
 
 async def get_partner_kyc_status(
     db: AsyncSession, pujari_id: uuid.UUID
-) -> tuple[str, list[tuple[str, str | None, uuid.UUID | None]]]:
+) -> tuple[
+    str,
+    list[tuple[str, str | None, uuid.UUID | None]],
+    KycVerificationRequest | None,
+]:
+    await _lazy_expire_stale(db, pujari_id)
     pujari = (
         await db.execute(select(Pujari).where(Pujari.id == pujari_id))
     ).scalar_one_or_none()
     if pujari is None:
         raise PartnerKycError("Pujari not found.", status_code=404)
+
+    live = await _get_live_request(db, pujari_id)
 
     docs = (
         await db.execute(
@@ -884,8 +911,40 @@ async def get_partner_kyc_status(
         if doc is None:
             required.append((doc_type, None, None))
         else:
-            required.append((doc_type, doc.status, doc.id))
-    return pujari.verification_status, required
+            visible = _partner_visible_doc_status(doc.status)
+            required.append((doc_type, visible, doc.id if visible else None))
+    return pujari.verification_status, required, live
+
+
+async def digilocker_resume_url(live: KycVerificationRequest) -> str | None:
+    """Best-effort vendor URL for an in-flight `created` request (service-layer vendor call)."""
+    if live.status != "created" or live.vendor_request_id.startswith("local:"):
+        return None
+    vendor = get_kyc_vendor()
+    try:
+        vendor_status = await vendor.get_request_status(live.vendor_request_id)
+    except KycVendorError:
+        return None
+    return vendor_status.url
+
+
+async def latest_digilocker_review_flags(
+    db: AsyncSession, pujari_id: uuid.UUID
+) -> list[str]:
+    row = (
+        await db.execute(
+            select(KycVerificationRequest)
+            .where(
+                KycVerificationRequest.pujari_id == pujari_id,
+                KycVerificationRequest.kind == "digilocker",
+            )
+            .order_by(KycVerificationRequest.updated_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if row is None or not isinstance(row.review_flags, list):
+        return []
+    return list(row.review_flags)
 
 
 async def deny_identity(

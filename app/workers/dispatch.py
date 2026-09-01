@@ -24,6 +24,7 @@ from app.services.dispatch_launch import (
     offer_expires_interval,
 )
 from app.workers.celery_app import celery_app
+from app.workers.redis_sync import get_sync_redis, namespaced_key, new_lock_token, release_lock
 from app.workers.sweep import get_connection
 
 log = structlog.get_logger("dispatch")
@@ -42,11 +43,9 @@ def _status_id(cur, domain: str, code: str) -> int:
 
 
 def _redis():
-    import redis as redis_lib
+    from app.workers.redis_sync import get_sync_redis
 
-    from app.core.config import get_settings
-
-    return redis_lib.from_url(str(get_settings().REDIS_URL))
+    return get_sync_redis()
 
 
 def _ensure_dispatch_state(cur, booking_id: str) -> None:
@@ -120,8 +119,9 @@ def exhaust_booking_no_pujari(cur, conn, booking_id: str) -> dict:
 
 def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
     r = _redis()
-    lock_key = f"dispatch_lock:{booking_id}"
-    if not r.set(lock_key, "1", nx=True, ex=60):
+    lock_key = namespaced_key(f"dispatch_lock:{booking_id}")
+    lock_token = new_lock_token()
+    if not r.set(lock_key, lock_token, nx=True, ex=60):
         log.info("dispatch_skipped_locked", booking_id=booking_id)
         return {"skipped": "locked"}
 
@@ -145,13 +145,22 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                 return exhaust_booking_no_pujari(cur, conn, booking_id)
 
             cur.execute(
-                "SELECT round FROM booking_dispatch_state WHERE booking_id=%s",
+                "SELECT round, max_rounds FROM booking_dispatch_state WHERE booking_id=%s",
                 (booking_id,),
             )
             row = cur.fetchone()
             if row is None:
                 return {"error": "no_dispatch_state"}
-            expected = row[0]
+            expected, max_rounds = row[0], row[1]
+            if expected >= max_rounds:
+                log.info(
+                    "dispatch_round_cap_reached",
+                    booking_id=booking_id,
+                    round=expected,
+                    max_rounds=max_rounds,
+                )
+                return exhaust_booking_no_pujari(cur, conn, booking_id)
+
             next_round = expected + 1
             radius = RADIUS_SCHEDULE.get(next_round, 15.0)
 
@@ -219,14 +228,15 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
             return {"round": next_round, "offers": inserted}
     finally:
         conn.close()
-        r.delete(lock_key)
+        release_lock(r, lock_key, lock_token)
 
 
 def _direct_dispatch(booking_id: str) -> dict:
     """Single offer to intended_pujari_id, 10 min expiry (direct dispatch mode)."""
     r = _redis()
-    lock_key = f"dispatch_lock:{booking_id}"
-    if not r.set(lock_key, "1", nx=True, ex=60):
+    lock_key = namespaced_key(f"dispatch_lock:{booking_id}")
+    lock_token = new_lock_token()
+    if not r.set(lock_key, lock_token, nx=True, ex=60):
         log.info("direct_dispatch_skipped_locked", booking_id=booking_id)
         return {"skipped": "locked"}
 
@@ -277,10 +287,7 @@ def _direct_dispatch(booking_id: str) -> dict:
             return {"status": "direct_offer", "pujari_id": str(intended_id)}
     finally:
         conn.close()
-        r.delete(lock_key)
-
-
-@celery_app.task(name="app.workers.dispatch.broadcast_booking")
+        release_lock(r, lock_key, lock_token)
 def broadcast_booking(booking_id: str) -> dict:
     return _dispatch_round(booking_id, fresh=False)
 

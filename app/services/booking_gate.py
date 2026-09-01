@@ -21,6 +21,9 @@ _INSTANT_NIGHT_MSG = (
 _NIGHT_DISABLED_MSG = (
     "Night bookings are not available yet. Please choose a slot at or after 6:00 AM."
 )
+_SLOT_IN_PAST_MSG = (
+    "This slot is in the past. Please choose a future date and time."
+)
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,13 @@ def evaluate_booking_gate(
     )
 
 
+def past_slot_error_code(lead_hours: float) -> str | None:
+    """Reject slots that have already started (lead_hours <= 0)."""
+    if lead_hours <= 0:
+        return "SLOT_IN_PAST"
+    return None
+
+
 def night_gate_error_code(
     booking_class: BookingClass,
     is_night: bool,
@@ -110,6 +120,8 @@ def gate_warning_message(code: str) -> str:
         return _INSTANT_NIGHT_MSG
     if code == "NIGHT_BOOKINGS_DISABLED":
         return _NIGHT_DISABLED_MSG
+    if code == "SLOT_IN_PAST":
+        return _SLOT_IN_PAST_MSG
     return "This slot cannot be booked."
 
 
@@ -128,7 +140,7 @@ def assert_booking_gate(
     result = evaluate_booking_gate(
         scheduled_date, scheduled_time, settings, now=now
     )
-    code = night_gate_error_code(
+    code = past_slot_error_code(result.lead_hours) or night_gate_error_code(
         result.booking_class, result.is_night, settings.night_bookings_enabled
     )
     if code is not None:

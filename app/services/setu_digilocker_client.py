@@ -20,7 +20,10 @@ from app.services.kyc_types import (
 
 log = structlog.get_logger()
 
-_TIMEOUT = httpx.Timeout(connect=3.0, read=12.0, write=3.0, pool=3.0)
+
+def _timeout() -> httpx.Timeout:
+    read_s = max(5.0, float(get_settings().KYC_SETU_READ_TIMEOUT))
+    return httpx.Timeout(connect=3.0, read=read_s, write=3.0, pool=3.0)
 
 _SETU_STATUS_MAP = {
     "unauthenticated": "created",
@@ -68,11 +71,28 @@ class SetuDigiLockerClient:
     ) -> dict[str, Any]:
         url = urljoin(_base_url() + "/", path.lstrip("/"))
         try:
-            async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=_timeout()) as client:
                 resp = await client.request(method, url, headers=_headers(), json=json)
+        except httpx.ReadTimeout as exc:
+            log.error(
+                "kyc_vendor_error",
+                vendor=self.vendor_name,
+                error_code="read_timeout",
+                error="Setu DigiLocker read timeout",
+            )
+            raise KycVendorError(
+                "DigiLocker is taking too long to respond. Try again in a minute.",
+                code="read_timeout",
+                retryable=True,
+            ) from exc
         except httpx.HTTPError as exc:
-            log.error("kyc_vendor_error", vendor=self.vendor_name, error=str(exc))
-            raise KycVendorError(str(exc), retryable=True) from exc
+            log.error(
+                "kyc_vendor_error",
+                vendor=self.vendor_name,
+                error_code="http_error",
+                error=str(exc),
+            )
+            raise KycVendorError(str(exc), code="http_error", retryable=True) from exc
 
         if resp.status_code in (401, 403):
             raise KycVendorError(

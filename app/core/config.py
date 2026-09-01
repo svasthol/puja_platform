@@ -112,6 +112,7 @@ class Settings(BaseSettings):
     KYC_SETU_CLIENT_SECRET: str = ""
     KYC_SETU_DIGILOCKER_PRODUCT_ID: str = ""
     KYC_SETU_PAN_PRODUCT_ID: str = ""
+    KYC_SETU_READ_TIMEOUT: float = 25.0  # sandbox can be slow; connect stays 3s
     KYC_CALLBACK_RATE_LIMIT_PER_HOUR: int = 60
     KYC_START_RATE_LIMIT_PER_HOUR: int = 10
 

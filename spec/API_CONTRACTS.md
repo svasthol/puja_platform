@@ -223,17 +223,18 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `POST /v1/pujari/register`                   {bio?, years_experience?} — creates
   `pujaris` row `verification_status='pending'`. Idempotent per user.
 - `POST /v1/pujari/kyc/digilocker`             Start Setu DigiLocker (consent row → vendor start).
-  Returns `{request_id, url, expires_at}`. Rate-limited. If a live request already
-  exists, **200** resumes it (same `request_id` + current vendor `url`) instead of
-  minting a second Setu session. **409** only if a live row exists but the vendor
-  URL is no longer available.
+  Returns `{request_id, url?, expires_at, status}`. `url` is **null** when resuming an
+  `authenticated` session (client polls `GET .../kyc/requests/{id}` only). Rate-limited.
+  If a live request already exists, **200** resumes it (same `request_id` + vendor `url`
+  when still `created`) instead of minting a second Setu session.
 - `GET  /v1/pujari/kyc/callback`               **PUBLIC** — DigiLocker redirect landing (nonce-bound;
   no bearer). Lightweight: marks `authenticated` or `failed`; redirects to app deep link.
 - `GET  /v1/pujari/kyc/requests/{request_id}`  Self-healing poll — re-verifies Setu status,
   drives finalize; returns `{status, scope, doc_types_created[], review_flags[]}`.
-- `GET  /v1/pujari/kyc/status`                 `{verification_status, required:[{doc_type, status}]}`.
+- `GET  /v1/pujari/kyc/status`                 `{verification_status, required:[{doc_type, status}],
+  active_digilocker_request?}` — includes in-flight DigiLocker row for app-kill resume.
 - `POST /v1/pujari/documents`                  **Selfie only** — presigned PUT to private KYC bucket
-  (gating `photo` doc; DigiLocker supplies `identity_proof` + `address_proof`).
+  (gating `photo` doc; creates `pujari_documents.status='uploading'` until confirm).
 - `POST /v1/pujari/documents/{document_id}/confirm`  After presigned PUT — HEAD/S3 fetch, strip JPEG
   EXIF/GPS, set `uploaded_at`. **200** `{document_id, doc_type, status, file_url}`.
   **422** if object missing in S3.

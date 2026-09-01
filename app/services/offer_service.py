@@ -23,6 +23,7 @@ from app.models.catalog import Pujari
 from app.services import booking_events
 from app.services.relationship_manager import assign_rm_on_confirm
 from app.services.status import status_id
+from app.services.slot_guard import assert_slot_not_past_for_accept
 from app.services.travel_buffer import assert_accept_travel_buffer_ok
 
 log = structlog.get_logger()
@@ -51,6 +52,7 @@ async def accept_offer(
 ) -> dict:
     assignment = await _assignment_owned_by(db, assignment_id, user_id)
     accepted_id = await status_id(db, "assignment", "accepted")
+    await assert_slot_not_past_for_accept(db, booking_id=assignment.booking_id)
     await assert_accept_travel_buffer_ok(
         db, pujari_id=assignment.pujari_id, booking_id=assignment.booking_id
     )

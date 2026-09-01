@@ -14,6 +14,7 @@ from app.core.dependencies import Principal, require_pujari
 from app.db.engine import get_db, get_db_txn
 from app.schemas.partner_kyc import (
     DigilockerStartResponse,
+    KycActiveDigilockerRequest,
     KycDocRequirement,
     KycRequestStatusResponse,
     PartnerKycStatusResponse,
@@ -100,8 +101,9 @@ async def start_digilocker(
         raise _map_kyc_error(exc) from exc
     return DigilockerStartResponse(
         request_id=row.id,
-        url=url,
+        url=url or None,
         expires_at=row.expires_at,
+        status=row.status,
     )
 
 
@@ -219,13 +221,29 @@ async def partner_kyc_status(
 ):
     pid = await _pujari_id(db, p.user_id)
     try:
-        verification_status, required = await kyc_svc.get_partner_kyc_status(db, pid)
+        verification_status, required, live = await kyc_svc.get_partner_kyc_status(
+            db, pid
+        )
     except PartnerKycError as exc:
         raise _map_kyc_error(exc) from exc
+
+    active: KycActiveDigilockerRequest | None = None
+    if live is not None:
+        flags = live.review_flags if isinstance(live.review_flags, list) else []
+        resume_url = await kyc_svc.digilocker_resume_url(live)
+        active = KycActiveDigilockerRequest(
+            request_id=live.id,
+            status=live.status,
+            expires_at=live.expires_at,
+            url=resume_url,
+            review_flags=flags,
+        )
+
     return PartnerKycStatusResponse(
         verification_status=verification_status,
         required=[
             KycDocRequirement(doc_type=t, status=st, document_id=doc_id)
             for t, st, doc_id in required
         ],
+        active_digilocker_request=active,
     )

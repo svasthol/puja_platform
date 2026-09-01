@@ -84,6 +84,7 @@ KYC_SETU_CLIENT_ID=
 KYC_SETU_CLIENT_SECRET=
 KYC_SETU_DIGILOCKER_PRODUCT_ID=
 KYC_SETU_PAN_PRODUCT_ID=
+KYC_SETU_READ_TIMEOUT=25
 
 # ---- Maps ---------------------------------------------------------------
 GOOGLE_MAPS_API_KEY=
