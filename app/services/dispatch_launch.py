@@ -241,8 +241,8 @@ def ensure_dispatch_windows(
     return starts_at, deadline, scheduled_date, scheduled_time, booking_class
 
 
-def _eligibility_predicates(settings: LaunchDispatchSettings) -> str:
-    """Shared citywide filters; `b` must expose id, puja_id, scheduled_date, scheduled_time, duration_minutes."""
+def _eligibility_core_predicates(settings: LaunchDispatchSettings) -> str:
+    """Citywide filters without slot-in-future (used for pre-booking supply check)."""
     return f"""
           AND EXISTS (
             SELECT 1 FROM pujari_availability pa
@@ -313,6 +313,14 @@ def _eligibility_predicates(settings: LaunchDispatchSettings) -> str:
     """
 
 
+def _eligibility_predicates(settings: LaunchDispatchSettings) -> str:
+    """Dispatch-time filters — core predicates plus slot must still be in the future."""
+    return f"""
+          AND (b.scheduled_date + b.scheduled_time) > now()
+        {_eligibility_core_predicates(settings)}
+    """
+
+
 def launch_eligibility_sql(settings: LaunchDispatchSettings) -> str:
     """Citywide eligibility — no ST_DWithin / pujari_live_location (§21.2)."""
     return f"""
@@ -344,5 +352,5 @@ def launch_eligibility_slot_sql(settings: LaunchDispatchSettings) -> str:
         JOIN pujari_service_areas psa ON psa.pujari_id = pj.id
         JOIN service_areas sa ON sa.id = psa.service_area_id AND sa.is_active
         WHERE TRUE
-        {_eligibility_predicates(settings)}
+        {_eligibility_core_predicates(settings)}
     """

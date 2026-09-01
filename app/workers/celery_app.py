@@ -59,6 +59,14 @@ celery_app.conf.update(
     task_acks_late=True,               # redeliver on worker crash (tasks are idempotent)
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,      # fair dispatch for long-ish tasks
+    broker_connection_retry_on_startup=True,
+    broker_transport_options={
+        "visibility_timeout": 3600,
+        "socket_timeout": 30,
+        "socket_connect_timeout": 5,
+        "retry_on_timeout": True,
+        "health_check_interval": 30,
+    },
     task_default_queue="sweep",
     task_routes={
         "app.workers.sweep.*": {"queue": "sweep"},

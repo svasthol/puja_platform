@@ -8298,19 +8298,30 @@
             "title": "Request Id"
           },
           "url": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Url"
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
             "title": "Expires At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "created"
           }
         },
         "type": "object",
         "required": [
           "request_id",
-          "url",
           "expires_at"
         ],
         "title": "DigilockerStartResponse"
@@ -8453,6 +8464,50 @@
           "state"
         ],
         "title": "IdentityDenyResponse"
+      },
+      "KycActiveDigilockerRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "review_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Review Flags",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status",
+          "expires_at"
+        ],
+        "title": "KycActiveDigilockerRequest"
       },
       "KycDocRequirement": {
         "properties": {
@@ -9485,6 +9540,16 @@
             },
             "type": "array",
             "title": "Required"
+          },
+          "active_digilocker_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KycActiveDigilockerRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

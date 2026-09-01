@@ -119,6 +119,11 @@ Recommended repo name: `mana_guruji_mobile` (separate from `puja_platform`).
    `reconfirm_escalation`, `accept_ack`, `offer_withdrawn` (see `DISPATCH_FLOW.md` §21.6.H,
    `app/workers/notifications.py`, table below).
 7. **Safety net** — partner still polls `GET /v1/offers` (15–30s foreground / on-resume).
+8. **Partner instant sound** (`P-FLUTTER-FCM-SOUND`) — Android channel
+   `mana_guruji_offers_ghanta` + raw `offer_instant_ghanta` (double temple bell /
+   ghanta for instant offers only). Backend `fcm_client.py` must use the same channel +
+   sound name. Regenerate WAV: `mana_guruji_mobile/tool/generate_offer_sounds.py`.
+   Advance offers stay silent (inbox poll only). QA: `mana_guruji_mobile/test/PARTNER_FCM_SOUND.md`.
 
 ### Suggested `build.gradle` flavor sketch
 
@@ -178,5 +183,5 @@ Customer push types: add rows here when customer notification worker paths are d
 | 2026-07-29 | Firebase project `manapujari` created; Android apps `com.managuruji.customer` + `com.managuruji.partner` registered |
 | 2026-07-29 | Flutter repo `mana_guruji/mana_guruji_mobile` scaffolded — Phase A partner-first (flavors, OpenAPI client, OTP, FCM hook, offers/bookings shell) |
 | 2026-08-12 | `P-FCM-CUSTOMER-CANCEL` **COMPLETED** — `offer_withdrawn` FCM on customer cancel; partner Flutter handler + instant modal dismiss |
-| 2026-08-10 | `P-CANCEL-OFFERS-SYNC` — customer cancel expires pending assignments; `GET /v1/offers` excludes `cancelled_at`; partner 410 refresh |
+| 2026-08-30 | Partner instant FCM sound — `mana_guruji_offers_ghanta` + `offer_instant_ghanta.wav` (temple bell) |
 | 2026-07-30 | Added [`MOBILE_FLUTTER.md`](./MOBILE_FLUTTER.md) — normative Flutter implementation contract |

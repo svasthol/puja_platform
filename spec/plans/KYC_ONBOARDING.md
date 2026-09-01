@@ -1,6 +1,6 @@
 # Partner KYC onboarding — vendor-agnostic plan (DigiLocker first)
 
-**Status:** PROPOSED — awaiting approval. No app code until sign-off.
+**Status:** IMPLEMENTED (Aug 2026). Setu DigiLocker sandbox + production via `KYC_SETU_*` env.
 **Owner track:** Phase 0.5 supply onboarding (`B-REGISTER`, `B-KYC`).
 **Task status lives only in [`STATUS.md`](./STATUS.md)** — this file is scope/design, never a `Status:` source.
 
@@ -339,6 +339,19 @@ file linked from `MASTER.md` Phase 0.5.
 7. **PAN (Phase 4)** — only after DigiLocker E2E is green.
 8. **Production** — Setu Bridge prod creds + agreements, `KYC_SETU_BASE_URL=https://dg.setu.co`,
    `KYC_VENDOR` unchanged (proves the swap path already works via env).
+
+---
+
+## Appendix B — Production hardening (Aug 2026, Setu operational)
+
+| Change | Why |
+|--------|-----|
+| `GET /kyc/status` → `active_digilocker_request` | App-kill resume without 409 on authenticated sessions |
+| `DigilockerStartResponse.url` optional | Poll-only resume when Setu session already authenticated |
+| Selfie `uploading` status (migration **023**) | Orphan presign rows excluded from admin pending queue |
+| `KYC_SETU_READ_TIMEOUT=25` | Sandbox latency; distinct `read_timeout` error in logs |
+| Admin `digilocker_review_flags` | Surfaces `name_mismatch` / `age_under_18` at review time |
+| Flutter consent checkbox + terminal error banners | Compliance + Rapido-class UX on failed/expired journeys |
 
 ---
 

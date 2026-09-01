@@ -23,19 +23,28 @@ FIX (was a latent bug): step 2 previously released ALL of a user's active holds
 booking via bookings.hold_id, so an unrelated live hold on another slot survives.
 
 Safety:
-  - Redis "sweep_lock" NX EX 25 prevents overlapping beat ticks stacking.
+  - Redis sweep_lock (APP_ENV-namespaced, owner token, EX 90) prevents overlapping ticks.
   - FOR UPDATE SKIP LOCKED throughout.
   - Every step commits independently; step 4 re-scans from scratch (self-healing).
+  - Postgres worker_heartbeats row updated on every successful sweep (migration 024).
 """
 from __future__ import annotations
 
 import os
+import time
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import psycopg
 import structlog
 from psycopg.rows import tuple_row
 
 log = structlog.get_logger("sweep")
+
+T = TypeVar("T")
+
+EXHAUST_BATCH_LIMIT = 50
+SWEEP_LOCK_TTL_SECONDS = 90
 
 
 def _normalize_db_url(url: str) -> str:
@@ -57,6 +66,39 @@ def _database_url() -> str:
 
 def get_connection() -> psycopg.Connection:
     return psycopg.connect(_database_url(), row_factory=tuple_row)
+
+
+def _safe_step(name: str, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
+    try:
+        return fn(*args, **kwargs)
+    except Exception:
+        log.exception("sweep_step_failed", step=name)
+        return None
+
+
+def _dispatch_window_open_sql() -> str:
+    """In-window predicate shared by initial broadcast and rebroadcast scans."""
+    return """
+              AND bds.dispatch_deadline IS NOT NULL
+              AND bds.dispatch_deadline > now()
+              AND (b.scheduled_date + b.scheduled_time) > now()
+    """
+
+
+def _past_dispatch_exhaust_sql() -> str:
+    """Bookings that must flip to failed_no_pujari (deadline passed or NULL + past slot)."""
+    return """
+            WHERE st.domain = 'booking' AND st.code = 'requested'
+              AND b.pujari_id IS NULL
+              AND b.cancelled_at IS NULL
+              AND (
+                  (bds.dispatch_deadline IS NOT NULL AND bds.dispatch_deadline <= now())
+                  OR (
+                      bds.dispatch_deadline IS NULL
+                      AND (b.scheduled_date + b.scheduled_time) <= now()
+                  )
+              )
+    """
 
 
 # --------------------------------------------------------------------------- #
@@ -183,28 +225,30 @@ def exhaust_past_dispatch_deadline(conn: psycopg.Connection) -> list[str]:
 
     with conn.cursor() as cur:
         cur.execute(
-            """
+            f"""
             SELECT b.id
             FROM bookings b
             JOIN booking_dispatch_state bds ON bds.booking_id = b.id
             JOIN status_types st ON st.id = b.status_id
-            WHERE st.domain = 'booking' AND st.code = 'requested'
-              AND b.pujari_id IS NULL
-              AND b.cancelled_at IS NULL
-              AND bds.dispatch_deadline IS NOT NULL
-              AND bds.dispatch_deadline <= now()
+            {_past_dispatch_exhaust_sql()}
+            ORDER BY bds.dispatch_deadline NULLS LAST
+            LIMIT %s
             FOR UPDATE OF b SKIP LOCKED
-            """
+            """,
+            (EXHAUST_BATCH_LIMIT,),
         )
         booking_ids = [str(r[0]) for r in cur.fetchall()]
     conn.commit()
 
     exhausted: list[str] = []
     for booking_id in booking_ids:
-        with conn.cursor() as cur:
-            result = exhaust_booking_no_pujari(cur, conn, booking_id)
-            if result.get("status") == "failed_no_pujari":
-                exhausted.append(booking_id)
+        try:
+            with conn.cursor() as cur:
+                result = exhaust_booking_no_pujari(cur, conn, booking_id)
+                if result.get("status") == "failed_no_pujari":
+                    exhausted.append(booking_id)
+        except Exception:
+            log.exception("dispatch_exhaust_failed", booking_id=booking_id)
     if exhausted:
         log.info("dispatch_deadline_exhausted", count=len(exhausted))
     return exhausted
@@ -221,7 +265,7 @@ def bookings_needing_initial_broadcast(conn: psycopg.Connection) -> list[str]:
     """
     with conn.cursor() as cur:
         cur.execute(
-            """
+            f"""
             SELECT b.id
             FROM bookings b
             JOIN status_types st ON st.id = b.status_id
@@ -236,7 +280,7 @@ def bookings_needing_initial_broadcast(conn: psycopg.Connection) -> list[str]:
                   bds.booking_id IS NULL
                   OR (
                       (bds.dispatch_starts_at IS NULL OR bds.dispatch_starts_at <= now())
-                      AND (bds.dispatch_deadline IS NULL OR bds.dispatch_deadline > now())
+                      {_dispatch_window_open_sql()}
                   )
               )
             """
@@ -253,7 +297,7 @@ def bookings_needing_rebroadcast(conn: psycopg.Connection) -> list[str]:
     """
     with conn.cursor() as cur:
         cur.execute(
-            """
+            f"""
             SELECT b.id
             FROM bookings b
             JOIN status_types st ON st.id = b.status_id
@@ -264,8 +308,9 @@ def bookings_needing_rebroadcast(conn: psycopg.Connection) -> list[str]:
               AND b.paid_at IS NOT NULL
               AND bds.last_dispatched IS NOT NULL
               AND bds.exhausted_at IS NULL
+              AND bds.round < bds.max_rounds
               AND (bds.dispatch_starts_at IS NULL OR bds.dispatch_starts_at <= now())
-              AND (bds.dispatch_deadline IS NULL OR bds.dispatch_deadline > now())
+              {_dispatch_window_open_sql()}
               AND NOT EXISTS (
                   SELECT 1 FROM booking_assignments ba
                   JOIN status_types s2 ON s2.id = ba.status_id
@@ -308,19 +353,36 @@ def run_sweep(conn: psycopg.Connection, redis_client=None) -> dict:
     from app.monitoring.scanner import run_stuck_state_monitor
     from app.workers.reconfirmation import run_reconfirmation
 
-    reconfirm_summary = run_reconfirmation(conn)
-    monitor_summary = run_stuck_state_monitor(conn)
-    return {
-        "holds_released": release_expired_slot_holds(conn),
-        "bookings_abandoned": abandon_stale_payment_pending(conn),
-        "offers_expired_on": expire_stale_assignments(conn),
-        "dispatch_deadline_exhausted": exhaust_past_dispatch_deadline(conn),
-        "needs_initial_broadcast": bookings_needing_initial_broadcast(conn),
-        "needs_rebroadcast": bookings_needing_rebroadcast(conn),
-        "presence_synced": sync_pujari_presence(conn, redis_client),
+    started = time.perf_counter()
+    reconfirm_summary = _safe_step("reconfirmation", run_reconfirmation, conn) or {}
+    monitor_summary = _safe_step("stuck_state_monitor", run_stuck_state_monitor, conn) or {}
+
+    summary: dict[str, Any] = {
+        "holds_released": _safe_step("release_holds", release_expired_slot_holds, conn) or 0,
+        "bookings_abandoned": _safe_step(
+            "abandon_payment_pending", abandon_stale_payment_pending, conn
+        )
+        or 0,
+        "offers_expired_on": _safe_step("expire_assignments", expire_stale_assignments, conn)
+        or [],
+        "dispatch_deadline_exhausted": _safe_step(
+            "exhaust_dispatch_deadline", exhaust_past_dispatch_deadline, conn
+        )
+        or [],
+        "needs_initial_broadcast": _safe_step(
+            "scan_initial_broadcast", bookings_needing_initial_broadcast, conn
+        )
+        or [],
+        "needs_rebroadcast": _safe_step("scan_rebroadcast", bookings_needing_rebroadcast, conn)
+        or [],
+        "presence_synced": _safe_step("presence_sync", sync_pujari_presence, conn, redis_client)
+        or 0,
         **monitor_summary,
         **reconfirm_summary,
     }
+    summary["duration_ms"] = int((time.perf_counter() - started) * 1000)
+    log.info("sweep_done", **{k: v for k, v in summary.items() if k != "duration_ms"}, duration_ms=summary["duration_ms"])
+    return summary
 
 
 # --------------------------------------------------------------------------- #
@@ -331,20 +393,30 @@ try:
 
     @celery_app.task(name="app.workers.sweep.sweep_task")
     def sweep_task():
-        import redis as redis_lib
+        from app.workers.redis_sync import (
+            acquire_lock,
+            get_sync_redis,
+            namespaced_key,
+            new_lock_token,
+            release_lock,
+        )
+        from app.workers.sweep_heartbeat import SWEEP_WORKER_NAME, record_worker_heartbeat
 
-        from app.core.config import get_settings
+        lock_key = namespaced_key("sweep_lock")
+        lock_token = new_lock_token()
+        r = get_sync_redis()
 
-        settings = get_settings()
-        r = redis_lib.from_url(str(settings.REDIS_URL))
-
-        if not r.set("sweep_lock", "1", nx=True, ex=25):
+        if not acquire_lock(r, lock_key, lock_token, ttl_seconds=SWEEP_LOCK_TTL_SECONDS):
             log.info("sweep_skipped_locked")
             return {"skipped": "locked"}
 
         conn = get_connection()
         try:
             summary = run_sweep(conn, redis_client=r)
+            try:
+                record_worker_heartbeat(conn, SWEEP_WORKER_NAME, summary)
+            except Exception:
+                log.exception("sweep_heartbeat_failed")
             for booking_id in summary["needs_initial_broadcast"]:
                 celery_app.send_task(
                     "app.workers.dispatch.broadcast_booking", args=[str(booking_id)]
@@ -356,7 +428,7 @@ try:
             return summary
         finally:
             conn.close()
-            r.delete("sweep_lock")
+            release_lock(r, lock_key, lock_token)
 
 except ImportError:
     pass

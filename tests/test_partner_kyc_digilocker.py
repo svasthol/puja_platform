@@ -195,3 +195,59 @@ async def test_start_resumes_live_request(session):
     assert second.id == first.id
     assert second_url
     assert vendor.start_calls == 1
+
+
+class _AuthenticatedNoUrlVendor(_FakeVendor):
+    async def get_request_status(self, vendor_request_id: str) -> KycStatusResult:
+        return KycStatusResult(
+            vendor_request_id=vendor_request_id,
+            status="authenticated",
+            url=None,
+            expires_at=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=20),
+            scope="ADHAR",
+            digilocker_id="DL-test-id",
+        )
+
+
+@pytest.mark.asyncio
+async def test_resume_authenticated_without_url_poll_only(session):
+    pid = await _seed_pujari(session)
+    vendor = _FakeVendor()
+    await session.commit()
+    with (
+        patch("app.services.partner_kyc_service.get_kyc_vendor", return_value=vendor),
+        patch.object(kyc_svc.settings, "KYC_REDIRECT_URL", "https://api.example/kyc/callback"),
+        patch.object(kyc_svc.settings, "KYC_IDENTITY_PEPPER", "pepper"),
+    ):
+        row, _ = await kyc_svc.start_digilocker(
+            session, pujari_id=pid, ip=None, user_agent=None
+        )
+        await session.commit()
+
+    no_url_vendor = _AuthenticatedNoUrlVendor()
+    with patch("app.services.partner_kyc_service.get_kyc_vendor", return_value=no_url_vendor):
+        resumed, url = await kyc_svc._resume_or_clear_live(session, row)
+    assert resumed is not None
+    assert url == ""
+
+
+@pytest.mark.asyncio
+async def test_kyc_status_includes_active_digilocker_request(session):
+    pid = await _seed_pujari(session)
+    vendor = _FakeVendor()
+    await session.commit()
+    with (
+        patch("app.services.partner_kyc_service.get_kyc_vendor", return_value=vendor),
+        patch.object(kyc_svc.settings, "KYC_REDIRECT_URL", "https://api.example/kyc/callback"),
+        patch.object(kyc_svc.settings, "KYC_IDENTITY_PEPPER", "pepper"),
+    ):
+        row, _ = await kyc_svc.start_digilocker(
+            session, pujari_id=pid, ip=None, user_agent=None
+        )
+        await session.commit()
+        verification, required, live = await kyc_svc.get_partner_kyc_status(session, pid)
+    assert verification == "pending"
+    assert live is not None
+    assert live.id == row.id
+    assert live.status == "created"
+    assert required[0][1] is None

@@ -48,6 +48,8 @@ Policy merged into `SPEC_AMENDMENTS.md` §21.6.A–H, `DISPATCH_FLOW.md`, `LAUNC
 | MIG-016 | COMPLETED | `ops_monitor_alerts` — P-MONITOR unified alert store |
 | MIG-017 | COMPLETED | `panchangam_daily` — §23 server-cached panchangam (`spec/db/migration_017.sql`) |
 | MIG-018 | COMPLETED | Panchangam home-ribbon columns — §23.6 (`spec/db/migration_018.sql`) |
+| MIG-023 | COMPLETED | Selfie presign `uploading` status — excludes orphan rows from admin KYC queue (`migration_023.sql`) |
+| MIG-024 | COMPLETED | `worker_heartbeats` — P-SWEEP-RELIABILITY sweep liveness (`spec/db/migration_024.sql`; `scripts/apply_migration_024.py`) |
 | DV2-BOOKING-GATE | COMPLETED | §21.6.A — `booking_class` + night 422s at `POST /v1/bookings`; advisory warnings on `POST /slot-holds` |
 | DV2-SUPERSEDE | COMPLETED | §21.6.B — sibling-offer resolution in trigger 3 (`superseded` + `responded_at`); `LG-sibling-supersede` |
 | DV2-IMMEDIATE | COMPLETED | §21.6.C — webhook no longer writes `booking_dispatch_state`; worker `ensure_dispatch_windows()` + class-aware TTL |
@@ -69,7 +71,7 @@ Customer + partner apps share one Flutter codebase (build flavors). Repo:
 | ID | Status | Notes |
 |---|---|---|
 | C-FLUTTER-CUSTOMER | IN_PROGRESS | Waves 0–4 + bookings + **cancel UX** shipped (2026-08-09). Next: **Wave 4 customer FCM** or panchangam ribbon QA. |
-| P-FLUTTER-PARTNER | IN_PROGRESS | **Core slice done** (auth, online, offers, bookings, cancel UX, FCM handlers incl. `offer_withdrawn`, l10n). **IN_PROGRESS:** FCM sound QA. **HOLD:** availability, register/KYC, earnings. |
+| P-FLUTTER-PARTNER | IN_PROGRESS | Core + onboarding **device-signed-off** (2026-08-30): register → KYC → admin verify → online → offer accept. **Next:** `P-FLUTTER-FCM-SOUND`. **HOLD:** earnings (Phase 3). |
 | C-LAUNCH-UX | IN_PROGRESS | **Alias → `P-FLUTTER-PARTNER`** (Offers vs Bookings tabs, §21.9); keep ID for cross-ref |
 
 ### Customer app — progress (`C-FLUTTER-CUSTOMER` sub-track)
@@ -97,18 +99,18 @@ Customer + partner apps share one Flutter codebase (build flavors). Repo:
 | P-FLUTTER-FCM-REGISTER | COMPLETED | `POST /v1/me/devices`; Firebase partner flavor; token refresh on Pixel 10 |
 | P-FLUTTER-FCM-HANDLERS | COMPLETED | All 5 partner types routed (`offer_instant`, `offer_advance`, `reconfirm_*`, `accept_ack`); foreground + tap; `test/fcm_message_parser_test.dart` |
 | P-FLUTTER-FCM-CUSTOMER-CANCEL | COMPLETED | **`P-FCM-CUSTOMER-CANCEL`** — `offer_withdrawn` FCM handler; dismiss instant modal + refresh Offers. Safety nets: poll + 410 refresh (`P-CANCEL-OFFERS-SYNC`) |
-| P-FLUTTER-FCM-SOUND | IN_PROGRESS | Native channel + `OfferAlertSound` + FCM sound dedup (2026-08-09). Device sign-off: `mana_guruji_mobile/test/PARTNER_FCM_SOUND.md` C1–C4 |
+| P-FLUTTER-FCM-SOUND | IN_PROGRESS | Temple ghanta (`offer_instant_ghanta`) + double haptic; channel `mana_guruji_offers_ghanta`; device sign-off: `test/PARTNER_FCM_SOUND.md` C1–C4 |
 | P-FLUTTER-L10N | COMPLETED | Partner shell + **OTP auth screen** EN/TE; `LocaleToggleBar` on login |
 | P-FLUTTER-DEV-NETWORK | COMPLETED | Physical device: `adb reverse tcp:8000` or LAN IP + `uvicorn --host 0.0.0.0` |
 | P-FLUTTER-E2E-SMOKE | IN_PROGRESS | **A, B, D, E — PASS** (2026-08-03). **C1–C4** via `test/PARTNER_FCM_SOUND.md`; checklist: `test/PARTNER_E2E_SMOKE.md` |
-| P-FLUTTER-AVAILABILITY | HOLD | Weekly hours + date blocks UI — backend ready (`B-AVAIL`/`B-UNAVAIL`); unblock when onboarding track starts |
-| P-FLUTTER-REGISTER | IN_PROGRESS | Register screen + profile bootstrap wired to `POST /v1/pujari/register` |
-| P-FLUTTER-KYC | IN_PROGRESS | DigiLocker WebView + camera selfie + status hub; device QA pending |
+| P-FLUTTER-AVAILABILITY | PENDING | Weekly hours + date blocks UI — backend ready (`B-AVAIL`/`B-UNAVAIL`); unblocked after onboarding sign-off |
+| P-FLUTTER-REGISTER | COMPLETED | Register screen + `POST /v1/pujari/register`; device-verified on physical Android (2026-08-30) |
+| P-FLUTTER-KYC | COMPLETED | DigiLocker + selfie + admin approve → `verified` → online → offer display + accept; physical Android (2026-08-30) |
 | P-FLUTTER-EARNINGS-UI | HOLD | Header earnings strip — blocked on Phase 3 `B-EARNINGS` / `P-SPLITS` |
 
 **Phase 2 FCM:** `P-FCM-E2E` **IN_PROGRESS** (partner sound device QA — `test/PARTNER_FCM_SOUND.md`). **`P-FCM-CUSTOMER-CANCEL` COMPLETED** (2026-08-12). Customer FCM **PENDING** (`C-FLUTTER-FCM`).
 
-**Partner polish (Aug 2026):** FCM sound device sign-off → availability/register/KYC/earnings HOLD bucket.
+**Partner polish (Aug 2026):** FCM sound device sign-off (`P-FLUTTER-FCM-SOUND`) → optional availability UI → customer FCM / panchangam.
 
 ---
 
@@ -134,12 +136,12 @@ exit gate in MASTER.md is met.
 | Phase | Name | Phase status | Exit gate (summary) |
 |---|---|---|---|
 | **0** | Integrity + dispatch | **COMPLETED** | P0 trio + dispatch wiring + Sprint 1 concurrency tests |
-| **0.5** | Supply onboarding | **IN_PROGRESS** | KYC approve path **signed off** (backend E2E); earnings stub still pending |
+| **0.5** | Supply onboarding | **IN_PROGRESS** | **Flutter supply path device-signed-off** (2026-08-30): KYC → admin verify → offer accept. Remaining for phase exit: `B-EARNINGS` stub (blocked Phase 3) |
 | **1** | Customer + partner APIs | **COMPLETED** | Addresses, booking detail, availability |
 | **2** | Notifications | **IN_PROGRESS** | Backend done; live SMS blocked on DLT; partner FCM handlers **COMPLETED**; `P-FCM-E2E` + `P-FLUTTER-FCM-SOUND` QA pending |
 | **3** | Money pipeline | **ON HOLD** | CA memo + Razorpay Route → migration 007, splits, TDS, payouts |
 | **4** | Admin control plane | **IN_PROGRESS** | 4-0 + 4A + 4B + **4C COMPLETED** (manual QA 2026-07-22); partner Flutter **IN_PROGRESS** (`mana_guruji_mobile`); remaining Phase 4 exit gate items in ADMIN.md (4B catalogue/KYC smoke) |
-| **5** | Scheduled-booking ops | **COMPLETED** | B-CANCEL, P-SWEEP-CONFIRMED, P-MONITOR (M0 foundation) |
+| **5** | Scheduled-booking ops | **COMPLETED** | B-CANCEL, P-SWEEP-CONFIRMED, P-SWEEP-RELIABILITY, P-MONITOR (M0 foundation) |
 | **6** | Launch gate | **PENDING** | Full DISPATCH_FLOW concurrent test suite green |
 | **7** | Observability & ops notifications | **PENDING** | **Last** — after Flutter + admin UX freeze; see `OBSERVABILITY.md` exit gate |
 
@@ -210,6 +212,7 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | P-CTX | COMPLETED | — | app_context enforcement |
 | P-SWEEP | COMPLETED | — | 5-step sweep + rebroadcast enqueue; **2026-08-02:** step-4 stranded scan fixed — see `P-SWEEP-ZERO-OFFER-RETRY` |
 | P-SWEEP-ZERO-OFFER-RETRY | COMPLETED | — | DISPATCH_FLOW §4 alignment: `bookings_needing_rebroadcast` uses `last_dispatched` (not assignment history); `bookings_needing_initial_broadcast` for lost first `broadcast_booking`; `dispatch_round_done` logs `candidates`/`live`; `tests/test_sweep.py` (5 tests) |
+| P-SWEEP-RELIABILITY | COMPLETED | 5 | **2026-08-30** — Postgres `worker_heartbeats` + `/health` `sweep_stale`; isolated sweep steps; deadline exhaust LIMIT/try-except; `max_rounds` enforced; `SLOT_IN_PAST` gate + accept slot guard; `spec/SWEEP_RELIABILITY.md`; `tests/test_sweep_reliability.py` + `scripts/verify_sweep_e2e.py` (10/10 E2E pass) |
 | P-REFUND | COMPLETED | — | refund worker (live Razorpay TBD) |
 | P-AUTH | COMPLETED | 2 | `otp/request` → `sms_router`; `sms_sent` + `sms_provider` in response |
 | P-SMS-ROUTER | COMPLETED | 2 | FAST2SMS primary, MSG91 held (`MSG91_ENABLED=false`); `test_sms_router.py` |
@@ -293,9 +296,9 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | B-EARNINGS | PENDING | 3 | blocked_by: P-SPLITS; + TDS line, ₹4.5L nudge |
 | B-AVAIL | COMPLETED | 1 | `PUT/GET /v1/me/availability` replace-all |
 | B-UNAVAIL | COMPLETED | 1 | `PUT/GET /v1/me/unavailability` replace-all |
-| B-KYC | COMPLETED | 0.5 | Setu DigiLocker + selfie presign/confirm + admin approve → `verified`; `api-full` smoke + pytest green |
+| B-KYC | COMPLETED | 0.5 | Setu DigiLocker + selfie presign/confirm + admin approve → `verified`; hardened Aug 2026: resume-after-kill (`active_digilocker_request`), `uploading` selfie gate, Setu read timeout 25s |
 | B-KYC-VENDOR | COMPLETED | 0.5 | `partner_kyc_service` + Setu async client + self-healing poll finalize |
-| B-KYC-SELFIE | COMPLETED | 0.5 | presign + confirm (EXIF strip); `tests/e2e/test_kyc_selfie_live.py` (7 cases) + `kyc_selfie_smoke.py` |
+| B-KYC-SELFIE | COMPLETED | 0.5 | presign (`uploading`) + confirm → `pending` (EXIF strip); migration **023** |
 | B-DEVICE | COMPLETED | 2 | `POST/DELETE /v1/me/devices`; upsert by `device_token` |
 | B-CANCEL | COMPLETED | 5 | `POST /v1/bookings/{id}/pujari-cancel` → requested + `rebroadcast(fresh=True)`; `test_pujari_cancel.py` |
 | B-REGISTER | COMPLETED | 0.5 | `POST /v1/pujari/register` — idempotent pending pujari bootstrap |
@@ -410,6 +413,7 @@ gate signed off; booking lifecycle API frozen.
 |---|---|---|
 | P-MONITOR | COMPLETED | `app/monitoring/` — see Phase 5 platform row |
 | P-SWEEP-CONFIRMED | COMPLETED | Alert-only no-show |
+| P-SWEEP-RELIABILITY | COMPLETED | Sweep heartbeat, deadline exhaust hardening, past-slot gates — `spec/SWEEP_RELIABILITY.md` (2026-08-30) |
 
 ### M1 — Lifecycle instrumentation
 

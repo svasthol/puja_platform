@@ -82,7 +82,8 @@ Manual / CI smoke for **real Setu sandbox** + your running API. Completing DigiL
 ### Prerequisites
 
 1. **Migration 020** applied: `python scripts/apply_migration_020.py`
-2. **Uvicorn** on `:8000` for `api` mode
+2. **Migration 023** applied: `python scripts/apply_migration_023.py` (selfie `uploading` status)
+3. **Uvicorn** on `:8000` for `api` mode
 3. **Redis** reachable (`REDIS_URL`) — poll finalize uses a short NX lock
 4. **Public callback URL** — Setu redirects the browser to your API; localhost alone will not work for real consent. Use **ngrok** (or similar) pointing at `http://127.0.0.1:8000`
 
