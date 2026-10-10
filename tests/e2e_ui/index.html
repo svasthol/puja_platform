@@ -4,13 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Puja Platform — E2E Test UI (DEV ONLY)</title>
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=17" />
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
   <header>
     <h1>Puja Platform — E2E Test UI</h1>
-    <p class="banner">TEST ONLY · not shipped · lives in <code>tests/e2e_ui/</code> · <span id="e2eVersion">v?</span></p>
+    <p class="banner">TEST ONLY · not shipped · lives in <code>tests/e2e_ui/</code> · <span id="e2eVersion">v?</span> ·
+      <a href="tds_launch_guide.html">TDS Launch Guide (visual)</a></p>
   </header>
 
   <section class="panel" id="settings">
@@ -27,6 +28,9 @@
 
   <nav class="tabs">
     <button type="button" class="tab" data-tab="otp">OTP / SMS</button>
+    <button type="button" class="tab" data-tab="sprint1">Sprint 1 — Settlements</button>
+    <button type="button" class="tab" data-tab="sprint2">Sprint 2 — TDS &amp; Compliance</button>
+    <a class="tab tab-link" href="tds_launch_guide.html" title="Visual flow + scenarios">TDS Guide ↗</a>
     <button type="button" class="tab active" data-tab="customer">Customer</button>
     <button type="button" class="tab" data-tab="partner">Partner</button>
     <button type="button" class="tab" data-tab="admin">Admin</button>
@@ -154,14 +158,24 @@
       <h2>4 — Booking &amp; pay</h2>
       <label>Payment mode
         <select id="payMode">
-          <option value="full_online">full_online</option>
-          <option value="advance_balance">advance_balance</option>
+          <option value="booking_fee">booking_fee (live API — Sprint 1)</option>
+          <option value="booking_fee_preview">booking_fee — simulated (no DB)</option>
+          <option value="advance_balance">advance_balance (legacy — disabled at launch)</option>
         </select>
       </label>
+      <p id="payModeHint" class="hint warn">
+        <strong>Sprint 1 preview</strong> does not call <code>POST /bookings</code> — it simulates
+        the ₹61 token checkout. Use <strong>advance_balance</strong> for a real booking + dispatch test.
+      </p>
+      <div id="sprint1CheckoutPanel" class="settlement-panel" hidden>
+        <h3 class="catalog-subhead">Sprint 1 checkout preview</h3>
+        <pre id="sprint1CheckoutJson" class="admin-pre">—</pre>
+      </div>
       <button type="button" id="btnBook">POST /bookings</button>
       <p>Booking: <code id="bookingId">—</code></p>
       <p>Order: <code id="orderId">—</code></p>
-      <p>Amount online: <code id="amountOnline">—</code></p>
+      <p>Amount online (Razorpay): <code id="amountOnline">—</code></p>
+      <p>Pay pujari offline: <code id="amountOffline">—</code></p>
       <label>Razorpay Key ID (test, public)
         <input id="rzKeyPay" placeholder="rzp_test_… or auto-loaded from .env" />
       </label>
@@ -214,6 +228,45 @@
       <label>Assignment ID <input id="assignmentId" placeholder="from GET /offers — NOT booking id" /></label>
       <button type="button" id="btnAccept">Accept offer</button>
       <button type="button" id="btnReject">Reject offer</button>
+    </section>
+    <section class="panel" id="pjPanPanel">
+      <h2>Setu PAN verify (end-to-end)</h2>
+      <p class="hint">
+        Uses real <code>POST /v1/pujari/kyc/pan</code> + Setu when
+        <code>KYC_SETU_PAN_PRODUCT_ID</code> is set on the API (<code>.env</code> + restart uvicorn).
+        Sandbox: <strong>ABCDE1234A</strong> valid · <strong>ABCDE1234B</strong> invalid.
+      </p>
+      <p id="pjPanEnvStatus" class="hint warn">Setu config: checking…</p>
+      <ol class="admin-steps">
+        <li><strong>Partner login</strong> above (Request OTP → Verify) — use <code>+910000000011</code> after <code>ensure_seed.py</code>.</li>
+        <li>Pick sandbox PAN or type your own (10 chars).</li>
+        <li>Tick consent → <strong>Submit PAN</strong> → expect <code>pan_status: operative</code> for A.</li>
+        <li><strong>Load tax profile</strong> / <strong>tax summary</strong> — confirm FY gate fields.</li>
+        <li>Optional: <strong>Heartbeat</strong> / <strong>Accept</strong> if gates enabled in API env.</li>
+      </ol>
+      <label>Entity type
+        <select id="pjPanEntity">
+          <option value="individual" selected>individual</option>
+          <option value="huf">huf</option>
+          <option value="firm">firm</option>
+          <option value="company">company</option>
+        </select>
+      </label>
+      <label>PAN <input id="pjPan" value="ABCDE1234A" maxlength="10" autocomplete="off" /></label>
+      <div class="admin-actions">
+        <button type="button" id="btnPjPanSandboxValid">Sandbox valid (A)</button>
+        <button type="button" id="btnPjPanSandboxInvalid">Sandbox invalid (B)</button>
+      </div>
+      <label class="admin-dev-secret">Reason (≥20 chars, Setu contract)
+        <textarea id="pjPanReason" rows="2">TDS compliance verification for partner onboarding flow via E2E UI.</textarea>
+      </label>
+      <label><input type="checkbox" id="pjPanConsent" checked /> I consent to PAN verification (required)</label>
+      <div class="admin-actions">
+        <button type="button" id="btnPjPanSubmit">Submit PAN → Setu</button>
+        <button type="button" id="btnPjTaxProfile">GET /me/tax-profile</button>
+        <button type="button" id="btnPjTaxSummary">GET /me/tax-summary</button>
+      </div>
+      <pre id="pjPanOut" class="admin-pre">Login as partner, then Submit PAN.</pre>
     </section>
   </main>
 
@@ -364,6 +417,204 @@
     </section>
   </main>
 
+  <main id="tab-sprint1" class="tab-panel">
+    <section class="panel">
+      <h2>Sprint 1 — Launch-lite booking fee model</h2>
+      <p class="hint">
+        <strong>TEST ONLY preview.</strong> Production API still uses
+        <code>advance_balance</code> / <code>full_online</code> until Sprint 1 ships.
+        This tab shows how money and settlements will work with
+        <code>payment_mode = booking_fee</code> (display: <em>Muhurat &amp; Slot Lock Token</em>).
+      </p>
+      <div class="settlement-flow" aria-label="Money flow diagram">
+        <div class="flow-step">Customer</div>
+        <div class="flow-arrow">₹61 via Razorpay →</div>
+        <div class="flow-step flow-platform">Platform<br /><small>booking fee</small></div>
+        <div class="flow-arrow flow-sep">+</div>
+        <div class="flow-arrow">₹puja total cash/UPI →</div>
+        <div class="flow-step flow-pujari">Pujari<br /><small>offline</small></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Quote calculator</h2>
+      <label>Puja price (INR)
+        <input id="s1PujaPrice" type="number" min="1" step="1" value="2100" />
+      </label>
+      <label>Addons total (INR)
+        <input id="s1AddonTotal" type="number" min="0" step="1" value="0" />
+      </label>
+      <label>Booking fee / token (INR)
+        <input id="s1BookingFee" type="number" min="1" step="1" value="61" />
+      </label>
+      <button type="button" id="btnS1Quote">Compute Sprint 1 quote</button>
+      <button type="button" id="btnS1SimulateBook">Simulate POST /bookings (no DB)</button>
+      <pre id="s1QuoteOut" class="admin-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Refund tiers (booking fee only)</h2>
+      <p class="hint">Puja amount is never collected online at launch — no platform refund on offline portion.</p>
+      <button type="button" id="btnS1Refunds">Load refund matrix</button>
+      <div class="ops-table-wrap">
+        <table class="ops-table" id="s1RefundTable">
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Status</th>
+              <th>Fee refund</th>
+            </tr>
+          </thead>
+          <tbody id="s1RefundBody">
+            <tr><td colspan="3" class="ops-empty">Click Load refund matrix</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Inspect real booking — settlement view</h2>
+      <p class="hint">
+        Reads your local DB via <code>/test-sprint1-settlement.json</code>.
+        For <code>advance_balance</code> bookings, shows a <strong>Sprint 1 preview</strong>
+        side-by-side with current API amounts.
+      </p>
+      <label>Booking ID
+        <input id="s1InspectId" class="ops-id-input" placeholder="from Test ops table" />
+      </label>
+      <button type="button" id="btnS1Inspect">Inspect settlement</button>
+      <button type="button" id="btnS1CopyFromOps">Use last ops booking id</button>
+      <pre id="s1SettlementOut" class="admin-pre settlement-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Partner lifecycle (Sprint 1)</h2>
+      <ol class="admin-steps">
+        <li>Customer pays <strong>₹61</strong> token online → booking <code>requested</code></li>
+        <li>Dispatch → partner accepts → <code>confirmed</code></li>
+        <li>Partner starts puja → <code>in_progress</code></li>
+        <li><strong>C4 gate:</strong> <code>POST …/confirm-balance-collected</code> (full puja ₹ offline)</li>
+        <li>Partner completes → <code>completed</code> (blocked until step 4)</li>
+        <li>Sprint 2: TDS accrual stubbed at step 4 until CA memo §2</li>
+      </ol>
+    </section>
+  </main>
+
+  <main id="tab-sprint2" class="tab-panel">
+    <section class="panel">
+      <h2>Sprint 2 — TDS &amp; compliance (preview)</h2>
+      <p class="hint">
+        <strong>TEST ONLY preview.</strong> Production accrual is stubbed
+        (<code>TDS_ACCRUAL_ENABLED=false</code>) until CA memo §2.
+        Simulates TDS at <code>confirm-balance-collected</code>, PAN accept gate, and G2 turnover monitor.
+      </p>
+      <p class="hint warn">
+        Sprint 2 buttons need <strong>serve.py v17+</strong>; Setu PAN panel needs <strong>v19+</strong>. Slabs load from
+        <code>platform_settings.tds_facilitation</code> (editable in Admin → TDS &amp; compliance).
+        Restart test server if you see HTML/JSON errors.
+      </p>
+      <p id="s2ConfigHint" class="hint">Loading admin TDS slabs…</p>
+      <div class="settlement-flow" aria-label="TDS flow diagram">
+        <div class="flow-step">Partner confirms<br /><small>balance collected</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step flow-platform">TDS accrual<br /><small>ledger write</small></div>
+        <div class="flow-arrow flow-sep">+</div>
+        <div class="flow-step">FY gross<br /><small>pujari_tax_year</small></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>TDS calculator</h2>
+      <label>Entity type
+        <select id="s2EntityType">
+          <option value="individual">individual</option>
+          <option value="huf">huf</option>
+          <option value="firm">firm</option>
+          <option value="company">company</option>
+          <option value="trust">trust</option>
+          <option value="aop">aop</option>
+          <option value="other">other</option>
+          <option value="null">null (invalid)</option>
+        </select>
+      </label>
+      <label class="inline-check">
+        <input type="checkbox" id="s2PanOnFile" checked /> PAN on file
+      </label>
+      <label>FY gross before (INR)
+        <input id="s2FyGross" type="number" min="0" step="1" value="490000" />
+      </label>
+      <label>Transaction gross (INR)
+        <input id="s2TxnAmount" type="number" min="1" step="1" value="2100" />
+      </label>
+      <button type="button" id="btnS2Tds">Compute TDS</button>
+      <pre id="s2TdsOut" class="admin-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Accrual simulator (no DB)</h2>
+      <p class="hint">Simulates <code>POST …/confirm-balance-collected</code> ledger write. Idempotent per booking id.</p>
+      <label>Booking ID (optional)
+        <input id="s2AccrualBookingId" class="ops-id-input" placeholder="auto-generated if empty" />
+      </label>
+      <label class="inline-check">
+        <input type="checkbox" id="s2AccrualEnabled" checked /> TDS accrual enabled
+      </label>
+      <label class="inline-check">
+        <input type="checkbox" id="s2AccrualReset" /> Reset in-memory ledger first
+      </label>
+      <button type="button" id="btnS2Accrual">Simulate accrual</button>
+      <button type="button" id="btnS2Reversal">Simulate reversal</button>
+      <pre id="s2AccrualOut" class="admin-pre settlement-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>G2 — FY platform fee turnover</h2>
+      <label>Manual FY fee revenue (INR)
+        <input id="s2TurnoverAmount" type="number" min="0" step="1000" value="0" />
+      </label>
+      <button type="button" id="btnS2Turnover">Preview thresholds</button>
+      <button type="button" id="btnS2TurnoverDb">Load from DB (read-only)</button>
+      <pre id="s2TurnoverOut" class="admin-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>PAN accept gate</h2>
+      <label class="inline-check">
+        <input type="checkbox" id="s2PanGateEnabled" checked /> Gate enabled
+      </label>
+      <label class="inline-check">
+        <input type="checkbox" id="s2PanGateOnFile" /> PAN on file
+      </label>
+      <button type="button" id="btnS2PanGate">Preview accept gate</button>
+      <pre id="s2PanGateOut" class="admin-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Inspect booking — TDS settlement view</h2>
+      <p class="hint">
+        Reads local DB via <code>/test-sprint2-settlement.json</code> + simulates accrual preview.
+      </p>
+      <label>Booking ID
+        <input id="s2InspectId" class="ops-id-input" placeholder="from Test ops table" />
+      </label>
+      <button type="button" id="btnS2Inspect">Inspect TDS settlement</button>
+      <button type="button" id="btnS2CopyFromOps">Use last ops booking id</button>
+      <pre id="s2SettlementOut" class="admin-pre settlement-pre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Partner lifecycle (Sprint 2)</h2>
+      <ol class="admin-steps">
+        <li>Sprint 1: customer pays ₹61 token; puja offline</li>
+        <li><strong>PAN gate (when enabled):</strong> partner must have PAN before accept</li>
+        <li>Partner confirms balance collected → <strong>TDS accrual</strong> (Sprint 2)</li>
+        <li>FY gross updated in <code>pujari_tax_year</code>; ledger append-only</li>
+        <li>Cancel after accrual → <strong>reversal</strong> entry</li>
+        <li>G2 monitor: warn ₹18L / block ₹20L platform fee FY revenue</li>
+      </ol>
+    </section>
+  </main>
+
   <main id="tab-ops" class="tab-panel">
     <section class="panel">
       <h2>Booking test dashboard</h2>
@@ -374,6 +625,11 @@
       <p class="hint warn">
         If refresh fails with HTML/JSON error, stop the old server (Ctrl+C) and restart:
         <code>python tests/e2e_ui/serve.py</code>
+      </p>
+      <p class="hint warn">
+        <strong>Sprint 1 column:</strong> Token ₹ shows configured fee preview when API is still
+        <code>advance_balance</code>. Click a booking id → <strong>Sprint 1 — Settlements</strong> tab
+        → Inspect settlement.
       </p>
       <p class="hint warn">
         <strong>Payment stuck on PAYMENT_PENDING?</strong> Razorpay Pay alone does not confirm
@@ -404,8 +660,12 @@
               <th>Customer</th>
               <th>Puja</th>
               <th>Slot</th>
+              <th>Mode</th>
+              <th>Token ₹</th>
               <th>Online ₹</th>
+              <th>Offline ₹</th>
               <th>Paid</th>
+              <th>Bal. coll.</th>
               <th>Payment ID</th>
               <th>Offers</th>
               <th>Pujari</th>
@@ -413,7 +673,7 @@
             </tr>
           </thead>
           <tbody id="opsTableBody">
-            <tr><td colspan="11" class="ops-empty">Loading…</td></tr>
+            <tr><td colspan="15" class="ops-empty">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -425,6 +685,6 @@
     <button type="button" id="btnClearLog">Clear log</button>
   </main>
 
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

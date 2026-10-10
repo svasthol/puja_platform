@@ -30,6 +30,13 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO puja_app;
 REVOKE UPDATE, DELETE ON admin_audit_log        FROM puja_app;
 REVOKE UPDATE, DELETE ON booking_status_history FROM puja_app;
 
+DO $$
+BEGIN
+    IF to_regclass('pujari_tds_facilitation_ledger') IS NOT NULL THEN
+        REVOKE UPDATE, DELETE ON pujari_tds_facilitation_ledger FROM puja_app;
+    END IF;
+END $$;
+
 -- ---- Statutory tax config: seeded by puja_migrate only (once 007 ships) ----
 DO $$
 BEGIN

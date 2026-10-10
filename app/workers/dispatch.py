@@ -24,8 +24,9 @@ from app.services.dispatch_launch import (
     offer_expires_interval,
 )
 from app.workers.celery_app import celery_app
+from app.core.redis_keys import presence_redis_key
 from app.workers.redis_sync import get_sync_redis, namespaced_key, new_lock_token, release_lock
-from app.workers.sweep import get_connection
+from app.workers.sweep import _agent_dbg, get_connection
 
 log = structlog.get_logger("dispatch")
 
@@ -91,11 +92,19 @@ def exhaust_booking_no_pujari(cur, conn, booking_id: str) -> dict:
         """
         INSERT INTO refunds (id, payment_id, booking_id, amount, reason, status,
                              attempt_count, next_attempt_at, created_at)
-        SELECT gen_random_uuid(), p.id, b.id, b.amount_due_online, 'no_pujari',
-               'pending', 0, now(), now()
+        SELECT gen_random_uuid(), p.id, b.id,
+               CASE
+                 WHEN b.payment_mode = 'booking_fee' THEN b.booking_fee
+                 ELSE b.amount_due_online
+               END,
+               'no_pujari', 'pending', 0, now(), now()
         FROM bookings b
         JOIN payments p ON p.booking_id = b.id AND p.status = 'success'
-        WHERE b.id = %s AND b.amount_due_online > 0
+        WHERE b.id = %s
+          AND (
+            (b.payment_mode = 'booking_fee' AND b.booking_fee > 0)
+            OR (b.payment_mode <> 'booking_fee' AND b.amount_due_online > 0)
+          )
         ON CONFLICT DO NOTHING
         """,
         (booking_id,),
@@ -118,11 +127,23 @@ def exhaust_booking_no_pujari(cur, conn, booking_id: str) -> dict:
 
 
 def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
+    _agent_dbg(
+        "H2",
+        "dispatch.py:_dispatch_round",
+        "dispatch_round_enter",
+        {"booking_id": booking_id, "fresh": fresh},
+    )
     r = _redis()
     lock_key = namespaced_key(f"dispatch_lock:{booking_id}")
     lock_token = new_lock_token()
     if not r.set(lock_key, lock_token, nx=True, ex=60):
         log.info("dispatch_skipped_locked", booking_id=booking_id)
+        _agent_dbg(
+            "H2",
+            "dispatch.py:_dispatch_round",
+            "dispatch_skipped_locked",
+            {"booking_id": booking_id},
+        )
         return {"skipped": "locked"}
 
     conn = get_connection()
@@ -140,8 +161,20 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
             now_db = cur.fetchone()[0]
             if starts_at > now_db:
                 log.info("dispatch_deferred", booking_id=booking_id, starts_at=str(starts_at))
+                _agent_dbg(
+                    "H7",
+                    "dispatch.py:_dispatch_round",
+                    "dispatch_skipped_deferred",
+                    {"booking_id": booking_id, "starts_at": str(starts_at)},
+                )
                 return {"skipped": "deferred", "dispatch_starts_at": str(starts_at)}
             if deadline <= now_db:
+                _agent_dbg(
+                    "H7",
+                    "dispatch.py:_dispatch_round",
+                    "dispatch_exhaust_deadline",
+                    {"booking_id": booking_id},
+                )
                 return exhaust_booking_no_pujari(cur, conn, booking_id)
 
             cur.execute(
@@ -158,6 +191,16 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                     booking_id=booking_id,
                     round=expected,
                     max_rounds=max_rounds,
+                )
+                _agent_dbg(
+                    "H7",
+                    "dispatch.py:_dispatch_round",
+                    "dispatch_exhaust_max_rounds",
+                    {
+                        "booking_id": booking_id,
+                        "round": expected,
+                        "max_rounds": max_rounds,
+                    },
                 )
                 return exhaust_booking_no_pujari(cur, conn, booking_id)
 
@@ -189,9 +232,62 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
 
             live = []
             if candidates:
-                keys = [f"presence:{c}" for c in candidates]
+                keys = [presence_redis_key(c) for c in candidates]
                 vals = r.mget(keys)
                 live = [c for c, v in zip(candidates, vals) if v is not None]
+
+            if not live and candidates:
+                cur.execute("SELECT id FROM pujaris WHERE is_online = true")
+                online_ids = [str(row[0]) for row in cur.fetchall()]
+                cand_set = {str(c) for c in candidates}
+                redis_online: list[str] = []
+                if online_ids:
+                    okeys = [presence_redis_key(pid) for pid in online_ids]
+                    ovals = r.mget(okeys)
+                    redis_online = [
+                        pid for pid, val in zip(online_ids, ovals) if val is not None
+                    ]
+                overlap = [pid for pid in redis_online if pid in cand_set]
+                _agent_dbg(
+                    "H8",
+                    "dispatch.py:_dispatch_round",
+                    "dispatch_zero_live_diagnosis",
+                    {
+                        "booking_id": booking_id,
+                        "candidates": len(candidates),
+                        "redis_online_count": len(redis_online),
+                        "redis_online_in_candidate_pool": len(overlap),
+                        "db_is_online_count": len(online_ids),
+                    },
+                )
+                if redis_online and not overlap:
+                    log.warning(
+                        "dispatch_online_pujari_not_in_candidate_pool",
+                        booking_id=booking_id,
+                        candidates=len(candidates),
+                        redis_online=len(redis_online),
+                        hint="pujari needs pujari_pricing for this puja, service area, "
+                        "and availability covering the booked slot",
+                    )
+                elif not redis_online:
+                    log.info(
+                        "dispatch_no_redis_presence",
+                        booking_id=booking_id,
+                        candidates=len(candidates),
+                        hint="no pujari heartbeat keys in Redis at dispatch time",
+                    )
+
+            _agent_dbg(
+                "H3",
+                "dispatch.py:_dispatch_round",
+                "dispatch_candidates_presence",
+                {
+                    "booking_id": booking_id,
+                    "candidates": len(candidates),
+                    "live": len(live),
+                    "booking_class": booking_class,
+                },
+            )
 
             inserted = 0
             offer_ttl = offer_expires_interval(booking_class, settings)
@@ -221,6 +317,17 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                 inbox_capped=inbox_capped,
             )
 
+            _agent_dbg(
+                "H4",
+                "dispatch.py:_dispatch_round",
+                "dispatch_round_finished",
+                {
+                    "booking_id": booking_id,
+                    "round": next_round,
+                    "inserted": inserted,
+                    "will_enqueue_notify": inserted > 0,
+                },
+            )
             if inserted:
                 celery_app.send_task(
                     "app.workers.notifications.notify_offers", args=[booking_id]
@@ -288,7 +395,16 @@ def _direct_dispatch(booking_id: str) -> dict:
     finally:
         conn.close()
         release_lock(r, lock_key, lock_token)
+
+
+@celery_app.task(name="app.workers.dispatch.broadcast_booking")
 def broadcast_booking(booking_id: str) -> dict:
+    _agent_dbg(
+        "H1",
+        "dispatch.py:broadcast_booking",
+        "broadcast_booking_called",
+        {"booking_id": booking_id},
+    )
     return _dispatch_round(booking_id, fresh=False)
 
 

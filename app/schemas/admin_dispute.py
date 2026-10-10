@@ -13,6 +13,13 @@ class AdminDisputeRequest(BaseModel):
     dispute_type: Literal["service", "offline_non_payment"] = "service"
 
 
+class TdsReversalInfo(BaseModel):
+    reversed: bool
+    booking_id: str | None = None
+    reason: str | None = None
+    tds_amount: str | None = None
+
+
 class AdminDisputeResponse(BaseModel):
     booking_id: uuid.UUID
     previous_status: str
@@ -20,3 +27,4 @@ class AdminDisputeResponse(BaseModel):
     dispute_type: str
     disputed_at: dt.datetime
     offline_balance_note: str | None = None
+    tds_reversal: TdsReversalInfo | None = None

@@ -105,7 +105,7 @@ class KycVendor(Protocol):
     async def start_digilocker(self, *, redirect_url: str) -> KycStartResult: ...
     async def get_request_status(self, *, vendor_request_id: str) -> KycStatusResult: ...
     async def fetch_aadhaar(self, *, vendor_request_id: str) -> KycIdentity: ...
-    # Phase 4 (PAN):
+    # PAN verify (Setu when KYC_SETU_PAN_PRODUCT_ID configured):
     async def verify_pan(self, *, pan: str, consent: bool, reason: str) -> KycPanResult: ...
     # Webhook (Phase 2):
     def verify_webhook_signature(self, *, raw_body: bytes, signature: str) -> bool: ...
@@ -190,7 +190,7 @@ All under `app_context=pujari` (`require_pujari`), except the webhook (public, s
 | `POST /v1/pujari/kyc/digilocker` | Start DigiLocker journey | 201 `{request_id, url, expires_at}` |
 | `GET /v1/pujari/kyc/requests/{request_id}` | Poll journey status (owner only) | 200 `{status, scope, doc_types_created[]}` |
 | `GET /v1/pujari/kyc/status` | Overall onboarding status | 200 `{verification_status, required:[{doc_type, status}]}` |
-| `POST /v1/pujari/kyc/pan` *(Phase 4)* | `{pan, consent, reason}` standalone PAN | 200 `{verification, name?}` |
+| `POST /v1/pujari/kyc/pan` | `{pan, consent, reason}` → updates tax profile; Setu verify when product id set | 200 `{verification, name?}` |
 | `POST /v1/webhooks/kyc/{vendor}` | Vendor async callback (signature-verified) | 200 always once recorded |
 
 **Deprecation:** the old `POST /v1/pujari/documents` (manual S3 presign) becomes **optional /
@@ -318,7 +318,7 @@ no duplicated ingest logic.
 | `B-REGISTER` | unblock (was HOLD) | `POST /v1/pujari/register` |
 | `B-KYC-VENDOR` | supersedes S3-only `B-KYC` | vendor layer + `kyc_verification_requests` + start/status/ingest |
 | `B-KYC-WEBHOOK` | new (Phase 2) | signed webhook + async finalize |
-| `B-KYC-PAN` | new (Phase 4) | standalone PAN via vendor |
+| `B-KYC-PAN` | `L-SPRINT-2-TDS-KYC-PAN` **COMPLETED** | Setu verify in `setu_digilocker_client.verify_pan`; `pan_enc` Phase 3 |
 | `P-FLUTTER-REGISTER` | unblock after backend E2E | register screen |
 | `P-FLUTTER-KYC` | unblock after backend E2E | DigiLocker WebView + status screen |
 
@@ -336,7 +336,7 @@ file linked from `MASTER.md` Phase 0.5.
 4. **Manual sandbox E2E** — real DigiLocker test identity; admin approve.
 5. **Backend Phase 2** — webhook + expiry sweep (optional but recommended before prod).
 6. **Flutter** — register + DigiLocker WebView + status, aligned to the frozen contract.
-7. **PAN (Phase 4)** — only after DigiLocker E2E is green.
+7. **PAN profile** — `POST /kyc/pan` + partner PAN screen (shipped); enable Setu verify in prod via `KYC_SETU_PAN_PRODUCT_ID`; encrypted filing (`pan_enc`) remains Phase 3.
 8. **Production** — Setu Bridge prod creds + agreements, `KYC_SETU_BASE_URL=https://dg.setu.co`,
    `KYC_VENDOR` unchanged (proves the swap path already works via env).
 

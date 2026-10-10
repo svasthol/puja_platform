@@ -79,7 +79,7 @@ class PujaCreate(BaseModel):
     tagline: str | None = Field(default=None, max_length=200)
     description: str | None = None
     duration_minutes: int | None = Field(default=None, ge=1, le=24 * 60)
-    default_price: Decimal = Field(ge=0)
+    default_price: Decimal = Field(gt=0)
     price_max: Decimal | None = Field(default=None, ge=0)
     change_reason: str | None = Field(default=None, max_length=300)
 
@@ -92,7 +92,7 @@ class PujaUpdate(BaseModel):
     tagline: str | None = Field(default=None, max_length=200)
     description: str | None = None
     duration_minutes: int | None = Field(default=None, ge=1, le=24 * 60)
-    default_price: Decimal | None = Field(default=None, ge=0)
+    default_price: Decimal | None = Field(default=None, gt=0)
     price_max: Decimal | None = None
     is_active: bool | None = None
     hero_media_id: uuid.UUID | None = None
@@ -109,9 +109,15 @@ class PujaImpactResponse(BaseModel):
     puja_id: uuid.UUID
     active_future_bookings: int
     active_holds_unscoped: int
+    default_price: Decimal
+    customer_price_from: Decimal
+    customer_price_to: Decimal
+    verified_pujari_pricing_count: int
+    lowest_pujari_base_price: Decimal | None = None
     note: str = (
-        "Holds are not puja-scoped until booking; counts are future non-cancelled bookings. "
-        "Price/duration changes may affect live quote window (§20.4)."
+        "Launch: customer app price_from/to follow catalog default_price and price_max "
+        "(same as checkout). verified pujari_pricing is for dispatch offers only. "
+        "Holds are not puja-scoped until booking."
     )
 
 

@@ -183,7 +183,7 @@ async def test_pujaris_unit_price_matches_resolver(session):
     if match is None:
         pytest.skip("Pujari not returned for slot (availability/overlap filters)")
 
-    expected = await resolve_puja_unit_price(session, puja_id, pujari_id)
+    expected = await resolve_puja_unit_price(session, puja_id, None)
     assert match.unit_price == expected
 
 

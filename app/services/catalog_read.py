@@ -45,9 +45,18 @@ async def list_customer_categories(
     db: AsyncSession, *, locale: str | None = None
 ) -> list[dict]:
     loc = normalize_locale(locale)
-    # Telugu: i18n only — never fall back to English base columns.
-    name_expr = "ci.name" if loc == "te" else "COALESCE(ci.name, c.name)"
-    desc_expr = "ci.description" if loc == "te" else "COALESCE(ci.description, c.description)"
+    # Telugu: te i18n, then en i18n (locale_fallback_chain) — never base columns.
+    if loc == "te":
+        name_expr = "COALESCE(ci.name, ci_en.name)"
+        desc_expr = "COALESCE(ci.description, ci_en.description)"
+        join_en = """
+                LEFT JOIN puja_category_i18n ci_en
+                  ON ci_en.category_id = c.id AND ci_en.locale = 'en'
+        """
+    else:
+        name_expr = "COALESCE(ci.name, c.name)"
+        desc_expr = "COALESCE(ci.description, c.description)"
+        join_en = ""
     rows = (
         await db.execute(
             text(
@@ -58,6 +67,7 @@ async def list_customer_categories(
                 FROM puja_categories c
                 LEFT JOIN puja_category_i18n ci
                   ON ci.category_id = c.id AND ci.locale = :locale
+                {join_en}
                 WHERE c.is_active
                 ORDER BY c.display_order, c.id
                 """
@@ -65,6 +75,7 @@ async def list_customer_categories(
             {"locale": loc},
         )
     ).mappings().all()
+    rows = [r for r in rows if r["name"] is not None]
 
     media_ids = [r["image_media_id"] for r in rows if r.get("image_media_id")]
     urls = await media_urls_by_ids(db, media_ids)

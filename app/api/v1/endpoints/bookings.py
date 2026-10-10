@@ -60,6 +60,13 @@ async def checkout_quote(
     puja = (await db.execute(select(Puja).where(Puja.id == puja_id))).scalar_one_or_none()
     if puja is None or not puja.is_active:
         raise HTTPException(http.HTTP_404_NOT_FOUND, "Puja not found.")
+    from app.core.config import get_settings
+    from app.services.pricing import (
+        BOOKING_FEE_LABEL,
+        compute_booking_fee_amounts,
+        load_booking_fee_setting,
+    )
+
     unit_price = await resolve_puja_unit_price(db, puja_id, pujari_id)
     addon_total = Decimal("0")
     if addon_ids:
@@ -73,6 +80,19 @@ async def checkout_quote(
         addon_total = sum((Decimal(str(p)) for p in prices), Decimal("0"))
     total = unit_price + addon_total
 
+    settings = get_settings()
+    if not settings.FULL_ONLINE_ENABLED:
+        fee, label = await load_booking_fee_setting(db)
+        _, online, offline, frozen_fee = compute_booking_fee_amounts(total, fee)
+        return CheckoutQuote(
+            total_amount=total,
+            booking_fee=frozen_fee,
+            booking_fee_label=label or BOOKING_FEE_LABEL,
+            amount_due_online=online,
+            amount_due_offline=offline,
+            razorpay_amount=frozen_fee,
+        )
+
     setting = (
         await db.execute(
             select(PlatformSetting.value_json).where(
@@ -82,15 +102,24 @@ async def checkout_quote(
     ).scalar_one()
     advance = Decimal(str(setting["amount"]))
     online = min(advance, total)
+    fee, label = await load_booking_fee_setting(db)
+    _, bf_online, bf_offline, frozen_fee = compute_booking_fee_amounts(total, fee)
     return CheckoutQuote(
         total_amount=total,
+        booking_fee=frozen_fee,
+        booking_fee_label=label,
+        amount_due_online=bf_online,
+        amount_due_offline=bf_offline,
+        razorpay_amount=frozen_fee,
         advance_amount=advance,
         full_online=QuotePaymentOption(
-            amount_due_online=total, amount_due_offline=Decimal("0"),
+            amount_due_online=total,
+            amount_due_offline=Decimal("0"),
             label="Pay full amount now (UPI / card)",
         ),
         advance_balance=QuotePaymentOption(
-            amount_due_online=online, amount_due_offline=total - online,
+            amount_due_online=online,
+            amount_due_offline=total - online,
             label=f"Pay ₹{online:.0f} now, rest ₹{total - online:.0f} to pujari at service",
         ),
     )
@@ -228,7 +257,8 @@ async def get_booking(
         await db.execute(
             text(
                 "SELECT b.id, st.code AS status, b.booking_class, b.payment_mode, b.total_amount, "
-                "b.amount_due_online, b.amount_due_offline, b.balance_collected_at, "
+                "b.booking_fee, b.amount_due_online, b.amount_due_offline, "
+                "b.balance_collected_at, b.balance_collected_amount, "
                 "b.pujari_id, b.user_id, b.dispatch_mode, b.scheduled_date, "
                 "b.scheduled_time, b.duration_minutes, b.created_at, b.cancelled_at, "
                 "b.razorpay_order_id, "
@@ -249,6 +279,14 @@ async def get_booking(
         raise HTTPException(http.HTTP_403_FORBIDDEN, "Not your booking.")
 
     detail = dict(row)
+    if row["payment_mode"] == "booking_fee":
+        from app.services.pricing import BOOKING_FEE_LABEL
+
+        fee = Decimal(str(row.get("booking_fee") or 0))
+        detail["booking_fee_label"] = BOOKING_FEE_LABEL
+        detail["razorpay_amount"] = str(fee)
+    else:
+        detail["razorpay_amount"] = str(row["amount_due_online"])
 
     pujari = None
     if row["pujari_id"] is not None:

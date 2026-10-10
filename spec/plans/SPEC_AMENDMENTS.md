@@ -652,8 +652,8 @@ resolve_puja_unit_price(db, puja_id, pujari_id=None) -> Decimal
     pujas.default_price
 
 resolve_catalog_display_range(db, puja_id) -> (price_from, price_to):
-    price_from = MIN(verified pujari_pricing.base_price) OR default_price
-    price_to   = pujas.price_max OR price_from
+    price_from = resolve_puja_unit_price(pujari_id=None)  — same as broadcast checkout
+    price_to   = pujas.price_max OR price_from (display cap only at launch)
 ```
 
 **Consumers (no duplicate price logic in endpoints):** `checkout_quote`, `compute_amounts`,

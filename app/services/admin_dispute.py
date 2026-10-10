@@ -9,6 +9,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services import tds_accrual_service
+
 
 async def open_dispute(
     db: AsyncSession,
@@ -90,6 +92,7 @@ async def open_dispute(
     )
 
     offline_note: str | None = None
+    tds_reversal: dict | None = None
     offline_due = Decimal(str(row["amount_due_offline"] or 0))
     if dispute_type == "offline_non_payment" or (
         row["payment_mode"] == "advance_balance" and offline_due > 0
@@ -105,6 +108,11 @@ async def open_dispute(
                 "Platform refunds apply to the online portion only."
             )
 
+    if dispute_type == "offline_non_payment" and row["balance_collected_at"] is not None:
+        tds_reversal = await tds_accrual_service.reverse_tds_if_accrued(
+            db, booking_id=booking_id
+        )
+
     return {
         "booking_id": booking_id,
         "previous_status": row["status"],
@@ -112,4 +120,5 @@ async def open_dispute(
         "dispute_type": dispute_type,
         "disputed_at": dt.datetime.now(dt.UTC),
         "offline_balance_note": offline_note,
+        "tds_reversal": tds_reversal,
     }

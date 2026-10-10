@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TDS Launch — Visual Test Guide (DEV ONLY)</title>
+  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="tds_launch_guide.css?v=1" />
+</head>
+<body class="tds-guide">
+  <header class="tds-header">
+    <div>
+      <h1>TDS Launch — Visual Test Guide</h1>
+      <p class="banner">
+        TEST ONLY · read before implementing decouple / E2E ·
+        <a href="index.html">← E2E Test UI</a> ·
+        <a href="tds_launch_guide.html">this page</a>
+      </p>
+    </div>
+    <div class="hold-banner" role="status">
+      <strong>GST &amp; TCS §52 ON HOLD</strong> — memo questions only; no build.
+      Launch gate <code>L-SPRINT-2-TDS-LAUNCH-GATE</code> = BLOCKED.
+    </div>
+  </header>
+
+  <div class="tds-layout">
+    <nav class="tds-nav" aria-label="Guide sections">
+      <a href="#overview" class="tds-nav-link active" data-section="overview">1. Overview</a>
+      <a href="#money-split" class="tds-nav-link" data-section="money-split">2. Money split</a>
+      <a href="#partner-flow" class="tds-nav-link" data-section="partner-flow">3. Partner flow</a>
+      <a href="#scenarios" class="tds-nav-link" data-section="scenarios">4. Test scenarios</a>
+      <a href="#decouple" class="tds-nav-link" data-section="decouple">5. Target (decouple)</a>
+      <a href="#launch-gate" class="tds-nav-link" data-section="launch-gate">6. Launch gate</a>
+      <a href="#e2e-links" class="tds-nav-link" data-section="e2e-links">7. Run E2E</a>
+    </nav>
+
+    <main class="tds-main">
+      <!-- 1. Overview -->
+      <section id="overview" class="panel tds-section">
+        <h2>1. What you are testing</h2>
+        <p>
+          <strong>Launch Sprint 2</strong> = TDS accrual at <code>confirm-balance-collected</code>
+          under <code>payment_mode=booking_fee</code>. Phase 3 deposit/forms/Route stays ON HOLD.
+        </p>
+        <div class="tds-cards">
+          <article class="tds-card tds-card--ok">
+            <h3>Today (code)</h3>
+            <p>Inline accrual in same DB txn as balance UPDATE. Flag default <code>false</code>.</p>
+          </article>
+          <article class="tds-card tds-card--warn">
+            <h3>Target (decouple PR)</h3>
+            <p>Balance always saves; accrual via worker + intent table. Partner never 422 on tax.</p>
+          </article>
+          <article class="tds-card tds-card--hold">
+            <h3>Not building</h3>
+            <p>GST platform fee, TCS §52 ledger, Razorpay Route payouts.</p>
+          </article>
+        </div>
+        <figure class="tds-figure">
+          <figcaption>Scope map</figcaption>
+          <svg viewBox="0 0 720 200" class="tds-svg" role="img" aria-label="Scope map">
+            <rect x="10" y="20" width="200" height="70" rx="8" class="svg-box svg-launch"/>
+            <text x="110" y="48" text-anchor="middle" class="svg-label">Launch-S2</text>
+            <text x="110" y="68" text-anchor="middle" class="svg-sublabel">balance + TDS accrual</text>
+            <rect x="250" y="20" width="200" height="70" rx="8" class="svg-box svg-blocked"/>
+            <text x="350" y="48" text-anchor="middle" class="svg-label">LAUNCH-GATE</text>
+            <text x="350" y="68" text-anchor="middle" class="svg-sublabel">BLOCKED</text>
+            <rect x="490" y="20" width="220" height="70" rx="8" class="svg-box svg-hold"/>
+            <text x="600" y="48" text-anchor="middle" class="svg-label">Phase 3</text>
+            <text x="600" y="68" text-anchor="middle" class="svg-sublabel">deposit · 26Q · Route</text>
+            <path d="M 210 55 L 240 55" class="svg-arrow"/>
+            <path d="M 450 55 L 480 55" class="svg-arrow"/>
+            <rect x="10" y="110" width="700" height="75" rx="8" class="svg-box svg-muted"/>
+            <text x="360" y="140" text-anchor="middle" class="svg-sublabel">GST / TCS — CA memo only (P-GST-MODEL BLOCKED)</text>
+          </svg>
+        </figure>
+      </section>
+
+      <!-- 2. Money split -->
+      <section id="money-split" class="panel tds-section">
+        <h2>2. booking_fee money split (launch)</h2>
+        <div class="settlement-flow">
+          <div class="flow-step">Customer</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step flow-platform">Razorpay<br /><small>booking_fee ~₹61</small></div>
+          <div class="flow-arrow">+</div>
+          <div class="flow-step flow-pujari">Pujari offline<br /><small>full puja (amount_due_offline)</small></div>
+        </div>
+        <table class="tds-table">
+          <thead>
+            <tr><th>Field</th><th>Typical value</th><th>TDS gross today?</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>total_amount</code></td><td>₹2,100 puja</td><td>No (not used directly)</td></tr>
+            <tr><td><code>amount_due_offline</code></td><td>₹2,100</td><td>Default if amount omitted</td></tr>
+            <tr><td><code>balance_collected_amount</code></td><td>pujari-reported</td><td><strong>Yes — accrual base</strong></td></tr>
+            <tr><td><code>booking_fee</code></td><td>~₹61 online</td><td>No (CA Q1)</td></tr>
+          </tbody>
+        </table>
+        <p class="hint warn">
+          <strong>P0 defect:</strong> pujari can report ₹1 &lt; offline due and still <code>complete</code>
+          (only checks <code>balance_collected_at</code> set). See scenario S6.
+        </p>
+      </section>
+
+      <!-- 3. Partner flow -->
+      <section id="partner-flow" class="panel tds-section">
+        <h2>3. Partner lifecycle (current code)</h2>
+        <figure class="tds-figure">
+          <figcaption>Status transitions — accrual only after <code>in_progress</code></figcaption>
+          <svg viewBox="0 0 760 280" class="tds-svg" role="img">
+            <rect x="20" y="100" width="100" height="50" rx="6" class="svg-box"/>
+            <text x="70" y="130" text-anchor="middle" class="svg-sublabel">confirmed</text>
+            <path d="M 120 125 L 150 125" marker-end="url(#arrow)" class="svg-arrow"/>
+            <text x="135" y="115" class="svg-tiny">start</text>
+            <rect x="150" y="100" width="110" height="50" rx="6" class="svg-box svg-launch"/>
+            <text x="205" y="125" text-anchor="middle" class="svg-sublabel">in_progress</text>
+            <path d="M 260 125 L 290 125" marker-end="url(#arrow)" class="svg-arrow"/>
+            <text x="275" y="115" class="svg-tiny">balance</text>
+            <rect x="290" y="85" width="150" height="80" rx="6" class="svg-box svg-blocked"/>
+            <text x="365" y="115" text-anchor="middle" class="svg-label">confirm-balance</text>
+            <text x="365" y="135" text-anchor="middle" class="svg-tiny">+ inline TDS if flag on</text>
+            <path d="M 440 125 L 470 125" marker-end="url(#arrow)" class="svg-arrow"/>
+            <rect x="470" y="100" width="100" height="50" rx="6" class="svg-box"/>
+            <text x="520" y="130" text-anchor="middle" class="svg-sublabel">complete</text>
+            <rect x="290" y="200" width="150" height="55" rx="6" class="svg-box svg-fail"/>
+            <text x="365" y="225" text-anchor="middle" class="svg-sublabel">422 → rollback</text>
+            <text x="365" y="242" text-anchor="middle" class="svg-tiny">entity_type null</text>
+            <path d="M 365 165 L 365 198" class="svg-arrow-dashed"/>
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/>
+              </marker>
+            </defs>
+          </svg>
+        </figure>
+        <ol class="admin-steps">
+          <li><code>POST …/start</code> — booking must be <code>confirmed</code>, ±60 min window</li>
+          <li><code>POST …/confirm-balance-collected</code> — must be <code>in_progress</code> (409 otherwise)</li>
+          <li>If <code>TDS_ACCRUAL_ENABLED=true</code> and <code>entity_type</code> null → <strong>422, whole txn rolls back</strong></li>
+          <li><code>POST …/complete</code> — 409 if offline due &gt; 0 and balance not recorded</li>
+        </ol>
+      </section>
+
+      <!-- 4. Scenarios -->
+      <section id="scenarios" class="panel tds-section">
+        <h2>4. Test scenarios (click to inspect)</h2>
+        <p class="hint">Use these in Partner tab + Sprint 2 tab, or pytest. Selected scenario details appear below.</p>
+        <div class="tds-scenario-grid" id="scenarioGrid">
+          <button type="button" class="tds-scenario active" data-scenario="s1">
+            <span class="tds-scenario-id">S1</span>
+            <span class="tds-scenario-title">Flag OFF</span>
+            <span class="tds-scenario-http">200 balance · no ledger</span>
+          </button>
+          <button type="button" class="tds-scenario" data-scenario="s2">
+            <span class="tds-scenario-id">S2</span>
+            <span class="tds-scenario-title">Flag ON · no entity_type</span>
+            <span class="tds-scenario-http">422 · balance NOT saved</span>
+          </button>
+          <button type="button" class="tds-scenario" data-scenario="s3">
+            <span class="tds-scenario-id">S3</span>
+            <span class="tds-scenario-title">Flag ON · compliant</span>
+            <span class="tds-scenario-http">200 · ledger +1</span>
+          </button>
+          <button type="button" class="tds-scenario" data-scenario="s4">
+            <span class="tds-scenario-id">S4</span>
+            <span class="tds-scenario-title">₹5L threshold cross</span>
+            <span class="tds-scenario-http">0.1% on txn</span>
+          </button>
+          <button type="button" class="tds-scenario" data-scenario="s5">
+            <span class="tds-scenario-id">S5</span>
+            <span class="tds-scenario-title">No PAN</span>
+            <span class="tds-scenario-http">5% on gross</span>
+          </button>
+          <button type="button" class="tds-scenario" data-scenario="s6">
+            <span class="tds-scenario-id">S6</span>
+            <span class="tds-scenario-title">Partial ack + complete</span>
+            <span class="tds-scenario-http">200 complete (bug)</span>
+          </button>
+          <button type="button" class="tds-scenario" data-scenario="s7">
+            <span class="tds-scenario-id">S7</span>
+            <span class="tds-scenario-title">PAN accept gate</span>
+            <span class="tds-scenario-http">422 accept offer</span>
+          </button>
+          <button type="button" class="tds-scenario" data-scenario="s8">
+            <span class="tds-scenario-id">S8</span>
+            <span class="tds-scenario-title">Dispute reversal</span>
+            <span class="tds-scenario-http">offline_non_payment only</span>
+          </button>
+        </div>
+        <article id="scenarioDetail" class="tds-scenario-detail panel">
+          <h3 id="scenarioDetailTitle">S1 — Flag OFF (launch default)</h3>
+          <div id="scenarioDetailBody">
+            <p><strong>Setup:</strong> <code>TDS_ACCRUAL_ENABLED=false</code> in .env (default).</p>
+            <p><strong>Steps:</strong> Partner records balance → completes job.</p>
+            <p><strong>Expected:</strong> Balance saved; <code>tds.skipped=true</code> in response; <code>pujari_tds_facilitation_ledger</code> empty.</p>
+            <p><strong>E2E UI:</strong> Sprint 2 → uncheck “TDS accrual enabled” → Accrual simulator.</p>
+            <p><strong>pytest:</strong> <code>tests/test_service_lifecycle_balance.py</code></p>
+          </div>
+        </article>
+      </section>
+
+      <!-- 5. Decouple target -->
+      <section id="decouple" class="panel tds-section">
+        <h2>5. Target architecture (decouple PR — not built yet)</h2>
+        <figure class="tds-figure">
+          <figcaption>Request path vs worker (head-of-line per pujari)</figcaption>
+          <svg viewBox="0 0 720 220" class="tds-svg" role="img">
+            <rect x="20" y="30" width="120" height="45" rx="6" class="svg-box svg-pujari"/>
+            <text x="80" y="58" text-anchor="middle" class="svg-sublabel">Partner API</text>
+            <path d="M 140 52 L 180 52" class="svg-arrow"/>
+            <rect x="180" y="20" width="140" height="65" rx="6" class="svg-box svg-ok"/>
+            <text x="250" y="45" text-anchor="middle" class="svg-sublabel">balance UPDATE</text>
+            <text x="250" y="62" text-anchor="middle" class="svg-tiny">+ intent pending</text>
+            <text x="250" y="78" text-anchor="middle" class="svg-tiny">always 200</text>
+            <path d="M 320 52 L 360 52" class="svg-arrow"/>
+            <rect x="360" y="30" width="100" height="45" rx="6" class="svg-box"/>
+            <text x="410" y="58" text-anchor="middle" class="svg-sublabel">complete OK</text>
+            <rect x="180" y="110" width="280" height="90" rx="6" class="svg-box svg-launch"/>
+            <text x="320" y="135" text-anchor="middle" class="svg-label">Celery worker</text>
+            <text x="320" y="155" text-anchor="middle" class="svg-tiny">ORDER BY balance_collected_at</text>
+            <text x="320" y="172" text-anchor="middle" class="svg-tiny">head-of-line: parked blocks later intents</text>
+            <text x="320" y="189" text-anchor="middle" class="svg-tiny">FOR UPDATE pujari_tax_year per pujari</text>
+            <path d="M 250 85 L 250 108" class="svg-arrow-dashed"/>
+          </svg>
+        </figure>
+        <ul class="admin-steps">
+          <li>Worker constraints 1–5 from plan v6 (chronological + serialize + head-of-line)</li>
+          <li><code>L-SPRINT-2-TDS-INTENT-MIGRATION</code> — new table at PR time</li>
+          <li>Rollback: keep inline behind flag until staging verified</li>
+        </ul>
+      </section>
+
+      <!-- 6. Launch gate -->
+      <section id="launch-gate" class="panel tds-section">
+        <h2>6. Launch gate checklist (documentation)</h2>
+        <p class="hint">Track in <code>spec/plans/TDS_LAUNCH_STATUS.md</code> (Pass 1). Not launch-ready until all satisfied.</p>
+        <ul class="tds-checklist" id="launchChecklist">
+          <li><label><input type="checkbox" disabled /> CA sign-off + memo sent</label></li>
+          <li><label><input type="checkbox" disabled /> Q1 gross basis + Q1b retroactivity answered</label></li>
+          <li><label><input type="checkbox" disabled /> TCS §52 answered (memo; build ON HOLD)</label></li>
+          <li><label><input type="checkbox" disabled /> TAN obtained (owner assigned)</label></li>
+          <li><label><input type="checkbox" disabled /> Decouple + intent migration shipped</label></li>
+          <li><label><input type="checkbox" disabled /> Parked-intent mechanism (N, script, alert)</label></li>
+          <li><label><input type="checkbox" disabled /> No silent partial complete</label></li>
+          <li><label><input type="checkbox" disabled /> Reversal gaps closed</label></li>
+          <li><label><input type="checkbox" disabled /> FY ledger reconciliation green</label></li>
+          <li><label><input type="checkbox" disabled /> Correction ops path exists</label></li>
+        </ul>
+        <p class="hint">
+          Staging proof booking: <code>f95a920e-dbe4-413f-a6fd-2c44ff9de0ea</code> —
+          QA row only; may need correction after CA Q1.
+        </p>
+      </section>
+
+      <!-- 7. E2E links -->
+      <section id="e2e-links" class="panel tds-section">
+        <h2>7. Run manual + automated tests</h2>
+        <h3>Start test server</h3>
+        <pre class="admin-pre">cd mana_guruji/puja_platform
+.\.venv\Scripts\activate
+python tests/e2e_ui/serve.py
+# open http://127.0.0.1:8765/tds_launch_guide.html</pre>
+
+        <h3>Navigation map</h3>
+        <table class="tds-table">
+          <thead>
+            <tr><th>Goal</th><th>Where in E2E UI</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Full customer → partner flow</td><td><a href="index.html#tab-customer">Customer</a> → <a href="index.html#tab-partner">Partner</a></td></tr>
+            <tr><td>TDS calculator / accrual sim</td><td><a href="index.html#tab-sprint2">Sprint 2 — TDS</a></td></tr>
+            <tr><td>booking_fee quote</td><td><a href="index.html#tab-sprint1">Sprint 1 — Settlements</a></td></tr>
+            <tr><td>Find booking UUID</td><td><a href="index.html#tab-ops">Test ops</a> table</td></tr>
+            <tr><td>Admin TDS slabs</td><td><a href="index.html#tab-admin">Admin</a> (TDS settings in prod admin UI)</td></tr>
+            <tr><td>Readiness counts</td><td><code>python scripts/check_tds_readiness.py</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>pytest (contract / API)</h3>
+        <pre class="admin-pre">pytest tests/test_tds_accrual.py -q
+pytest tests/test_service_lifecycle_balance.py -q
+pytest tests/test_tds_facilitation_settings.py -q
+pytest tests/e2e/test_sprint2_tds_launch_e2e.py -q
+pytest tests/test_admin_slice3.py -q  # dispute reversal</pre>
+
+        <h3>API must be running for live partner tests</h3>
+        <pre class="admin-pre">uvicorn app.main:app --reload --port 8000
+# .env: DEBUG=true, TDS_ACCRUAL_ENABLED=true|false</pre>
+      </section>
+    </main>
+  </div>
+
+  <script src="tds_launch_guide.js?v=1"></script>
+</body>
+</html>

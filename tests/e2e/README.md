@@ -2,6 +2,27 @@
 
 Manual / CI smoke tests against real SMS providers. **Not part of the product.**
 
+---
+
+## Sprint 1 — booking_fee settlement contract (tests/e2e)
+
+Defines the launch-lite money model **before** migration 025 / `app/` changes ship.
+
+```powershell
+cd C:\OM\Guruji\mana_guruji\puja_platform
+pytest tests/e2e/test_booking_fee_launch_e2e.py -q
+```
+
+| Module | Role |
+|---|---|
+| `tests/e2e/booking_fee_model.py` | Pure settlement math (no app imports) |
+| `tests/e2e/test_booking_fee_launch_e2e.py` | 18 launch-gate scenarios as contract tests |
+| `tests/e2e_ui/sprint1_settlement.py` | E2E UI + `/test-sprint1-*.json` endpoints |
+
+E2E UI: **Sprint 1 — Settlements** tab at http://127.0.0.1:8765
+
+---
+
 ## FAST2SMS — verify API key in `.env`
 
 ### Prerequisites

@@ -46,8 +46,76 @@ async def _resolve_booking_id(db: AsyncSession, payload: dict) -> uuid.UUID | No
         ).scalar_one_or_none()
         if row is not None:
             return row
+        row = (
+            await db.execute(
+                text("SELECT id FROM bookings WHERE tds_razorpay_order_id = :oid"),
+                {"oid": str(order_id)},
+            )
+        ).scalar_one_or_none()
+        if row is not None:
+            return row
 
     return None
+
+
+def _notes_purpose_tds_facilitation(payment_entity: dict) -> bool:
+    notes = payment_entity.get("notes") or {}
+    if isinstance(notes, dict):
+        return notes.get("purpose") == "tds_facilitation"
+    return False
+
+
+async def _route_tds_payment_webhook(
+    db: AsyncSession,
+    *,
+    booking_id: uuid.UUID,
+    payment_entity: dict,
+) -> dict[str, str] | None:
+    """Return handler result if this capture is TDS facilitation (not booking fee)."""
+    from decimal import Decimal
+
+    from app.services.tds_v3_accept_service import mark_tds_collected_from_webhook
+
+    pay_order_id = payment_entity.get("order_id")
+    if not pay_order_id and not _notes_purpose_tds_facilitation(payment_entity):
+        return None
+
+    tds_row = (
+        await db.execute(
+            text(
+                """
+                SELECT tds_razorpay_order_id, tds_liability_inr
+                FROM bookings WHERE id = :bid
+                """
+            ),
+            {"bid": str(booking_id)},
+        )
+    ).mappings().first()
+    if tds_row is None:
+        return None
+
+    liability = tds_row["tds_liability_inr"]
+    order_matches = (
+        pay_order_id
+        and tds_row["tds_razorpay_order_id"]
+        and str(tds_row["tds_razorpay_order_id"]) == str(pay_order_id)
+    )
+    is_tds = _notes_purpose_tds_facilitation(payment_entity) or order_matches
+    if not is_tds:
+        return None
+    if liability is None or Decimal(str(liability)) <= 0:
+        if not _notes_purpose_tds_facilitation(payment_entity):
+            return None
+
+    captured = Decimal(int(payment_entity.get("amount", 0))) / Decimal("100")
+    outcome = await mark_tds_collected_from_webhook(
+        db,
+        booking_id=booking_id,
+        amount_inr=captured,
+        order_id=str(pay_order_id) if pay_order_id else None,
+        gateway_txn_id=str(payment_entity.get("id") or ""),
+    )
+    return {"status": outcome.get("status", "tds_handled"), "booking_id": str(booking_id)}
 
 
 @router.post("/razorpay")
@@ -78,6 +146,13 @@ async def razorpay_webhook(
     if booking_id is None:
         log.error("webhook_missing_booking_id", event=event)
         return {"status": "no_booking_ref"}
+
+    if payment_entity:
+        tds_outcome = await _route_tds_payment_webhook(
+            db, booking_id=booking_id, payment_entity=payment_entity
+        )
+        if tds_outcome is not None:
+            return tds_outcome
 
     result = await webhook_service.handle_payment_captured(
         db,

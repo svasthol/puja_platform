@@ -43,6 +43,7 @@ class AdminBookingMoneyResponse(BaseModel):
     total_amount: Decimal
     amount_due_online: Decimal
     amount_due_offline: Decimal
+    booking_fee: Decimal | None = None
     balance_collected_at: dt.datetime | None = None
     online_settlement_label: str = Field(default=SETTLEMENT_PENDING_LABEL)
     offline_balance_note: str | None = None

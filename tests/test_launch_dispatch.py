@@ -38,7 +38,9 @@ def test_compute_dispatch_windows_instant_vs_advance():
         instant_date, instant_time, settings, booking_class="instant", now=now
     )
     assert starts == now
-    assert deadline == now + dt.timedelta(minutes=30)
+    slot = slot_datetime(instant_date, instant_time)
+    pre_slot = slot - dt.timedelta(minutes=settings.dispatch_buffer_minutes)
+    assert deadline == max(now + dt.timedelta(minutes=30), pre_slot)
 
     advance_date = dt.date(2026, 7, 25)
     advance_time = dt.time(14, 0)

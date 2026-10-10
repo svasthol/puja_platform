@@ -83,8 +83,21 @@ KYC_SETU_BASE_URL=https://dg-sandbox.setu.co
 KYC_SETU_CLIENT_ID=
 KYC_SETU_CLIENT_SECRET=
 KYC_SETU_DIGILOCKER_PRODUCT_ID=
+# Setu PAN verification product instance (POST /api/verify/pan). Sandbox test PAN: ABCDE1234A
 KYC_SETU_PAN_PRODUCT_ID=
 KYC_SETU_READ_TIMEOUT=25
+
+# ---- TDS / Sprint 2 (same code prod + staging — flip flags per environment) ----
+# Accrual worker (§0.S shadow). Does NOT withhold from payouts (Phase 3).
+TDS_ACCRUAL_ENABLED=false
+# Block all offer accept without PAN on file.
+PAN_ACCEPT_GATE_ENABLED=false
+# Block accept without PAN + entity_type.
+PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT=false
+# Block accept / go-online / record-balance at ₹5L FY gross without PAN (warn at ₹4.5L in API).
+PUJARI_FY_PAN_GATE_ENABLED=false
+# Slabs (₹4.5L warn, ₹5L block, rates): Admin UI → TDS & compliance (platform_settings.tds_facilitation)
+# Statutory rates: tax_statutory_config (DB). See spec/plans/TDS_RUNTIME_CONFIG.md
 
 # ---- Maps ---------------------------------------------------------------
 GOOGLE_MAPS_API_KEY=

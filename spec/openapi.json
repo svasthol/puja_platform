@@ -11,7 +11,7 @@
           "app-config"
         ],
         "summary": "Get App Config",
-        "description": "Launch toggles for Flutter clients \u2014 rate-limit at edge.",
+        "description": "Launch toggles for Flutter clients — rate-limit at edge.",
         "operationId": "get_app_config_v1_app_config_get",
         "responses": {
           "200": {
@@ -33,7 +33,7 @@
           "panchangam"
         ],
         "summary": "Get Panchangam",
-        "description": "Daily panchangam from server cache \u2014 mobile never calls vendor directly.",
+        "description": "Daily panchangam from server cache — mobile never calls vendor directly.",
         "operationId": "get_panchangam_v1_panchangam_get",
         "parameters": [
           {
@@ -579,7 +579,7 @@
           "service-areas"
         ],
         "summary": "List Active Service Areas",
-        "description": "Active zones for address dropdown (\u00a721.3). Display label only at launch.",
+        "description": "Active zones for address dropdown (§21.3). Display label only at launch.",
         "operationId": "list_active_service_areas_v1_service_areas_get",
         "security": [
           {
@@ -693,11 +693,10 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["te", "en"],
+              "pattern": "^(te|en)$",
               "default": "te",
               "title": "Locale"
-            },
-            "description": "Catalogue language — te (Telugu) or en (English)."
+            }
           }
         ],
         "responses": {
@@ -730,7 +729,7 @@
           "catalog"
         ],
         "summary": "Get Puja",
-        "description": "Puja detail \u2014 content blocks, addons, and gallery (ready media only).",
+        "description": "Puja detail — content blocks, addons, and gallery (ready media only).",
         "operationId": "get_puja_v1_pujas__puja_id__get",
         "security": [
           {
@@ -754,11 +753,10 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["te", "en"],
+              "pattern": "^(te|en)$",
               "default": "te",
               "title": "Locale"
-            },
-            "description": "Catalogue language — te (Telugu) or en (English)."
+            }
           }
         ],
         "responses": {
@@ -1270,7 +1268,7 @@
           "offers"
         ],
         "summary": "List Offers",
-        "description": "Live offers \u2014 area label only; no customer address or phone (\u00a721.4).",
+        "description": "Live offers — area label only; no customer address or phone (§21.4).",
         "operationId": "list_offers_v1_offers_get",
         "security": [
           {
@@ -1413,7 +1411,7 @@
           "pujari-bookings"
         ],
         "summary": "List Pujari Bookings",
-        "description": "Assigned pujari's bookings \u2014 summary rows for Bookings tab (\u00a721.9).",
+        "description": "Assigned pujari's bookings — summary rows for Bookings tab (§21.9).",
         "operationId": "list_pujari_bookings_v1_pujari_bookings_get",
         "security": [
           {
@@ -1480,7 +1478,7 @@
           "pujari-bookings"
         ],
         "summary": "Get Pujari Booking",
-        "description": "Assigned pujari only \u2014 full address + map link + RM; no customer phone (\u00a721.4).",
+        "description": "Assigned pujari only — full address + map link + RM; no customer phone (§21.4).",
         "operationId": "get_pujari_booking_v1_pujari_bookings__booking_id__get",
         "security": [
           {
@@ -1529,7 +1527,7 @@
           "pujari-bookings"
         ],
         "summary": "Reconfirm Booking",
-        "description": "Advance attendance ack \u2014 sets pujari_confirmed_at (\u00a723.5).",
+        "description": "Advance attendance ack — sets pujari_confirmed_at (§23.5).",
         "operationId": "reconfirm_booking_v1_pujari_bookings__booking_id__reconfirm_post",
         "security": [
           {
@@ -1570,6 +1568,103 @@
             }
           }
         }
+      }
+    },
+    "/v1/me/tax-summary": {
+      "get": {
+        "tags": [
+          "pujari-self"
+        ],
+        "summary": "Tax Summary",
+        "description": "Current FY facilitation gross, TDS accrued, and ₹5L threshold nudge.",
+        "operationId": "tax_summary_v1_me_tax_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PujariTaxSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/me/tax-profile": {
+      "get": {
+        "tags": [
+          "pujari-self"
+        ],
+        "summary": "Get Tax Profile",
+        "operationId": "get_tax_profile_v1_me_tax_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PujariTaxProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "pujari-self"
+        ],
+        "summary": "Put Tax Profile",
+        "operationId": "put_tax_profile_v1_me_tax_profile_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PujariTaxProfileUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PujariTaxProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/v1/me/heartbeat": {
@@ -1905,7 +2000,7 @@
           "pujari-onboarding"
         ],
         "summary": "Presign Selfie Document",
-        "description": "Camera-captured selfie only \u2014 gating `photo` doc (UX control, not liveness).",
+        "description": "Camera-captured selfie only — gating `photo` doc (UX control, not liveness).",
         "operationId": "presign_selfie_document_v1_pujari_documents_post",
         "requestBody": {
           "content": {
@@ -1952,7 +2047,7 @@
           "pujari-onboarding"
         ],
         "summary": "Confirm Selfie Document",
-        "description": "After presigned PUT \u2014 verify S3 object and strip JPEG EXIF before admin review.",
+        "description": "After presigned PUT — verify S3 object and strip JPEG EXIF before admin review.",
         "operationId": "confirm_selfie_document_v1_pujari_documents__document_id__confirm_post",
         "security": [
           {
@@ -1995,6 +2090,53 @@
         }
       }
     },
+    "/v1/pujari/kyc/pan": {
+      "post": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Submit Pan",
+        "description": "Partner PAN + entity type for TDS (Setu verify when KYC_SETU_PAN_PRODUCT_ID set).",
+        "operationId": "submit_pan_v1_pujari_kyc_pan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PujariPanSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PujariPanSubmitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/pujari/kyc/status": {
       "get": {
         "tags": [
@@ -2027,7 +2169,7 @@
           "pujari-kyc-callback"
         ],
         "summary": "Kyc Callback",
-        "description": "PUBLIC \u2014 nonce-bound DigiLocker redirect landing (no bearer token).",
+        "description": "PUBLIC — nonce-bound DigiLocker redirect landing (no bearer token).",
         "operationId": "kyc_callback_v1_pujari_kyc_callback_get",
         "parameters": [
           {
@@ -2270,7 +2412,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceCollectedResponse"
+                }
               }
             }
           },
@@ -2339,7 +2483,7 @@
           "admin"
         ],
         "summary": "Admin Me",
-        "description": "Current admin session \u2014 roles from DB (not JWT) for accurate RBAC nav.",
+        "description": "Current admin session — roles from DB (not JWT) for accurate RBAC nav.",
         "operationId": "admin_me_v1_admin_me_get",
         "responses": {
           "200": {
@@ -2408,6 +2552,146 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdvanceAmountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings/booking-fee": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Booking Fee",
+        "operationId": "get_booking_fee_v1_admin_settings_booking_fee_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingFeeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Booking Fee",
+        "operationId": "set_booking_fee_v1_admin_settings_booking_fee_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingFeeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingFeeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings/tds-facilitation": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Tds Facilitation",
+        "operationId": "get_tds_facilitation_v1_admin_settings_tds_facilitation_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdsFacilitationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Tds Facilitation",
+        "operationId": "set_tds_facilitation_v1_admin_settings_tds_facilitation_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TdsFacilitationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdsFacilitationResponse"
                 }
               }
             }
@@ -2597,7 +2881,7 @@
           "admin"
         ],
         "summary": "Provision Credential",
-        "description": "Generate (or reset) a target admin's TOTP secret. Secret shown ONCE.\n\nAdmin-vouched provisioning replaces phone-only self-enrolment \u2014 it closes\nthe enrolment race and keeps SMS/DLT out of the admin path entirely. Used\nfor onboarding a new admin and for resetting a lost authenticator.",
+        "description": "Generate (or reset) a target admin's TOTP secret. Secret shown ONCE.\n\nAdmin-vouched provisioning replaces phone-only self-enrolment — it closes\nthe enrolment race and keeps SMS/DLT out of the admin path entirely. Used\nfor onboarding a new admin and for resetting a lost authenticator.",
         "operationId": "provision_credential_v1_admin_users__user_id__credential_post",
         "security": [
           {
@@ -2969,6 +3253,128 @@
         }
       }
     },
+    "/v1/admin/catalog/pujas/{puja_id}/i18n/{locale}": {
+      "get": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Get Puja I18N",
+        "operationId": "get_puja_i18n_v1_admin_catalog_pujas__puja_id__i18n__locale__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "puja_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Puja Id"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PujaI18nResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Upsert Puja I18N",
+        "operationId": "upsert_puja_i18n_v1_admin_catalog_pujas__puja_id__i18n__locale__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "puja_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Puja Id"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Locale"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PujaI18nUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PujaI18nResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/catalog/pujas/{puja_id}/impact": {
       "get": {
         "tags": [
@@ -3094,6 +3500,17 @@
               "type": "string",
               "title": "Kind"
             }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(te|en)$",
+              "default": "en",
+              "title": "Locale"
+            }
           }
         ],
         "responses": {
@@ -3139,6 +3556,17 @@
               "type": "string",
               "format": "uuid",
               "title": "Puja Id"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(te|en)$",
+              "default": "en",
+              "title": "Locale"
             }
           }
         ],
@@ -3389,7 +3817,7 @@
           "admin-catalog"
         ],
         "summary": "Upload Media Body",
-        "description": "Server-side upload to S3 \u2014 same-origin proxy (no bucket CORS required).",
+        "description": "Server-side upload to S3 — same-origin proxy (no bucket CORS required).",
         "operationId": "upload_media_body_v1_admin_catalog_media__media_id__upload_put",
         "security": [
           {
@@ -3946,13 +4374,101 @@
         }
       }
     },
+    "/v1/admin/pujaris/fy-earnings": {
+      "get": {
+        "tags": [
+          "admin-pujaris"
+        ],
+        "summary": "List Pujari Fy Earnings",
+        "description": "Ops report — collections + ledger FY gross per pujari.",
+        "operationId": "list_pujari_fy_earnings_v1_admin_pujaris_fy_earnings_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fy_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Indian FY start (default: current FY)",
+              "title": "Fy Start"
+            },
+            "description": "Indian FY start (default: current FY)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "min_gross",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Gross"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/pujaris": {
       "get": {
         "tags": [
           "admin-pujaris"
         ],
         "summary": "List Pujaris",
-        "description": "Partner directory \u2014 search by phone, name, verification, service area.",
+        "description": "Partner directory — search by phone, name, verification, service area.",
         "operationId": "list_pujaris_v1_admin_pujaris_get",
         "security": [
           {
@@ -4208,6 +4724,65 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/pujaris/{pujari_id}/tax-compliance": {
+      "patch": {
+        "tags": [
+          "admin-pujaris"
+        ],
+        "summary": "Patch Pujari Tax Compliance",
+        "description": "Set entity_type and PAN hash for TDS accrual (admin until KYC PAN pipeline ships).",
+        "operationId": "patch_pujari_tax_compliance_v1_admin_pujaris__pujari_id__tax_compliance_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pujari_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pujari Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PujariTaxComplianceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PujariTaxComplianceResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4479,7 +5054,7 @@
           "admin-kyc"
         ],
         "summary": "Deny Identity",
-        "description": "Ban a DigiLocker identity hash \u2014 blocks re-registration under a new phone.",
+        "description": "Ban a DigiLocker identity hash — blocks re-registration under a new phone.",
         "operationId": "deny_identity_v1_admin_kyc_identity_deny_post",
         "requestBody": {
           "content": {
@@ -4526,7 +5101,7 @@
           "admin-bookings"
         ],
         "summary": "Search Bookings",
-        "description": "Search bookings for ops \u2014 phone, id, status, scheduled date range.",
+        "description": "Search bookings for ops — phone, id, status, scheduled date range.",
         "operationId": "search_bookings_v1_admin_bookings_get",
         "security": [
           {
@@ -4587,6 +5162,24 @@
               "title": "Status"
             },
             "description": "Booking status code"
+          },
+          {
+            "name": "booking_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "instant or advance",
+              "title": "Booking Class"
+            },
+            "description": "instant or advance"
           },
           {
             "name": "date_from",
@@ -4681,7 +5274,7 @@
           "admin-bookings"
         ],
         "summary": "Get Booking Detail",
-        "description": "Booking 360\u00b0 \u2014 history, assignments, payments, refunds, dispatch, address.",
+        "description": "Booking 360° — history, assignments, payments, refunds, dispatch, address.",
         "operationId": "get_booking_detail_v1_admin_bookings__booking_id__get",
         "security": [
           {
@@ -4730,7 +5323,7 @@
           "admin-bookings"
         ],
         "summary": "Reassign Booking",
-        "description": "Manual reassign \u2014 clear-revoke-insert in one transaction (A-REASSIGN).",
+        "description": "Manual reassign — clear-revoke-insert in one transaction (A-REASSIGN).",
         "operationId": "reassign_booking_v1_admin_bookings__booking_id__reassign_post",
         "security": [
           {
@@ -4789,7 +5382,7 @@
           "admin-bookings"
         ],
         "summary": "Get Booking Money",
-        "description": "Read-only money view \u2014 settlement pending until P-SPLITS (A-MONEY-READ).",
+        "description": "Read-only money view — settlement pending until P-SPLITS (A-MONEY-READ).",
         "operationId": "get_booking_money_v1_admin_bookings__booking_id__money_get",
         "security": [
           {
@@ -4897,7 +5490,7 @@
           "admin-refunds"
         ],
         "summary": "Refund Override",
-        "description": "Insert refunds row reason=admin_override \u2014 worker executes Razorpay (A-REFUND).",
+        "description": "Insert refunds row reason=admin_override — worker executes Razorpay (A-REFUND).",
         "operationId": "refund_override_v1_admin_refunds_override_post",
         "requestBody": {
           "content": {
@@ -4944,7 +5537,7 @@
           "admin-refunds"
         ],
         "summary": "List Refunds",
-        "description": "List refunds by status \u2014 e.g. failed_permanent queue for ops.",
+        "description": "List refunds by status — e.g. failed_permanent queue for ops.",
         "operationId": "list_refunds_v1_admin_refunds_get",
         "security": [
           {
@@ -4999,6 +5592,140 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminRefundListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/tds/compliance-backlog": {
+      "get": {
+        "tags": [
+          "admin-tds"
+        ],
+        "summary": "Get Compliance Backlog",
+        "operationId": "get_compliance_backlog_v1_admin_tds_compliance_backlog_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdsComplianceBacklogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/tds/fy-reconcile": {
+      "get": {
+        "tags": [
+          "admin-tds"
+        ],
+        "summary": "Get Fy Reconcile",
+        "operationId": "get_fy_reconcile_v1_admin_tds_fy_reconcile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdsFyReconcileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/tds/bookings/{booking_id}/correct-offline-collection": {
+      "post": {
+        "tags": [
+          "admin-tds"
+        ],
+        "summary": "Post Correct Offline Collection",
+        "operationId": "post_correct_offline_collection_v1_admin_tds_bookings__booking_id__correct_offline_collection_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TdsCorrectOfflineCollectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdsCorrectOfflineCollectionResponse"
                 }
               }
             }
@@ -5263,6 +5990,23 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Health Live",
+        "description": "Liveness only — no DB/Redis (use for device LAN reachability probes).",
+        "operationId": "health_live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
       }
     },
     "/health": {
@@ -6103,6 +6847,17 @@
             "type": "string",
             "title": "Amount Due Offline"
           },
+          "booking_fee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Fee"
+          },
           "balance_collected_at": {
             "anyOf": [
               {
@@ -6118,7 +6873,7 @@
           "online_settlement_label": {
             "type": "string",
             "title": "Online Settlement Label",
-            "default": "Collected online \u2014 settlement pending"
+            "default": "Collected online — settlement pending"
           },
           "offline_balance_note": {
             "anyOf": [
@@ -6507,6 +7262,16 @@
               }
             ],
             "title": "Offline Balance Note"
+          },
+          "tds_reversal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TdsReversalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6540,7 +7305,7 @@
           "code"
         ],
         "title": "AdminLoginRequest",
-        "description": "Phone identifies the staff user; code is the current TOTP.\n\nFirst login against a freshly-provisioned (not-yet-activated) credential\nactivates it. No password, no SMS \u2014 the authenticator app is the factor."
+        "description": "Phone identifies the staff user; code is the current TOTP.\n\nFirst login against a freshly-provisioned (not-yet-activated) credential\nactivates it. No password, no SMS — the authenticator app is the factor."
       },
       "AdminMeResponse": {
         "properties": {
@@ -6614,7 +7379,7 @@
           "settlement_label": {
             "type": "string",
             "title": "Settlement Label",
-            "default": "Collected online \u2014 settlement pending"
+            "default": "Collected online — settlement pending"
           },
           "split": {
             "anyOf": [
@@ -7255,6 +8020,19 @@
             "type": "string",
             "title": "Advance Booking Amount"
           },
+          "booking_fee": {
+            "type": "string",
+            "title": "Booking Fee"
+          },
+          "booking_fee_label": {
+            "type": "string",
+            "title": "Booking Fee Label"
+          },
+          "full_online_enabled": {
+            "type": "boolean",
+            "title": "Full Online Enabled",
+            "default": false
+          },
           "razorpay_key_id": {
             "anyOf": [
               {
@@ -7280,13 +8058,40 @@
                 "type": "null"
               }
             ]
+          },
+          "tds_accrual_enabled": {
+            "type": "boolean",
+            "title": "Tds Accrual Enabled",
+            "default": false
+          },
+          "pan_accept_gate_enabled": {
+            "type": "boolean",
+            "title": "Pan Accept Gate Enabled",
+            "default": false
+          },
+          "pujari_tax_profile_required_for_accept": {
+            "type": "boolean",
+            "title": "Pujari Tax Profile Required For Accept",
+            "default": false
+          },
+          "pujari_fy_pan_gate_enabled": {
+            "type": "boolean",
+            "title": "Pujari Fy Pan Gate Enabled",
+            "default": false
+          },
+          "setu_pan_verify_configured": {
+            "type": "boolean",
+            "title": "Setu Pan Verify Configured",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "night_bookings_enabled",
           "instant_lead_hours",
-          "advance_booking_amount"
+          "advance_booking_amount",
+          "booking_fee",
+          "booking_fee_label"
         ],
         "title": "AppConfigResponse"
       },
@@ -7366,6 +8171,20 @@
               "upi_direct"
             ],
             "title": "Method"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
           }
         },
         "type": "object",
@@ -7373,6 +8192,59 @@
           "method"
         ],
         "title": "BalanceCollected"
+      },
+      "BalanceCollectedResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "collected",
+              "already_collected"
+            ],
+            "title": "Status"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cash",
+                  "upi_direct"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "tds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TdsAccrualInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "BalanceCollectedResponse"
       },
       "BookingCreate": {
         "properties": {
@@ -7413,18 +8285,19 @@
           "payment_mode": {
             "type": "string",
             "enum": [
+              "booking_fee",
               "full_online",
               "advance_balance"
             ],
-            "title": "Payment Mode"
+            "title": "Payment Mode",
+            "default": "booking_fee"
           }
         },
         "type": "object",
         "required": [
           "hold_id",
           "puja_id",
-          "address_id",
-          "payment_mode"
+          "address_id"
         ],
         "title": "BookingCreate"
       },
@@ -7466,6 +8339,26 @@
             "type": "string",
             "title": "Total Amount"
           },
+          "booking_fee": {
+            "type": "string",
+            "title": "Booking Fee",
+            "default": "0"
+          },
+          "booking_fee_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Fee Label"
+          },
+          "razorpay_amount": {
+            "type": "string",
+            "title": "Razorpay Amount"
+          },
           "payment_mode": {
             "type": "string",
             "title": "Payment Mode"
@@ -7488,10 +8381,91 @@
           "amount_due_online",
           "amount_due_offline",
           "total_amount",
+          "razorpay_amount",
           "payment_mode",
           "hold_expires_at"
         ],
         "title": "BookingCreateResponse"
+      },
+      "BookingFeeResponse": {
+        "properties": {
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "currency",
+          "label"
+        ],
+        "title": "BookingFeeResponse"
+      },
+      "BookingFeeUpdate": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount"
+        ],
+        "title": "BookingFeeUpdate"
       },
       "CheckoutQuote": {
         "properties": {
@@ -7499,23 +8473,72 @@
             "type": "string",
             "title": "Total Amount"
           },
-          "advance_amount": {
+          "payment_mode": {
             "type": "string",
+            "const": "booking_fee",
+            "title": "Payment Mode",
+            "default": "booking_fee"
+          },
+          "booking_fee": {
+            "type": "string",
+            "title": "Booking Fee"
+          },
+          "booking_fee_label": {
+            "type": "string",
+            "title": "Booking Fee Label"
+          },
+          "amount_due_online": {
+            "type": "string",
+            "title": "Amount Due Online"
+          },
+          "amount_due_offline": {
+            "type": "string",
+            "title": "Amount Due Offline"
+          },
+          "razorpay_amount": {
+            "type": "string",
+            "title": "Razorpay Amount"
+          },
+          "advance_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Advance Amount"
           },
           "full_online": {
-            "$ref": "#/components/schemas/QuotePaymentOption"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuotePaymentOption"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "advance_balance": {
-            "$ref": "#/components/schemas/QuotePaymentOption"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuotePaymentOption"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "total_amount",
-          "advance_amount",
-          "full_online",
-          "advance_balance"
+          "booking_fee",
+          "booking_fee_label",
+          "amount_due_online",
+          "amount_due_offline",
+          "razorpay_amount"
         ],
         "title": "CheckoutQuote"
       },
@@ -7681,7 +8704,7 @@
           "secret"
         ],
         "title": "CredentialProvisionResponse",
-        "description": "Returned ONCE at provisioning \u2014 the URI/secret are never retrievable again."
+        "description": "Returned ONCE at provisioning — the URI/secret are never retrievable again."
       },
       "CustomerAddon": {
         "properties": {
@@ -8103,7 +9126,8 @@
           },
           "unit_price": {
             "type": "string",
-            "title": "Unit Price"
+            "title": "Unit Price",
+            "description": "Launch broadcast: catalog default_price for this puja (same for all listed pujaris)."
           }
         },
         "type": "object",
@@ -8497,8 +9521,7 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Review Flags",
-            "default": []
+            "title": "Review Flags"
           }
         },
         "type": "object",
@@ -8784,6 +9807,13 @@
           "all_required_verified": {
             "type": "boolean",
             "title": "All Required Verified"
+          },
+          "digilocker_review_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Digilocker Review Flags"
           }
         },
         "type": "object",
@@ -9324,7 +10354,7 @@
           "otp"
         ],
         "title": "OtpVerify",
-        "description": "P-ADMIN-AUTH-FIX: app_context is a BODY field and structurally cannot be\n'admin' \u2014 the SMS OTP path never mints admin tokens (422 at the schema\nlayer, before any handler code runs). Admin staff log in via TOTP\n(P-ADMIN-AUTH). It was previously a bare query parameter, which let any\nphone that passed OTP request `?app_context=admin` with no role check."
+        "description": "P-ADMIN-AUTH-FIX: app_context is a BODY field and structurally cannot be\n'admin' — the SMS OTP path never mints admin tokens (422 at the schema\nlayer, before any handler code runs). Admin staff log in via TOTP\n(P-ADMIN-AUTH). It was previously a bare query parameter, which let any\nphone that passed OTP request `?app_context=admin` with no role check."
       },
       "PanchangamResponse": {
         "properties": {
@@ -10097,6 +11127,106 @@
         ],
         "title": "PujaCreate"
       },
+      "PujaI18nResponse": {
+        "properties": {
+          "puja_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Puja Id"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "te",
+              "en"
+            ],
+            "title": "Locale"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "puja_id",
+          "locale",
+          "name"
+        ],
+        "title": "PujaI18nResponse"
+      },
+      "PujaI18nUpdate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PujaI18nUpdate"
+      },
       "PujaImpactResponse": {
         "properties": {
           "puja_id": {
@@ -10115,7 +11245,7 @@
           "note": {
             "type": "string",
             "title": "Note",
-            "default": "Holds are not puja-scoped until booking; counts are future non-cancelled bookings. Price/duration changes may affect live quote window (\u00a720.4)."
+            "default": "Holds are not puja-scoped until booking; counts are future non-cancelled bookings. Price/duration changes may affect live quote window (§20.4)."
           }
         },
         "type": "object",
@@ -10514,6 +11644,22 @@
             "type": "string",
             "title": "Total Amount"
           },
+          "booking_fee": {
+            "type": "string",
+            "title": "Booking Fee",
+            "default": "0"
+          },
+          "booking_fee_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Fee Label"
+          },
           "amount_due_online": {
             "type": "string",
             "title": "Amount Due Online"
@@ -10533,6 +11679,17 @@
               }
             ],
             "title": "Balance Collected At"
+          },
+          "balance_collected_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance Collected Amount"
           },
           "area_label": {
             "anyOf": [
@@ -10734,6 +11891,86 @@
         ],
         "title": "PujariCancelResponse"
       },
+      "PujariPanSubmitRequest": {
+        "properties": {
+          "pan": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 10,
+            "title": "Pan"
+          },
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "huf",
+              "company",
+              "firm",
+              "trust",
+              "aop",
+              "other"
+            ],
+            "title": "Entity Type"
+          },
+          "consent": {
+            "type": "boolean",
+            "title": "Consent"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 20,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pan",
+          "entity_type",
+          "consent",
+          "reason"
+        ],
+        "title": "PujariPanSubmitRequest"
+      },
+      "PujariPanSubmitResponse": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "pan_on_file": {
+            "type": "boolean",
+            "title": "Pan On File"
+          },
+          "pan_status": {
+            "type": "string",
+            "title": "Pan Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "verified_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "pan_on_file",
+          "pan_status",
+          "message"
+        ],
+        "title": "PujariPanSubmitResponse"
+      },
       "PujariPricingItemInput": {
         "properties": {
           "puja_id": {
@@ -10929,6 +12166,219 @@
         },
         "type": "object",
         "title": "PujariServiceAreasReplace"
+      },
+      "PujariTaxComplianceResponse": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "pan_on_file": {
+            "type": "boolean",
+            "title": "Pan On File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "entity_type",
+          "pan_on_file"
+        ],
+        "title": "PujariTaxComplianceResponse"
+      },
+      "PujariTaxComplianceUpdate": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "huf",
+              "company",
+              "firm",
+              "trust",
+              "aop",
+              "other"
+            ],
+            "title": "Entity Type"
+          },
+          "pan": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan"
+          },
+          "clear_pan": {
+            "type": "boolean",
+            "title": "Clear Pan",
+            "default": false
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type"
+        ],
+        "title": "PujariTaxComplianceUpdate"
+      },
+      "PujariTaxProfileResponse": {
+        "properties": {
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "pan_on_file": {
+            "type": "boolean",
+            "title": "Pan On File"
+          },
+          "pan_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan Status"
+          },
+          "tax_profile_complete": {
+            "type": "boolean",
+            "title": "Tax Profile Complete"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "pan_on_file",
+          "tax_profile_complete"
+        ],
+        "title": "PujariTaxProfileResponse"
+      },
+      "PujariTaxProfileUpdateRequest": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "huf",
+              "company",
+              "firm",
+              "trust",
+              "aop",
+              "other"
+            ],
+            "title": "Entity Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type"
+        ],
+        "title": "PujariTaxProfileUpdateRequest"
+      },
+      "PujariTaxSummary": {
+        "properties": {
+          "fy_start": {
+            "type": "string",
+            "title": "Fy Start"
+          },
+          "fy_gross_facilitation": {
+            "type": "string",
+            "title": "Fy Gross Facilitation"
+          },
+          "tds_accrued": {
+            "type": "string",
+            "title": "Tds Accrued"
+          },
+          "individual_fy_threshold_inr": {
+            "type": "string",
+            "title": "Individual Fy Threshold Inr"
+          },
+          "individual_fy_pan_warn_inr": {
+            "type": "string",
+            "title": "Individual Fy Pan Warn Inr"
+          },
+          "threshold_remaining_inr": {
+            "type": "string",
+            "title": "Threshold Remaining Inr"
+          },
+          "pan_on_file": {
+            "type": "boolean",
+            "title": "Pan On File"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "fy_pan_gate_level": {
+            "type": "string",
+            "title": "Fy Pan Gate Level"
+          },
+          "fy_pan_gate_message": {
+            "type": "string",
+            "title": "Fy Pan Gate Message"
+          },
+          "requires_pan_before_continue": {
+            "type": "boolean",
+            "title": "Requires Pan Before Continue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fy_start",
+          "fy_gross_facilitation",
+          "tds_accrued",
+          "individual_fy_threshold_inr",
+          "individual_fy_pan_warn_inr",
+          "threshold_remaining_inr",
+          "pan_on_file",
+          "entity_type",
+          "message",
+          "fy_pan_gate_level",
+          "fy_pan_gate_message",
+          "requires_pan_before_continue"
+        ],
+        "title": "PujariTaxSummary"
       },
       "QuotePaymentOption": {
         "properties": {
@@ -11199,7 +12649,7 @@
           "phone"
         ],
         "title": "RelationshipManagerPublic",
-        "description": "Exposed to customer/pujari after booking confirm \u2014 name + phone only."
+        "description": "Exposed to customer/pujari after booking confirm — name + phone only."
       },
       "RelationshipManagerUpdate": {
         "properties": {
@@ -11554,7 +13004,7 @@
           "zone_name"
         ],
         "title": "ServiceAreaPublic",
-        "description": "Customer dropdown row \u2014 active zones only."
+        "description": "Customer dropdown row — active zones only."
       },
       "ServiceAreaPublicList": {
         "properties": {
@@ -11735,6 +13185,636 @@
           "server_time"
         ],
         "title": "SlotHoldResponse"
+      },
+      "TdsAccrualInfo": {
+        "properties": {
+          "accrual_enabled": {
+            "type": "boolean",
+            "title": "Accrual Enabled"
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped",
+            "default": false
+          },
+          "idempotent": {
+            "type": "boolean",
+            "title": "Idempotent",
+            "default": false
+          },
+          "tds_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Rate"
+          },
+          "tds_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Amount"
+          },
+          "fy_gross_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fy Gross After"
+          },
+          "fy_threshold_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fy Threshold Inr"
+          },
+          "threshold_remaining_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Remaining Inr"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "message_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accrual_enabled"
+        ],
+        "title": "TdsAccrualInfo"
+      },
+      "TdsAccrualIntentRow": {
+        "properties": {
+          "intent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Intent Id"
+          },
+          "booking_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Booking Id"
+          },
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "park_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Park Reason"
+          },
+          "gross_amount": {
+            "type": "string",
+            "title": "Gross Amount"
+          },
+          "collected_at": {
+            "type": "string",
+            "title": "Collected At"
+          },
+          "snapshot_entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Entity Type"
+          },
+          "snapshot_pan_on_file": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Pan On File"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "intent_id",
+          "booking_id",
+          "pujari_id",
+          "status",
+          "park_reason",
+          "gross_amount",
+          "collected_at",
+          "snapshot_entity_type",
+          "snapshot_pan_on_file",
+          "attempt_count",
+          "last_error",
+          "created_at"
+        ],
+        "title": "TdsAccrualIntentRow"
+      },
+      "TdsComplianceBacklogResponse": {
+        "properties": {
+          "parked_count": {
+            "type": "integer",
+            "title": "Parked Count"
+          },
+          "pending_count": {
+            "type": "integer",
+            "title": "Pending Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "intents": {
+            "items": {
+              "$ref": "#/components/schemas/TdsAccrualIntentRow"
+            },
+            "type": "array",
+            "title": "Intents"
+          },
+          "pujari_readiness": {
+            "items": {
+              "$ref": "#/components/schemas/TdsPujariReadinessRow"
+            },
+            "type": "array",
+            "title": "Pujari Readiness"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parked_count",
+          "pending_count",
+          "failed_count",
+          "intents",
+          "pujari_readiness"
+        ],
+        "title": "TdsComplianceBacklogResponse"
+      },
+      "TdsCorrectOfflineCollectionRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "set_amount"
+            ],
+            "title": "Action"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "change_reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "change_reason"
+        ],
+        "title": "TdsCorrectOfflineCollectionRequest"
+      },
+      "TdsCorrectOfflineCollectionResponse": {
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Booking Id"
+          },
+          "balance_collected_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance Collected Amount"
+          },
+          "balance_collected_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance Collected At"
+          },
+          "tds_reversal": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Reversal"
+          },
+          "tds_requeued": {
+            "type": "boolean",
+            "title": "Tds Requeued",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "booking_id",
+          "balance_collected_amount",
+          "balance_collected_at"
+        ],
+        "title": "TdsCorrectOfflineCollectionResponse"
+      },
+      "TdsFacilitationResponse": {
+        "properties": {
+          "no_pan_rate_pct": {
+            "type": "string",
+            "title": "No Pan Rate Pct"
+          },
+          "pan_entity_rate_pct": {
+            "type": "string",
+            "title": "Pan Entity Rate Pct"
+          },
+          "individual_fy_threshold_inr": {
+            "type": "string",
+            "title": "Individual Fy Threshold Inr"
+          },
+          "fy_turnover_warn_inr": {
+            "type": "string",
+            "title": "Fy Turnover Warn Inr"
+          },
+          "fy_turnover_block_inr": {
+            "type": "string",
+            "title": "Fy Turnover Block Inr"
+          },
+          "always_taxed_entity_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Always Taxed Entity Types"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "no_pan_rate_pct",
+          "pan_entity_rate_pct",
+          "individual_fy_threshold_inr",
+          "fy_turnover_warn_inr",
+          "fy_turnover_block_inr",
+          "always_taxed_entity_types"
+        ],
+        "title": "TdsFacilitationResponse"
+      },
+      "TdsFacilitationUpdate": {
+        "properties": {
+          "no_pan_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "No Pan Rate Pct"
+          },
+          "pan_entity_rate_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Pan Entity Rate Pct"
+          },
+          "individual_fy_threshold_inr": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Individual Fy Threshold Inr"
+          },
+          "fy_turnover_warn_inr": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Fy Turnover Warn Inr"
+          },
+          "fy_turnover_block_inr": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Fy Turnover Block Inr"
+          },
+          "always_taxed_entity_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Always Taxed Entity Types"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "no_pan_rate_pct",
+          "pan_entity_rate_pct",
+          "individual_fy_threshold_inr",
+          "fy_turnover_warn_inr",
+          "fy_turnover_block_inr",
+          "always_taxed_entity_types"
+        ],
+        "title": "TdsFacilitationUpdate"
+      },
+      "TdsFyReconcileResponse": {
+        "properties": {
+          "green": {
+            "type": "boolean",
+            "title": "Green"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TdsFyReconcileRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "green",
+          "rows"
+        ],
+        "title": "TdsFyReconcileResponse"
+      },
+      "TdsFyReconcileRow": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "fy_start": {
+            "type": "string",
+            "title": "Fy Start"
+          },
+          "accumulator_gross": {
+            "type": "string",
+            "title": "Accumulator Gross"
+          },
+          "ledger_net": {
+            "type": "string",
+            "title": "Ledger Net"
+          },
+          "drift": {
+            "type": "string",
+            "title": "Drift"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "fy_start",
+          "accumulator_gross",
+          "ledger_net",
+          "drift"
+        ],
+        "title": "TdsFyReconcileRow"
+      },
+      "TdsPujariReadinessRow": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "pan_on_file": {
+            "type": "boolean",
+            "title": "Pan On File"
+          },
+          "pan_status": {
+            "type": "string",
+            "title": "Pan Status"
+          },
+          "parked_intents": {
+            "type": "integer",
+            "title": "Parked Intents"
+          },
+          "pending_intents": {
+            "type": "integer",
+            "title": "Pending Intents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "entity_type",
+          "pan_on_file",
+          "pan_status",
+          "parked_intents",
+          "pending_intents"
+        ],
+        "title": "TdsPujariReadinessRow"
+      },
+      "TdsReversalInfo": {
+        "properties": {
+          "reversed": {
+            "type": "boolean",
+            "title": "Reversed"
+          },
+          "booking_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "tds_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reversed"
+        ],
+        "title": "TdsReversalInfo"
       },
       "TokenPair": {
         "properties": {

@@ -1,0 +1,17 @@
+[setup] pujari=5f12ff01-8674-44c7-9f16-9a4ba7826f19 puja='Griha Pravesham'
+[customer] paid booking ff43e89d-37d3-4569-91a2-1a95d94cf7ad razorpay_amount=61.00
+[dispatch] {'round': 2, 'offers': 0}
+[PUT /v1/me/heartbeat go-online] 200 {"status":"ok"}
+[GET /v1/offers] 200 count=2 sample_keys=['assignment_id', 'booking_id', 'expires_at', 'puja_name', 'scheduled_date', 'scheduled_time', 'area_label', 'payment_mode', 'total_amount', 'amount_due_offline', 'booking_class', 'urgency', 'urgency_escalated']
+[offer detail] puja=Griha Pravesham area=QA Zone class=advance offline_due=4200.00 has_phone=False has_address=False
+[POST /v1/offers/accept] 200 {"status":"accepted","booking_id":"ff43e89d-37d3-4569-91a2-1a95d94cf7ad","tds_liability_inr":"0","tds_collected_online_inr":"0","amount_due_offline_inr":"4200.00","tds_recovery_pending":false,"tds_raz
+[db booking after accept] status=confirmed pujari_set=True rm_set=True
+[notifications after accept] [('pujari', 'Added to your Bookings'), ('pujari', 'New puja offer')]
+[GET /v1/pujari/bookings] 200 count=1
+[GET /v1/pujari/bookings/id] 200 status=confirmed customer_phone_present=False rm=True
+[POST start] 200 {"status":"in_progress"}
+[POST confirm-balance-collected] 200 {"status":"collected","method":"cash","amount":"4200.00","tds":{"accrual_enabled":true,"skipped":true,"idempotent":false,"tds_rate":null,"tds_amount":null,"fy_gross_after":null,"fy_threshold_inr":null,"threshold_remaining_inr":null,"message":"TDS acc
+[POST complete] 200 {"status":"completed"}
+[db final] status=completed collected_amount=4200.00 method=cash
+[GET /v1/me/tax-summary] 200 {'fy_start': '2026-04-01', 'fy_gross_facilitation': '4200.00', 'tds_accrued': '0.00', 'individual_fy_threshold_inr': '500000.00', 'individual_fy_pan_warn_inr': '450000.00', 'threshold_remaining_inr': 
+[DELETE /v1/me/heartbeat go-offline] 200 {"status":"offline"}

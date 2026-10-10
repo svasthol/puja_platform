@@ -101,6 +101,25 @@ psql -c "CREATE ROLE puja_app WITH LOGIN PASSWORD 'dev_password';"
 psql -c "GRANT CONNECT ON DATABASE Mana_Guruji TO puja_app;"
 ```
 
+Or use Python (Windows-friendly — no `psql` on PATH):
+
+```powershell
+# DATABASE_URL must be a superuser (e.g. postgres), not puja_app
+python scripts/bootstrap_puja_app_role.py
+python scripts/apply_grants.py
+```
+
+Or `psql` if installed:
+
+```bash
+psql "postgresql://postgres:YOUR_PASSWORD@localhost:5432/postgres" -f scripts/bootstrap_puja_app_role.sql
+psql "postgresql://postgres:YOUR_PASSWORD@localhost:5432/Mana_Guruji" -f scripts/apply_grants.sql
+```
+
+`apply_grants.sql` **requires** `puja_app` to exist — it fails loudly if missing (intentional for prod). After migrations **026/027**, run `apply_grants.sql` so append-only ledger + `tax_statutory_config` REVOKEs apply (R12).
+
+If you develop with `DATABASE_URL=...postgres...` only, the API works without `puja_app`; create the role + grants when you want prod-like permission tests.
+
 ---
 
 ## Step 4: Configure environment
@@ -242,3 +261,38 @@ Return only the code, no explanation needed.
 | Calling Razorpay refund API in a request handler | Insert a `refunds` row; let the worker call it |
 | Writing `bookings.pujari_id = pujari_id` | Never — trigger 3 does this |
 | Reading `pujaris.is_online` for dispatch | `redis.get(f"presence:{pujari_id}")` |
+
+---
+
+## TDS shadow on staging (§0.S14)
+
+Production launch stays **`TDS_ACCRUAL_ENABLED=false`**. Complete [`spec/plans/TDS_CODE_REVIEW.md`](spec/plans/TDS_CODE_REVIEW.md) and a dated run under [`spec/plans/reviews/`](spec/plans/reviews/) with **no open P0 Fail** before flip (see S14 row in `spec/plans/TDS_LAUNCH_STATUS.md`).
+
+To dogfood accrual on staging only, follow **[`spec/plans/TDS_STAGING_ROLLOUT.md`](spec/plans/TDS_STAGING_ROLLOUT.md)** (hard gates — do not skip):
+
+1. Fresh DB: `python scripts/apply_migrations_028_032.py` (028→034)
+2. Quarantine/clean test FY pollution; then `python scripts/check_tds_readiness.py --strict` (**zero TDS drift**)
+3. Staging `.env`: `TDS_ACCRUAL_ENABLED=true` and **`TDS_ACCEPT_STUB_COLLECT=true`** (keep stub until CA Q-recovery — do **not** turn stub off for real deduction)
+4. Run Celery worker + beat (task `app.workers.tds_accrual.process_tds_accrual_intents` every 60s)
+5. Manual accept → collect → refund → no-show; re-run `--strict`
+6. Then **`PUJARI_FY_PAN_GATE_ENABLED=true`** (optional later: `PAN_ACCEPT_GATE_ENABLED`)
+7. Admin: `GET /v1/admin/tds/fy-reconcile`, `/v1/admin/tds/compliance-backlog`
+
+Partner copy / gates: [`spec/plans/PAN_FY_GATES.md`](spec/plans/PAN_FY_GATES.md). Readiness details: [`spec/plans/TDS_READINESS.md`](spec/plans/TDS_READINESS.md).
+
+**S14 sign-off checklist (ops — mark in runbook, not code):**
+
+| Step | Pass? |
+|------|-------|
+| Dated TDS code review (`spec/plans/reviews/TDS_REVIEW_*.md`) — no open P0 (D6, R15, …) | |
+| Migration 027 applied on staging DB | |
+| One offline booking: confirm-balance → intent queued / processed | |
+| `check_tds_readiness.py --strict` reconcile green (see `TDS_READINESS.md`) | |
+| Admin FY reconcile API green | |
+| Compliance backlog bounded (no stuck parked storm) | |
+| Worker batch: poison intent quarantined (`failed` + attempt_count), not stuck `pending/0` | |
+| Partner gates still work with accrual on (accept / heartbeat / record-balance) | |
+
+Regenerate contract after API changes: `python scripts/export_openapi.py` → commit `spec/openapi.json`.
+
+Phase 3 (TAN, deposit, withholding) is **`P-TDS-393`** — not enabled by the accrual flag alone.

@@ -546,3 +546,38 @@ Canonical file: **`db/migration_021.sql`** (chains after 020). Apply via `script
 | `puja_media.entity_type` CHECK | Adds `'addon'` |
 | `uq_puja_addons_puja_name` | Idempotent addon seed upsert |
 | `uq_puja_content_items_puja_kind_pos` | Content seed upsert safety |
+
+### Migration 025 — Sprint 1 booking_fee launch model
+
+Canonical file: **`db/migration_025.sql`** (chains after 024). Apply via `scripts/apply_migration_025.py`.
+
+| Change | Purpose |
+|--------|---------|
+| `bookings.booking_fee DECIMAL(10,2) NOT NULL` | Frozen platform fee at checkout (Razorpay capture/refund cap) |
+| `bookings.balance_collected_amount DECIMAL(10,2)` | Offline puja amount acknowledged by pujari (C4 gate) |
+| `payment_mode` CHECK | Adds `'booking_fee'`; launch constraint `amount_due_online=0`, `amount_due_offline=total_amount` |
+| `platform_settings('booking_fee')` | Admin-configurable fee + customer label |
+| `pujaris.pan_*` + `pujari_tax_year` + `pujari_tds_facilitation_ledger` | PAN/TDS DDL (accrual stubbed `TDS_ACCRUAL_ENABLED=false`) |
+
+### Migration 026 — TDS classification snapshot at balance collection
+
+Canonical file: **`db/migration_026.sql`** (chains after 025). Apply via `scripts/apply_migration_026.py`.
+
+| Change | Purpose |
+|--------|---------|
+| `bookings.tds_snapshot_entity_type VARCHAR(20)` | Point-in-time `pujaris.entity_type` frozen at `confirm-balance-collected` (§0.L-4) |
+| `bookings.tds_snapshot_pan_on_file BOOLEAN` | Point-in-time `pan_hash IS NOT NULL` at collection — `FALSE` is a valid captured value |
+| `ix_bookings_tds_snapshot_missing` | Monitor collections missing snapshot (fail-open write) |
+
+Backfill from current pujari profile for existing `balance_collected_at` rows (best-effort; post-collection PAN drift documented in `TDS_LAUNCH_STATUS.md`).
+
+### Migration 027 — TDS accrual decouple (§0.S)
+
+Canonical file: **`db/migration_027.sql`** (chains after 026). Apply via `scripts/apply_migration_027.py`.
+
+| Change | Purpose |
+|--------|---------|
+| `pujaris.pan_status` | Operative vs inoperative vs unverified (R10 fail-safe-high) |
+| `tax_statutory_config` | Statutory TDS rates — `puja_app` SELECT only (R9) |
+| `pujari_tds_accrual_intents` | Async accrual queue; ordered per-pujari worker (D1/D3/R4/R13) |
+| `ux_tds_ledger_reversal_per_booking` | One reversal per booking (R2) |

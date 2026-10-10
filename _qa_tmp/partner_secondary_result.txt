@@ -1,0 +1,6 @@
+[reject offer] 200 {"status":"rejected","enqueue_rebroadcast":"593cdf6b-fe41-4f8a-8587-3715ed152bf0"}
+[reject] assignment_status=rejected
+[pujari-cancel] 200 {"booking_id":"501456e0-1fb6-4b9b-98de-ea6ca23ef5e4","status":"requested"}
+[pujari-cancel] booking_status=requested pujari_cleared=True
+[POST /v1/pujari/register] 200 {"pujari_id":"bd8dfb29-fbdd-42b1-a66e-051bfeeec436","verification_status":"pending","created":true}
+[GET /v1/pujari/kyc/status] 200 {"verification_status":"pending","required":[{"doc_type":"identity_proof","status":null,"document_id":null},{"doc_type":"address_proof","status":null,"document_id":null},{"doc_type":"photo","status":n

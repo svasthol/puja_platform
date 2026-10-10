@@ -55,3 +55,18 @@ class PujariPricingReplaceRequest(BaseModel):
 
     items: list[PujariPricingItemInput] = Field(default_factory=list, max_length=500)
     change_reason: str | None = Field(default=None, max_length=300)
+
+
+class PujariTaxComplianceUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    entity_type: Literal["individual", "huf", "company", "firm", "trust", "aop", "other"]
+    pan: str | None = Field(default=None, max_length=10)
+    clear_pan: bool = False
+    change_reason: str | None = Field(default=None, max_length=300)
+
+
+class PujariTaxComplianceResponse(BaseModel):
+    pujari_id: uuid.UUID
+    entity_type: str
+    pan_on_file: bool

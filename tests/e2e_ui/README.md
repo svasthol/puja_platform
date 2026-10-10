@@ -6,6 +6,8 @@ without touching `app/`. Do not deploy, bundle, or import from production code.
 ## What it covers
 
 - Customer: OTP login → address → slot hold → booking → Razorpay test checkout
+- **Sprint 1 (v15):** `Sprint 1 — Settlements` tab — booking_fee model, refund matrix, settlement inspect
+- **Sprint 2 (v16):** `Sprint 2 — TDS & Compliance` tab — TDS calculator, accrual simulator, PAN gate, G2 turnover
 - Optional: mock `payment.captured` webhook (local dev, no ngrok)
 - Partner: OTP login (`app_context=pujari`) → heartbeat → list/accept offers
 - **Admin (Phase 4):** TOTP login (`POST /admin/auth/login`) → settings, roles, credential provisioning, **catalogue smoke (4B)**
@@ -34,9 +36,83 @@ python tests/e2e_ui/serve.py
 powershell -ExecutionPolicy Bypass -File tests/e2e_ui/run_serve.ps1
 ```
 
-Then verify: http://127.0.0.1:8765/e2e-ui-version.json → should show `"version": "7"`.
+Then verify: http://127.0.0.1:8765/e2e-ui-version.json → should show `"version": "19"`.
 
 Open **http://127.0.0.1:8765**
+
+## Setu PAN verify — E2E UI walkthrough (Partner tab)
+
+End-user-style test without curl. **API must be running** with `KYC_SETU_PAN_PRODUCT_ID` in `.env` (restart uvicorn after change).
+
+| Step | Tab | Action | Expected |
+|------|-----|--------|----------|
+| 0 | — | `python tests/e2e_ui/ensure_seed.py` once | Seed pujari `+910000000011` |
+| 1 | — | `python tests/e2e_ui/serve.py` (or `run_serve.ps1`) | Open http://127.0.0.1:8765 · version **19** |
+| 2 | **Partner** | Green line: *Setu PAN product configured* | If warn → fix `.env` + restart API |
+| 3 | **Partner** | Request OTP → copy `otp_dev_only` from Log tab or uvicorn (`DEBUG=true`) → Verify | Log: pujari token OK |
+| 4 | **Partner** | Scroll **Setu PAN verify** → **Sandbox valid (A)** → Submit PAN | JSON: `pan_status: operative`, optional `verified_name` |
+| 5 | **Partner** | **GET /me/tax-profile** | `pan_on_file: true`, `tax_profile_complete: true` |
+| 6 | **Partner** | **GET /me/tax-summary** | `fy_pan_gate_level`, `message` (warn if FY gross ≥ ₹4.5L) |
+| 7 | **Partner** | **Sandbox invalid (B)** → Submit | **422** PAN verification failed |
+| 8 | **Log** | Review green/red lines | Full request/response trail |
+
+Optional: with `PAN_ACCEPT_GATE_ENABLED` / `PUJARI_FY_PAN_GATE_ENABLED` on API, use **Heartbeat** / **Accept offer** after step 4 to confirm gates unblock.
+
+### TDS Launch Guide (v18) — visual navigation
+
+**Before implementing decouple or writing E2E tests**, open the visual guide:
+
+**http://127.0.0.1:8765/tds_launch_guide.html**
+
+| Section | What it shows |
+|---|---|
+| Overview | Launch-S2 vs Phase 3 vs ON HOLD (GST/TCS) |
+| Money split | `booking_fee` Razorpay vs offline puja; TDS gross base |
+| Partner flow | SVG: confirmed → in_progress → balance (+ inline TDS) → complete |
+| Test scenarios S1–S8 | Click each scenario for expected HTTP codes + pytest links |
+| Target decouple | Worker + intent table (not built yet) |
+| Launch gate | Checklist from plan (documentation) |
+| Run E2E | Links to Customer / Partner / Sprint 2 tabs + pytest commands |
+
+Also linked from the main E2E UI header and **TDS Guide ↗** tab.
+
+### Sprint 1 — Settlements tab (v15)
+
+Preview the **launch-lite booking fee** model before production ships:
+
+| Action | What it shows |
+|---|---|
+| **Quote calculator** | `booking_fee` checkout: Razorpay = ₹61 token, puja = offline |
+| **Simulate POST /bookings** | 201 response shape — **no DB write** |
+| **Refund matrix** | Tiered fee refunds (100% requested, 0% confirmed, etc.) |
+| **Inspect settlement** | Real booking from DB + Sprint 1 preview for `advance_balance` rows |
+
+Customer tab: choose **booking_fee — Sprint 1 preview (simulated)** to walk checkout UX without calling the live API. Use **advance_balance** for real dispatch tests.
+
+Contract tests (no app code):
+
+```powershell
+pytest tests/e2e/test_booking_fee_launch_e2e.py -q
+```
+
+### Sprint 2 — TDS & Compliance tab (v17)
+
+Preview **TDS accrual at confirm-balance-collected** before production wiring
+(`TDS_ACCRUAL_ENABLED=false` at launch):
+
+| Action | What it shows |
+|---|---|
+| **TDS calculator** | Rate/amount by entity type, PAN, FY gross, transaction gross |
+| **Accrual simulator** | In-memory ledger — idempotent per booking id, reversal on cancel |
+| **G2 turnover** | Warn ₹18L / block ₹20L platform fee FY revenue |
+| **PAN accept gate** | 422 when gate on and PAN missing |
+| **Inspect TDS settlement** | Real booking + pujari compliance read from DB (read-only) |
+
+Contract tests:
+
+```powershell
+pytest tests/e2e/test_sprint2_tds_launch_e2e.py -q
+```
 
 ### Test ops dashboard
 

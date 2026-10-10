@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     admin_pujaris,
     admin_refunds,
     admin_rm,
+    admin_tds,
     app_config,
     auth,
     bookings,
@@ -53,6 +54,7 @@ api_router.include_router(admin_pujaris.router)
 api_router.include_router(admin_kyc.router)
 api_router.include_router(admin_bookings.router)
 api_router.include_router(admin_refunds.router)
+api_router.include_router(admin_tds.router)
 api_router.include_router(admin_promos.router)
 api_router.include_router(webhooks.router)
 api_router.include_router(ws.router)

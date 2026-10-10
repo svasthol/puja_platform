@@ -1,7 +1,8 @@
 """Single source of truth for puja unit pricing (SPEC_AMENDMENTS §20.3).
 
-Eliminates the live split where pujari listings use pujari_pricing.base_price but
-checkout/booking used pujas.default_price only.
+Launch (broadcast): customer catalogue, quote, and booking use admin catalog
+``pujas.default_price``. ``pujari_pricing`` is for dispatch supply and future
+direct booking — not customer-facing display at launch.
 """
 from __future__ import annotations
 
@@ -54,28 +55,15 @@ async def resolve_catalog_display_range(
     db: AsyncSession,
     puja_id: uuid.UUID,
 ) -> tuple[Decimal, Decimal]:
-    """Customer-facing price range for catalogue cards.
+    """Customer-facing price range for catalogue cards (launch broadcast).
 
-    price_from = MIN(verified pujari_pricing.base_price) OR default_price
-    price_to   = pujas.price_max OR price_from
+    price_from = resolve_puja_unit_price(pujari_id=None) — same as checkout
+    price_to   = pujas.price_max OR price_from (display upper bound only)
     """
     row = (
         await db.execute(
             text(
-                """
-                SELECT
-                    p.default_price,
-                    p.price_max,
-                    (
-                        SELECT MIN(pp.base_price)
-                        FROM pujari_pricing pp
-                        JOIN pujaris pj ON pj.id = pp.pujari_id
-                        WHERE pp.puja_id = p.id
-                          AND pj.verification_status = 'verified'
-                    ) AS min_pujari_price
-                FROM pujas p
-                WHERE p.id = :puja
-                """
+                "SELECT default_price, price_max FROM pujas WHERE id = :puja"
             ),
             {"puja": str(puja_id)},
         )
@@ -83,12 +71,7 @@ async def resolve_catalog_display_range(
     if row is None:
         raise ValueError(f"Puja not found: {puja_id}")
 
-    default = Decimal(str(row["default_price"]))
-    price_from = (
-        Decimal(str(row["min_pujari_price"]))
-        if row["min_pujari_price"] is not None
-        else default
-    )
+    price_from = await resolve_puja_unit_price(db, puja_id, None)
     price_to = (
         Decimal(str(row["price_max"])) if row["price_max"] is not None else price_from
     )

@@ -1,6 +1,7 @@
 """Admin partner directory + pujari_pricing matrix (Sprint 4B — A-PUJARI-PRICING)."""
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from decimal import Decimal
 
@@ -18,7 +19,11 @@ from app.schemas.admin_pujaris import (
     PujariPricingReplaceRequest,
     PujariPricingResponse,
     PujariPricingRow,
+    PujariTaxComplianceResponse,
+    PujariTaxComplianceUpdate,
 )
+from app.services.admin_pujari_fy_report import pujari_fy_earnings_report
+from app.services.pujari_compliance import update_tax_compliance
 from app.schemas.service_area import PujariServiceAreasReplace
 from app.schemas.common import decode_cursor, encode_cursor
 from app.services.audit import record_admin_action
@@ -26,6 +31,32 @@ from app.services.audit import record_admin_action
 router = APIRouter(prefix="/admin/pujaris", tags=["admin-pujaris"])
 
 _VALID_VERIFICATION = frozenset({"pending", "verified", "rejected"})
+
+
+@router.get("/fy-earnings")
+async def list_pujari_fy_earnings(
+    request: Request,
+    fy_start: dt.date | None = Query(None, description="Indian FY start (default: current FY)"),
+    limit: int = Query(100, ge=1, le=500),
+    min_gross: Decimal | None = Query(None, ge=0),
+    _p: Principal = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ops report — collections + ledger FY gross per pujari."""
+    data = await pujari_fy_earnings_report(
+        db, fy_start=fy_start, limit=limit, min_gross=min_gross
+    )
+    await record_admin_action(
+        db,
+        actor_user_id=_p.user_id,
+        action="read",
+        entity_type="pujari_fy_earnings",
+        entity_id=None,
+        after={"fy_start": data["fy_start"], "limit": limit},
+        ip=_client_ip(request),
+    )
+    await db.commit()
+    return data
 
 
 def _client_ip(request: Request) -> str | None:
@@ -325,5 +356,52 @@ async def replace_pujari_service_areas(
         after={"service_area_ids": payload.service_area_ids},
         change_reason=payload.change_reason,
         ip=_client_ip(request),
+    )
+
+
+@router.patch(
+    "/{pujari_id}/tax-compliance",
+    response_model=PujariTaxComplianceResponse,
+)
+async def patch_pujari_tax_compliance(
+    pujari_id: uuid.UUID,
+    payload: PujariTaxComplianceUpdate,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Set entity_type and PAN hash for TDS accrual (admin until KYC PAN pipeline ships)."""
+    await _require_pujari(db, pujari_id)
+    before = (
+        await db.execute(
+            text(
+                "SELECT entity_type, pan_hash IS NOT NULL AS pan_on_file "
+                "FROM pujaris WHERE id = :pid"
+            ),
+            {"pid": str(pujari_id)},
+        )
+    ).mappings().first()
+    result = await update_tax_compliance(
+        db,
+        pujari_id=pujari_id,
+        entity_type=payload.entity_type,
+        pan=payload.pan,
+        clear_pan=payload.clear_pan,
+    )
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="update",
+        entity_type="pujaris",
+        entity_id=str(pujari_id),
+        before=dict(before) if before else None,
+        after={"entity_type": result["entity_type"], "pan_on_file": result["pan_on_file"]},
+        change_reason=payload.change_reason,
+        ip=_client_ip(request),
+    )
+    return PujariTaxComplianceResponse(
+        pujari_id=pujari_id,
+        entity_type=result["entity_type"],
+        pan_on_file=result["pan_on_file"],
     )
 

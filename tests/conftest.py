@@ -14,7 +14,8 @@ would prove nothing. Run:
          -f spec/db/migration_012.sql -f spec/db/migration_013.sql -f spec/db/migration_014.sql \
          -f spec/db/migration_015.sql -f spec/db/migration_016.sql -f spec/db/migration_017.sql \
          -f spec/db/migration_018.sql -f spec/db/migration_019.sql -f spec/db/migration_020.sql \
-         -f spec/db/migration_021.sql -f spec/db/migration_022.sql -f spec/db/migration_023.sql
+         -f spec/db/migration_021.sql -f spec/db/migration_022.sql -f spec/db/migration_023.sql \
+         -f spec/db/migration_024.sql -f spec/db/migration_025.sql
     export DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji
     pytest -q
 """
@@ -42,6 +43,26 @@ if sys.platform == "win32":
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji"
 )
+
+_TDS_V3_MIGRATIONS = ("028", "029", "030", "031", "032", "033", "034")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ensure_tds_v3_migration_chain(engine):
+    """Apply idempotent TDS v3 SQL chain so dev DBs match 028→033 before tests run."""
+
+    async def _apply() -> None:
+        mig_dir = Path(__file__).resolve().parents[1] / "spec" / "db"
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as session:
+            async with session.begin():
+                for number in _TDS_V3_MIGRATIONS:
+                    path = mig_dir / f"migration_{number}.sql"
+                    if path.is_file():
+                        await session.execute(text(path.read_text(encoding="utf-8")))
+
+    asyncio.run(_apply())
+    yield
 
 
 @pytest.fixture(scope="session")
@@ -108,6 +129,25 @@ async def seed(engine):
                 ON CONFLICT (id) DO NOTHING;
             """))
     return True
+
+
+@pytest.fixture(autouse=True)
+def _enable_legacy_payment_modes_in_tests(request, monkeypatch):
+    """Legacy integration tests predate booking_fee launch; Sprint 1 tests opt out."""
+    if request.node.get_closest_marker("booking_fee_launch"):
+        return
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "FULL_ONLINE_ENABLED", True)
+    monkeypatch.setattr("app.services.booking_service._settings", settings)
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "booking_fee_launch: Sprint 1 tests with FULL_ONLINE_ENABLED=false",
+    )
 
 
 @pytest.fixture

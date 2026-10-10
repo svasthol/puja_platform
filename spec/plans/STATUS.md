@@ -9,7 +9,7 @@ gates: [`MASTER.md`](./MASTER.md).
 this file on every task). Status changes happen here and only here; track files own
 Spec / Files / Acceptance / Depends-on.
 
-**Last audited:** 2026-08-16 (spec doc sync — task-status conflicts vs `MOBILE_FLUTTER.md`, `CATALOG_SYNC.md`, `CUSTOMER.md`, Phase 2 exit gate) · **pytest:** `test_notify_offer_withdrawn_after_customer_cancel` added; run full `pytest tests/ -q` after clean seed
+**Last audited:** 2026-09-29 (TDS v3 close-out + **Phase 0b FY gate codes** + Flutter TDS alignment shipped in mobile)
 
 ---
 
@@ -33,6 +33,57 @@ Policy: `spec/plans/LAUNCH_POLICY.md`.
 
 **§21 backend in this repo:** all rows above through `P-LAUNCH-RECONFIRM` are **COMPLETED**.
 Mobile clients tracked separately below (`mana_guruji_mobile` — partner **IN_PROGRESS**, customer **IN_PROGRESS**).
+
+### Puja MVP launch — TDS (Sprint 2, s.393 ex-194-O)
+
+Narrative + exit gate: [`TDS_LAUNCH_STATUS.md`](./TDS_LAUNCH_STATUS.md). CA memo: [`TDS_CA_DECISION_MEMO.md`](./TDS_CA_DECISION_MEMO.md).
+**Runtime (env + slabs):** [`TDS_RUNTIME_CONFIG.md`](./TDS_RUNTIME_CONFIG.md). **Prod ops checklist:** [`TDS_PRODUCTION_OPS_READINESS.md`](./TDS_PRODUCTION_OPS_READINESS.md). **Flutter plan:** [`FLUTTER_TDS_ALIGNMENT_PLAN.md`](./FLUTTER_TDS_ALIGNMENT_PLAN.md).
+**Launch posture = OFF** (`TDS_ACCRUAL_ENABLED=false`): nothing accrued/withheld/deposited. Milestones:
+**L** (MVP launch, off) · **S** (shadow — decouple PR) · **P3** (deduction/deposit — `P-TDS-393`).
+**Accrual policy v2/v3 (CA Sep 2026):** [`TDS_ACCRUAL_POLICY.md`](./TDS_ACCRUAL_POLICY.md) + normative engine [`TDS_V3_IMPLEMENTATION.md`](./TDS_V3_IMPLEMENTATION.md) (incl. **close-out § platform-bears + CA export**).
+Exposure at launch (OFF): **s.201 risk** — **v3** post-₹5L slice at 0.1% (operative PAN); 5% fail-safe above ₹5L without operative PAN — **not** v13 “5%×all offline GMV”.
+
+**Backend Sprint 2 TDS (accrual engine + close-out):** **COMPLETE** in code — flip **`TDS_ACCRUAL_ENABLED`** only after staging S14 + §0.C. **Not complete:** Phase 3 deposit/TAN/`pan_enc`/automated filing (`P-TDS-393`).
+
+| ID | Status | Notes |
+|---|---|---|
+| L-SPRINT-2-TDS-LAUNCH-GATE | BLOCKED | §0.L — blocked on L5 (§0.C sign) + L6 (owners + memo sent); code gates L1–L4 done |
+| L-SPRINT-2-TDS-PAN-DRIVE | PENDING | **Primary mitigation** — DigiLocker/Setu PAN pull for ≈139 no-PAN pujaris; each PAN → ₹5L exemption; owner first |
+| L-SPRINT-2-TDS-TAN-REGISTRATION | PENDING | §0.P3 gate; acquisition starts now (longest lead); owner |
+| L-SPRINT-2-TDS-CA-SIGNOFF | BLOCKED | §0.P3; memo sent launch prep (Q-recovery first); owner |
+| L-SPRINT-2-TDS-MATH | COMPLETED | v3 threshold-first + `pricing_tds_v3.py`; excess_slice; `deduction_latched` (028+) |
+| L-SPRINT-2-TDS-V3-ENGINE | COMPLETED | Migrations **028–034**; T6 accept + T7 reversal; `apply_migrations_028_032.py`; tests green |
+| L-SPRINT-2-TDS-V3-CLOSEOUT | COMPLETED | **`scripts/export_tds_26q.py`**; FY gate **`pan_status=operative`**; `scripts/README.md` |
+| L-SPRINT-2-TDS-RISK-ACCEPTANCE | PENDING | §0.C — owner signs **v2** exposure (post-₹5L), not v13 5%×all GMV |
+| L-SPRINT-2-TDS-CLASSIFICATION-CAPTURE | COMPLETED | §0.L-4 — migration 026; `capture_classification_snapshot_at_collection` on confirm-balance; fail-open; `tests/test_tds_classification_capture.py` |
+| L-SPRINT-2-TDS-READINESS-CI | COMPLETED | `check_tds_readiness.py` — no phone PII; no-PAN aggregate ×5% monitor first; reconcile drift; migration 026 + snapshot coverage |
+| L-SPRINT-2-TDS-ACCRUAL | HOLD | §0.S14 shadow flip after S1–S13; global flag = new-accrual stop only (R13) |
+| L-SPRINT-2-TDS-ACCRUAL-DECOUPLE | COMPLETED | §0.S — `enqueue_tds_accrual_intent` + ordered worker + Celery beat 60s (D1/D3/R4) |
+| L-SPRINT-2-TDS-REVERSAL-INTEGRITY | COMPLETED | §0.S — unconditional reversal (R1) + unique reversal/booking (R2) + offline-keyed (R6) |
+| L-SPRINT-2-TDS-BASE-COMPOSITION | COMPLETED | §0.S — enqueue accrues on `total_amount` per §16 (R7) |
+| L-SPRINT-2-TDS-STATUTORY-CONFIG-VIOLATION | COMPLETED | §0.S — six statutory fields in `tax_statutory_config` (R9) |
+| L-SPRINT-2-TDS-OPERATIVE-PAN-GAP | COMPLETED | §0.S — `pan_status` + fail-safe-high (R10); bulk verify = `P-PAN-STATUS` |
+| L-SPRINT-2-TDS-ADMIN-COMPLIANCE | COMPLETED | §0.S S4/S8 — `GET /v1/admin/tds/compliance-backlog` |
+| L-SPRINT-2-TDS-FY-RECONCILE | COMPLETED | §0.S S7 — `GET /v1/admin/tds/fy-reconcile` + readiness script reconcile |
+| L-SPRINT-2-TDS-CORRECTION-OPS | COMPLETED | §0.S S9/D4 — `POST .../correct-offline-collection` |
+| L-SPRINT-2-TDS-PARTNER-BILLING-UX | COMPLETED | Checkout/detail/partner payment breakdown (puja vs platform fee vs total pay) |
+| L-SPRINT-2-TDS-PARTNER-TAX-UI | COMPLETED | `GET /me/tax-summary`, partner FY screen, post-collection TDS lines (existing) |
+| L-SPRINT-2-TDS-PAN-PROFILE | COMPLETED | `POST /pujari/kyc/pan`, `GET/PUT /me/tax-profile`, accept gate flags |
+| L-SPRINT-2-TDS-ADMIN-OPS-UX | COMPLETED | Bookings ops tabs, `GET /admin/pujaris/fy-earnings`, admin UI pages |
+| L-SPRINT-2-TDS-PAN-FY-GATES | COMPLETED | ₹4.5L warn / ₹5L block without **operative PAN** — `PAN_FY_GATES.md`; blocks accept + heartbeat; **confirm-balance warn+allow** (Phase 0b) |
+| L-SPRINT-2-TDS-FY-GATE-0B | COMPLETED | **`FY_PAN_GATE_BLOCKED`** 422 `{code,message}`; confirm-balance **`FY_PAN_GATE_WARN`** on `TdsAccrualInfo.message_code`; tests `test_pujari_fy_pan_gate_confirm_balance.py` |
+| L-SPRINT-2-TDS-KYC-PAN | COMPLETED | Setu `POST /api/verify/pan` via `setu_digilocker_client.verify_pan` + `submit_partner_pan`; **`KYC_SETU_PAN_PRODUCT_ID`** required in prod; `pan_enc` filing still P3 |
+| L-SPRINT-2-TDS-SPEC-DOCS | COMPLETED | DATABASE + grants (R12) + API_CONTRACTS TDS/tax-profile/admin ops |
+| L-SPRINT-2-TDS-OPENAPI | COMPLETED | `python scripts/export_openapi.py` → `spec/openapi.json` (app-config TDS flags in schema) |
+| L-SPRINT-2-TDS-RUNTIME-CONFIG | COMPLETED | `spec/plans/TDS_RUNTIME_CONFIG.md`; TDS flags on `GET /v1/app-config`; `.env - Copy.example` TDS block |
+| L-SPRINT-2-TDS-REVIEW-PLAYBOOK | COMPLETED | `spec/plans/TDS_CODE_REVIEW.md` + `spec/plans/reviews/` template |
+| L-SPRINT-2-TDS-CA-ACCRUAL-POLICY | COMPLETED | `TDS_ACCRUAL_POLICY.md` aligned with v3 engine; staging/platform-bears in `TDS_STAGING_ROLLOUT.md` |
+| L-SPRINT-2-TDS-CODE-REVIEW | COMPLETED | D6/R15 review 2026-09-15; close-out 2026-09-29 (no engine changes) |
+| L-SPRINT-2-TDS-STATUTORY-ASOF | COMPLETED | R15 — `load_tds_facilitation_config(as_of=…)` on accrual path |
+| L-SPRINT-2-TDS-WORKER-BATCH-TXN | COMPLETED | D6 — SAVEPOINT per intent + per-pujari intent cap (25) |
+| L-SPRINT-2-TDS-S14-STAGING-QA | IN_PROGRESS | Ops: migrate 028–034, `--strict`, platform-bears flags, `export_tds_26q.py`; see `TDS_STAGING_ROLLOUT.md` |
+| L-SPRINT-2-TDS-ADMIN-SLABS | COMPLETED | **Drift:** statutory knobs on commercial surface — remediation in STATUTORY-CONFIG-VIOLATION |
+| L-SPRINT-2-TDS-DDL | COMPLETED | migration 025 (`pujari_tax_year`, `pujari_tds_facilitation_ledger`, PAN cols) |
 
 ### Dispatch v2 (SPEC_AMENDMENTS §21.6.A–H)
 
@@ -83,6 +134,7 @@ Customer + partner apps share one Flutter codebase (build flavors). Repo:
 | C-FLUTTER-CATALOG | COMPLETED | Home + list + detail verified on physical device (2026-08-05); `CATALOG_SYNC.md` |
 | C-FLUTTER-ADDR | COMPLETED | Address CRUD + map pin + GPS + `service_area_id` verified on physical device (2026-08-05) |
 | C-FLUTTER-CHECKOUT | COMPLETED | hold → quote → Razorpay → confirming poll; **Wave 1 #3 E2E** pay → `requested` → partner accept → `confirmed` device-verified (2026-08-06); runbook `mana_guruji_mobile/test/WAVE1_DISPATCH_E2E.md` |
+| C-FLUTTER-BILLING-BREAKDOWN | COMPLETED | Checkout + booking detail show puja amount, platform fee (online), total pay (`booking_payment_breakdown.dart`; 2026-09-14) |
 | C-FLUTTER-BOOKINGS | COMPLETED | list + detail + class-aware tracking + RM; **cancel UX** shipped (`C-FLUTTER-CANCEL` 2026-08-09) |
 | C-FLUTTER-CANCEL | COMPLETED | `POST /v1/bookings/{id}/cancel` on detail — status-aware dialog + refund snackbar |
 | C-FLUTTER-FCM | PENDING | customer push handlers (Wave 6) |
@@ -106,6 +158,11 @@ Customer + partner apps share one Flutter codebase (build flavors). Repo:
 | P-FLUTTER-AVAILABILITY | PENDING | Weekly hours + date blocks UI — backend ready (`B-AVAIL`/`B-UNAVAIL`); unblocked after onboarding sign-off |
 | P-FLUTTER-REGISTER | COMPLETED | Register screen + `POST /v1/pujari/register`; device-verified on physical Android (2026-08-30) |
 | P-FLUTTER-KYC | COMPLETED | DigiLocker + selfie + admin approve → `verified` → online → offer display + accept; physical Android (2026-08-30) |
+| P-FLUTTER-PAN-PROFILE | COMPLETED | KYC hub PAN step + `partner_pan_profile_screen`; `GET/PUT /me/tax-profile`, `POST /kyc/pan` (2026-09-14) |
+| P-FLUTTER-TAX-SUMMARY | COMPLETED | FY facilitation summary from `GET /me/tax-summary`; entry from bookings tab (2026-09-14) |
+| P-FLUTTER-PAN-FY-GATE-UX | COMPLETED | Gate level UI + ⚠ on bookings tab when `fy_pan_gate_level` is warn or block |
+| P-FLUTTER-BILLING-BREAKDOWN | COMPLETED | Partner booking detail payment lines aligned with customer breakdown (2026-09-14) |
+| P-FLUTTER-TDS-ALIGNMENT | COMPLETED | OpenAPI TDS paths in `generate_api.py`; `partner_tax_summary_provider` + gate refresh after FY block; co-release with Phase 0b API |
 | P-FLUTTER-EARNINGS-UI | HOLD | Header earnings strip — blocked on Phase 3 `B-EARNINGS` / `P-SPLITS` |
 
 **Phase 2 FCM:** `P-FCM-E2E` **IN_PROGRESS** (partner sound device QA — `test/PARTNER_FCM_SOUND.md`). **`P-FCM-CUSTOMER-CANCEL` COMPLETED** (2026-08-12). Customer FCM **PENDING** (`C-FLUTTER-FCM`).
@@ -142,7 +199,7 @@ exit gate in MASTER.md is met.
 | **3** | Money pipeline | **ON HOLD** | CA memo + Razorpay Route → migration 007, splits, TDS, payouts |
 | **4** | Admin control plane | **IN_PROGRESS** | 4-0 + 4A + 4B + **4C COMPLETED** (manual QA 2026-07-22); partner Flutter **IN_PROGRESS** (`mana_guruji_mobile`); remaining Phase 4 exit gate items in ADMIN.md (4B catalogue/KYC smoke) |
 | **5** | Scheduled-booking ops | **COMPLETED** | B-CANCEL, P-SWEEP-CONFIRMED, P-SWEEP-RELIABILITY, P-MONITOR (M0 foundation) |
-| **6** | Launch gate | **PENDING** | Full DISPATCH_FLOW concurrent test suite green |
+| **6** | Launch gate | **PENDING** | Full DISPATCH_FLOW concurrent test suite green; ops sign-off: [`MVP_GO_NO_GO_CHECKLIST.md`](./MVP_GO_NO_GO_CHECKLIST.md) |
 | **7** | Observability & ops notifications | **PENDING** | **Last** — after Flutter + admin UX freeze; see `OBSERVABILITY.md` exit gate |
 
 **Phase 7 policy:** Do not start `M1+` tasks until Flutter apps + `ADMIN.md` exit gate are complete.

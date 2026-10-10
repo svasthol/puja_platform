@@ -44,6 +44,8 @@ async def list_offers(
                     b.booking_class,
                     bds.urgency_escalated_at IS NOT NULL AS urgency_escalated
                 FROM booking_assignments ba
+                JOIN status_types ast ON ast.id = ba.status_id
+                  AND ast.domain = 'assignment' AND ast.code = 'offered'
                 JOIN pujaris pj ON pj.id = ba.pujari_id
                 JOIN bookings b ON b.id = ba.booking_id
                 JOIN pujas pu ON pu.id = b.puja_id

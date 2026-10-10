@@ -15,6 +15,7 @@ from app.api.v1.endpoints import admin_promos as promos_ep
 from app.core.dependencies import Principal
 from app.schemas.admin_dispute import AdminDisputeRequest
 from app.schemas.admin_promos import AdminPromoCreate, AdminPromoUpdate
+from app.services import tds_accrual_service
 
 CUSTOMER = "aaaaaaaa-0000-0000-0000-000000000001"
 PUJARI_USER = "bbbbbbbb-0000-0000-0000-000000000001"
@@ -216,6 +217,73 @@ async def test_dispute_in_progress_booking(session, seed, uniq):
         )
     ).scalar_one()
     assert status_row == "disputed"
+
+
+@pytest.mark.asyncio
+async def test_dispute_offline_non_payment_reverses_tds(session, seed, uniq, monkeypatch):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "TDS_ACCRUAL_ENABLED", True)
+
+    bid = await _insert_in_progress_booking(session, uniq)
+    pujari_id = uuid.UUID(await _pujari_id(session))
+    await session.execute(
+        text(
+            """
+            UPDATE pujaris SET entity_type = 'individual', pan_hash = :ph
+            WHERE id = :pid
+            """
+        ),
+        {"ph": "a" * 64, "pid": str(pujari_id)},
+    )
+    await session.execute(
+        text(
+            """
+            UPDATE bookings
+            SET balance_collected_at = now(),
+                balance_collected_by = :uid,
+                balance_collection_method = 'cash'
+            WHERE id = :bid
+            """
+        ),
+        {"bid": bid, "uid": PUJARI_USER},
+    )
+    await tds_accrual_service.accrue_tds_on_balance_collected(
+        session,
+        booking_id=uuid.UUID(bid),
+        pujari_id=pujari_id,
+        gross_amount=Decimal("1850"),
+    )
+    actor = await _mk_admin(session)
+    await session.commit()
+
+    resp = await bookings_ep.dispute_booking(
+        uuid.UUID(bid),
+        AdminDisputeRequest(
+            change_reason="Offline payment dispute after collection",
+            dispute_type="offline_non_payment",
+        ),
+        _FakeRequest(),
+        _admin(actor),
+        session,
+    )
+    await session.commit()
+
+    assert resp.tds_reversal is not None
+    assert resp.tds_reversal.reversed is True
+    rev_count = (
+        await session.execute(
+            text(
+                """
+                SELECT count(*) FROM pujari_tds_facilitation_ledger
+                WHERE booking_id = :bid AND entry_type = 'reversal'
+                """
+            ),
+            {"bid": bid},
+        )
+    ).scalar_one()
+    assert rev_count == 1
 
 
 @pytest.mark.asyncio

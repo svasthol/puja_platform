@@ -17,7 +17,11 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/console", label: "Overview", section: "Main" },
-  { href: "/console/settings/advance", label: "Advance amount", section: "Settings" },
+  { href: "/console/settings/advance", label: "Booking fee", section: "Settings" },
+  { href: "/console/tds", label: "TDS hub", section: "TDS & compliance" },
+  { href: "/console/settings/tds", label: "TDS policy slabs", section: "TDS & compliance" },
+  { href: "/console/tds/backlog", label: "TDS accrual backlog", section: "TDS & compliance" },
+  { href: "/console/tds/reconcile", label: "TDS FY reconcile", section: "TDS & compliance" },
   { href: "/console/settings/areas", label: "Service areas", section: "Settings" },
   { href: "/console/settings/relationship-managers", label: "Relationship managers", section: "Settings" },
   { href: "/console/team/roles", label: "Roles", section: "Team", adminOnly: true },
@@ -25,7 +29,9 @@ const NAV: NavItem[] = [
   { href: "/console/catalog", label: "Catalogue", section: "Phase 4B" },
   { href: "/console/partners", label: "Partners", section: "Phase 4B" },
   { href: "/console/partners/kyc", label: "KYC review", section: "Phase 4B" },
-  { href: "/console/bookings", label: "Bookings", section: "Phase 4C" },
+  { href: "/console/bookings", label: "Bookings search", section: "Phase 4C" },
+  { href: "/console/bookings/ops", label: "Bookings ops", section: "Phase 4C" },
+  { href: "/console/partners/fy-earnings", label: "Partner FY earnings", section: "TDS & compliance" },
   { href: "/console/refunds", label: "Failed refunds", section: "Phase 4C" },
   { href: "/console/promos", label: "Promos", section: "Phase 4C" },
 ];

@@ -173,7 +173,7 @@ async def available_pujaris(
     pujaris = []
     for r in page_rows:
         pid = r["id"] if isinstance(r["id"], uuid.UUID) else uuid.UUID(str(r["id"]))
-        unit_price = await resolve_puja_unit_price(db, puja_id, pid)
+        unit_price = await resolve_puja_unit_price(db, puja_id, None)
         pujaris.append(
             {
                 "id": pid,

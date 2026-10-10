@@ -130,6 +130,16 @@ class Settings(BaseSettings):
     # ---- Platform business rules (override without redeploy via platform_settings table)
     # These are DEFAULTS only — live values come from platform_settings DB table.
     DEFAULT_ADVANCE_BOOKING_AMOUNT: float = 250.0
+    DEFAULT_BOOKING_FEE: float = 61.0
+    FULL_ONLINE_ENABLED: bool = False
+    TDS_ACCRUAL_ENABLED: bool = False
+    # Dev/staging: skip Razorpay and mark TDS collected at accept when liability > 0.
+    TDS_ACCEPT_STUB_COLLECT: bool = False
+    PAN_ACCEPT_GATE_ENABLED: bool = False
+    # When true, pujaris need entity_type + PAN before accept-offer (ops enables after PAN drive).
+    PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT: bool = False
+    # FY facilitation gates: warn ₹4.5L, block record-balance/accept/go-online at ₹5L without PAN.
+    PUJARI_FY_PAN_GATE_ENABLED: bool = False
     DEFAULT_SUPPORT_REFUND_CAP_PER_ACTION: float = 5000.0
     DEFAULT_SUPPORT_REFUND_CAP_DAILY: float = 20000.0
     SLOT_HOLD_TTL_MINUTES: int = 5

@@ -5,7 +5,7 @@ import datetime as dt
 import uuid
 
 from sqlalchemy import (
-    Date, DateTime, ForeignKey, Numeric, SmallInteger, String, Time,
+    Boolean, Date, DateTime, ForeignKey, Numeric, SmallInteger, String, Time,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -50,9 +50,14 @@ class Booking(Base):
     payment_mode: Mapped[str] = mapped_column(String(20), default="full_online")
     amount_due_online: Mapped[float] = mapped_column(Numeric(10, 2))
     amount_due_offline: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    booking_fee: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    balance_collected_amount: Mapped[float | None] = mapped_column(Numeric(10, 2))
     balance_collected_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     balance_collected_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     balance_collection_method: Mapped[str | None] = mapped_column(String(20))
+    # migration 026 — point-in-time TDS classification at balance collection (§0.L-4)
+    tds_snapshot_entity_type: Mapped[str | None] = mapped_column(String(20))
+    tds_snapshot_pan_on_file: Mapped[bool | None] = mapped_column(Boolean)
     # migration 004 — set at checkout; returned on idempotent duplicate submit
     razorpay_order_id: Mapped[str | None] = mapped_column(String(100))
     # migration 014 — frozen at POST /v1/bookings; no column default

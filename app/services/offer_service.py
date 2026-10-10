@@ -12,16 +12,19 @@ booking now has zero live offers, enqueue rebroadcast immediately (idempotent).
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 import structlog
 from fastapi import HTTPException, status as http
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.models.booking import BookingAssignment
 from app.models.catalog import Pujari
 from app.services import booking_events
 from app.services.relationship_manager import assign_rm_on_confirm
+from app.services.pujari_fy_pan_gate import assert_fy_pan_gate_allowed
 from app.services.status import status_id
 from app.services.slot_guard import assert_slot_not_past_for_accept
 from app.services.travel_buffer import assert_accept_travel_buffer_ok
@@ -47,23 +50,74 @@ async def _assignment_owned_by(
     return assignment
 
 
+async def _assert_tax_profile_for_accept(db: AsyncSession, pujari_id: uuid.UUID) -> None:
+    settings = get_settings()
+    if not settings.PAN_ACCEPT_GATE_ENABLED and not settings.PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT:
+        return
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT pan_hash IS NOT NULL AS pan_on_file, entity_type
+                FROM pujaris WHERE id = :pid
+                """
+            ),
+            {"pid": str(pujari_id)},
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(http.HTTP_404_NOT_FOUND, "Pujari not found.")
+    if settings.PAN_ACCEPT_GATE_ENABLED and not row["pan_on_file"]:
+        raise HTTPException(
+            http.HTTP_422_UNPROCESSABLE_ENTITY,
+            "PAN must be on file before accepting bookings.",
+        )
+    if settings.PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT and (
+        not row["pan_on_file"] or row["entity_type"] is None
+    ):
+        raise HTTPException(
+            http.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Complete tax profile (entity type and PAN) before accepting bookings.",
+        )
+
+
 async def accept_offer(
     db: AsyncSession, *, user_id: uuid.UUID, assignment_id: uuid.UUID
 ) -> dict:
     assignment = await _assignment_owned_by(db, assignment_id, user_id)
+    booking_row = (
+        await db.execute(
+            text("SELECT total_amount FROM bookings WHERE id = :bid"),
+            {"bid": str(assignment.booking_id)},
+        )
+    ).mappings().first()
+    if booking_row is None:
+        raise HTTPException(http.HTTP_404_NOT_FOUND, "Booking not found.")
+    projected = Decimal(str(booking_row["total_amount"])).quantize(Decimal("0.01"))
+    await _assert_tax_profile_for_accept(db, assignment.pujari_id)
+    await assert_fy_pan_gate_allowed(
+        db,
+        pujari_id=assignment.pujari_id,
+        additional_collection_inr=projected,
+    )
     accepted_id = await status_id(db, "assignment", "accepted")
     await assert_slot_not_past_for_accept(db, booking_id=assignment.booking_id)
     await assert_accept_travel_buffer_ok(
         db, pujari_id=assignment.pujari_id, booking_id=assignment.booking_id
     )
-    # ONE UPDATE. Trigger 3 fires on this UPDATE and does the rest (or raises,
-    # which the shared handler maps to 409/410).
     await db.execute(
         text(
             "UPDATE booking_assignments SET status_id = :sid, responded_at = now() "
             "WHERE id = :aid"
         ),
         {"sid": accepted_id, "aid": str(assignment_id)},
+    )
+    from app.services.tds_v3_accept_service import apply_tds_at_booking_confirmation
+
+    tds_result = await apply_tds_at_booking_confirmation(
+        db,
+        booking_id=assignment.booking_id,
+        pujari_id=assignment.pujari_id,
     )
     await assign_rm_on_confirm(db, assignment.booking_id)
     booking_class = (
@@ -83,7 +137,15 @@ async def accept_offer(
     await booking_events.publish_booking_event(
         str(assignment.booking_id), "status_changed", status="confirmed"
     )
-    return {"status": "accepted", "booking_id": str(assignment.booking_id)}
+    return {
+        "status": "accepted",
+        "booking_id": str(assignment.booking_id),
+        "tds_liability_inr": str(tds_result.tds_liability_inr),
+        "tds_collected_online_inr": str(tds_result.tds_collected_online_inr),
+        "amount_due_offline_inr": str(tds_result.amount_due_offline_inr),
+        "tds_recovery_pending": tds_result.recovery_pending,
+        "tds_razorpay_order_id": tds_result.tds_razorpay_order_id,
+    }
 
 
 async def reject_offer(

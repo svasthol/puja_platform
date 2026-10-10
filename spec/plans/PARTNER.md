@@ -119,6 +119,17 @@ Tasks trace to `spec/API_CONTRACTS.md` §Pujari app unless marked SPEC_AMENDMENT
 - **Blocked-by:** P-SPLITS (Phase 3)
 - **Acceptance:** `platform_payout` from `payment_splits` + `direct_collection` from `amount_due_offline` where `balance_collected_at` set
 
+### B-TAX-PROFILE — Entity type + PAN on file (launch prep)
+- **Spec:** API_CONTRACTS.md `GET/PUT /v1/me/tax-profile`; `POST /v1/pujari/kyc/pan`
+- **Files:** `app/api/v1/endpoints/pujaris.py`, `partner_onboarding.py`, `app/services/pujari_compliance.py`
+- **Acceptance:** Partner can set `entity_type` + PAN; optional accept gates: `PAN_ACCEPT_GATE_ENABLED`, `PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT` (default false)
+- **Flutter:** `P-FLUTTER-PAN-PROFILE`, KYC hub step — COMPLETED in `STATUS.md`
+
+### B-TAX-SUMMARY — FY facilitation read-only
+- **Spec:** API_CONTRACTS.md `GET /v1/me/tax-summary`; **`spec/plans/PAN_FY_GATES.md`** (₹4.5L warn / ₹5L block without PAN)
+- **Acceptance:** FY gross + TDS lines for partner transparency while accrual OFF/shadow; no withholding UI
+- **Flutter:** `P-FLUTTER-TAX-SUMMARY` — COMPLETED in `STATUS.md`
+
 ---
 
 ## Phase 5 — Provider dropout (SPEC_AMENDMENTS)
@@ -159,6 +170,8 @@ Tasks trace to `spec/API_CONTRACTS.md` §Pujari app unless marked SPEC_AMENDMENT
 - [x] Bookings list + detail + lifecycle + reconfirm + **pujari-cancel** → Requests tab
 - [x] FCM handlers (`offer_instant`, `offer_advance`, `reconfirm_*`, `accept_ack`); sound device QA pending (`P-FLUTTER-FCM-SOUND`)
 - [x] **COMPLETED:** `P-FCM-CUSTOMER-CANCEL` — partner push when customer cancels (`offer_withdrawn`)
-- [ ] Register → KYC approved → set availability (HOLD — `P-FLUTTER-REGISTER` / `P-FLUTTER-KYC`)
+- [x] Register → KYC approved → online (`P-FLUTTER-REGISTER` / `P-FLUTTER-KYC` — 2026-08-30)
+- [x] PAN profile + FY tax summary (`P-FLUTTER-PAN-PROFILE`, `P-FLUTTER-TAX-SUMMARY` — 2026-09-14)
+- [ ] Set availability UI (`P-FLUTTER-AVAILABILITY` PENDING — backend ready)
 - [ ] Earnings row visible after P-SPLITS (`P-FLUTTER-EARNINGS-UI` HOLD)
 - [x] Reject triggers rebroadcast per §21.6 (backend + client refresh)

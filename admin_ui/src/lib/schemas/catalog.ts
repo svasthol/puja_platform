@@ -46,6 +46,11 @@ export const pujaImpactSchema = z.object({
   puja_id: z.string().uuid(),
   active_future_bookings: z.number(),
   active_holds_unscoped: z.number(),
+  default_price: z.string(),
+  customer_price_from: z.string(),
+  customer_price_to: z.string(),
+  verified_pujari_pricing_count: z.number(),
+  lowest_pujari_base_price: z.string().nullable().optional(),
   note: z.string().optional(),
 });
 

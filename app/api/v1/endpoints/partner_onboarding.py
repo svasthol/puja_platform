@@ -24,8 +24,10 @@ from app.schemas.partner_kyc import (
     SelfiePresignRequest,
     SelfiePresignResponse,
 )
+from app.schemas.tax_profile import PujariPanSubmitRequest, PujariPanSubmitResponse
 from app.services import partner_kyc_service as kyc_svc
 from app.services.partner_kyc_service import PartnerKycError
+from app.services.pujari_compliance import submit_partner_pan
 
 router = APIRouter(prefix="/pujari", tags=["pujari-onboarding"])
 callback_router = APIRouter(tags=["pujari-kyc-callback"])
@@ -211,6 +213,31 @@ async def confirm_selfie_document(
         document_id=doc.id,
         status=doc.status,
         file_url=doc.file_url,
+    )
+
+
+@router.post("/kyc/pan", response_model=PujariPanSubmitResponse)
+async def submit_pan(
+    payload: PujariPanSubmitRequest,
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Partner PAN + entity type for TDS (Setu verify when KYC_SETU_PAN_PRODUCT_ID set)."""
+    pid = await _pujari_id(db, p.user_id)
+    result = await submit_partner_pan(
+        db,
+        pujari_id=pid,
+        entity_type=payload.entity_type,
+        pan=payload.pan,
+        consent=payload.consent,
+        reason=payload.reason,
+    )
+    return PujariPanSubmitResponse(
+        entity_type=result["entity_type"],
+        pan_on_file=result["pan_on_file"],
+        pan_status=result["pan_status"],
+        message=result["message"],
+        verified_name=result.get("verified_name"),
     )
 
 

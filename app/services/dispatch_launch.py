@@ -147,10 +147,17 @@ def compute_dispatch_windows(
     slot = slot_datetime(scheduled_date, scheduled_time)
 
     if booking_class == "instant":
-        return (
-            now_local,
-            now_local + dt.timedelta(minutes=settings.instant_dispatch_minutes),
-        )
+        slot = slot_datetime(scheduled_date, scheduled_time)
+        burst_end = now_local + dt.timedelta(minutes=settings.instant_dispatch_minutes)
+        # Instant-class bookings can be paid hours before the slot (lead <= instant_lead_hours).
+        # Keep dispatch/rebroadcast alive until the pre-slot buffer, not only the 30-minute burst,
+        # so pujaris who come online later still receive offers (DISPATCH_FLOW §21.6.C intent).
+        pre_slot_cutoff = slot - dt.timedelta(minutes=settings.dispatch_buffer_minutes)
+        if pre_slot_cutoff > now_local:
+            deadline = max(burst_end, pre_slot_cutoff)
+        else:
+            deadline = burst_end
+        return now_local, deadline
 
     if settings.immediate_dispatch_on_payment:
         starts = now_local
@@ -223,13 +230,14 @@ def ensure_dispatch_windows(
     if booking_class not in ("instant", "advance"):
         booking_class = "advance"
 
+    computed_start, computed_deadline = compute_dispatch_windows(
+        scheduled_date,
+        scheduled_time,
+        settings,
+        booking_class=booking_class,
+    )
     if starts_at is None or deadline is None:
-        starts_at, deadline = compute_dispatch_windows(
-            scheduled_date,
-            scheduled_time,
-            settings,
-            booking_class=booking_class,
-        )
+        starts_at, deadline = computed_start, computed_deadline
         cur.execute(
             """
             UPDATE booking_dispatch_state
@@ -237,6 +245,17 @@ def ensure_dispatch_windows(
             WHERE booking_id = %s
             """,
             (starts_at, deadline, booking_id),
+        )
+    elif booking_class == "instant" and computed_deadline > deadline:
+        # Extend instant window when policy allows (e.g. after code fix); never shrink.
+        deadline = computed_deadline
+        cur.execute(
+            """
+            UPDATE booking_dispatch_state
+            SET dispatch_deadline = %s
+            WHERE booking_id = %s
+            """,
+            (deadline, booking_id),
         )
     return starts_at, deadline, scheduled_date, scheduled_time, booking_class
 

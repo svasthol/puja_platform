@@ -48,7 +48,9 @@ Full rules: `spec/plans/LAUNCH_POLICY.md`, `DISPATCH_FLOW.md` §Puja MVP launch 
 
 Both are returned by `POST /v1/bookings` **before** the Razorpay order is created (no payment taken).
 
-## Error mapping — REQUIRED, this is how DB guarantees become good UX
+**FY PAN gate (§ Sprint 2 TDS, `PUJARI_FY_PAN_GATE_ENABLED`):**
+- `FY_PAN_GATE_BLOCKED` — **422** `detail` `{code, message}` on offer accept and `PUT /v1/me/heartbeat` at ₹5L+ block tier without operative PAN.
+- `FY_PAN_GATE_WARN` — **200** on `POST .../confirm-balance-collected` when warn/block tier applies: collection succeeds; response `tds.message_code` + `tds.message` (localize by code). See `spec/plans/PAN_FY_GATES.md`.
 
 The database raises on every integrity violation (see DISPATCH_FLOW.md).
 A shared exception handler must translate `psycopg` errors:
@@ -114,7 +116,9 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `GET  /v1/app-config`            launch toggles for Flutter clients (read from
   `platform_settings`). Includes optional **`muhurat_help_contact`** (default active
   relationship manager — name + phone only) for pre-booking muhurat guidance UI. **No auth.** Rate-limit at edge. Response:
-  `{ night_bookings_enabled, instant_lead_hours, advance_booking_amount, razorpay_key_id?, payments_enabled, muhurat_help_contact? }`.
+  `{ night_bookings_enabled, instant_lead_hours, advance_booking_amount, razorpay_key_id?, payments_enabled, muhurat_help_contact?,
+  tds_accrual_enabled, pan_accept_gate_enabled, pujari_tax_profile_required_for_accept, pujari_fy_pan_gate_enabled, setu_pan_verify_configured }`.
+  TDS booleans mirror `.env` (see `spec/plans/TDS_RUNTIME_CONFIG.md`); amounts/thresholds come from `GET /v1/me/tax-summary`.
   Clients MUST use this (not hardcoded constants) for night-slot UI and instant/advance
   copy. Authoritative gate remains `POST /v1/bookings` (422) and `gate_warnings` on holds.
 - `GET  /v1/panchangam`            server-cached daily panchangam (`panchangam_daily`,
@@ -153,14 +157,14 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
   Each puja summary includes **`is_muhurat_bound`** (§21.8, migration 012) for muhurat
   pill UX. `GET /v1/pujas/{id}` includes the same flag on detail.
 - `GET  /v1/checkout/quote?puja_id=&addon_ids[]=`  resolves unit price via
-  `pricing_resolver` (SPEC_AMENDMENTS §20.3). **Launch:** no `pujari_id` — broadcast
-  pricing only (`pujas.default_price`). Reads `platform_settings.advance_booking_amount`
-  from DB and returns `total_amount`, `advance_amount` (live setting), plus both payment options
-  (`full_online` and `advance_balance` breakdown per DISPATCH_FLOW.md).
-  **Also returns** (SPEC_AMENDMENTS §16): `platform_fee_gross`, `total_charged_online`,
-  `tax_statutory_config_id`, `tax_commercial_config_id` — snapshotted at quote.
+  `pricing_resolver` (SPEC_AMENDMENTS §20.3). **Sprint 1 launch:** no `pujari_id` —
+  broadcast pricing only (`pujas.default_price`). Reads `platform_settings.booking_fee`
+  and returns `payment_mode='booking_fee'`, `booking_fee`, `booking_fee_label`
+  (default "Muhurat & Slot Lock Token"), `total_amount`, `amount_due_online=0`,
+  `amount_due_offline=total_amount`, `razorpay_amount=booking_fee`.
+  Legacy `full_online` / `advance_balance` options omitted when `FULL_ONLINE_ENABLED=false`.
   Requires `billing_state_code` on user (422 if absent).
-  Client UI labels MUST interpolate `advance_amount` — never hardcode ₹250.
+  Client UI MUST interpolate `booking_fee_label` and `razorpay_amount` — never hardcode ₹61.
 - `GET  /v1/pujaris?puja_id=&date=&time=`      browse-only at launch (profiles/ratings);
   **not** used for checkout selection (§21.1). Filter via `pujari_pricing`; verified only
 - `POST /v1/slot-holds`                        {date, time} — **no `pujari_id` at launch**
@@ -174,34 +178,34 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
   is authoritative — same slot may still 422 there.
 - `POST /v1/bookings`                          {hold_id, puja_id, address_id,
   addon_ids[], promo_code?, payment_mode} —
-  `payment_mode`: `'full_online'` | `'advance_balance'` (required). ONE
+  **Sprint 1 launch:** only `payment_mode='booking_fee'` accepted (`FULL_ONLINE_ENABLED=false`;
+  `advance_balance` / `full_online` → 422). Promos disabled at launch (422). ONE
   transaction: validate hold (`FOR UPDATE`, owner + unexpired, else 410),
-  compute and snapshot `total_amount`, `amount_due_online`,
-  `amount_due_offline` per DATABASE.md migration 003 rules; insert booking
+  compute and snapshot `total_amount`, `booking_fee` (from `platform_settings` or default ₹61),
+  `amount_due_online=0`, `amount_due_offline=total_amount`; insert booking
   status='payment_pending' with `intended_pujari_id = NULL`, `dispatch_mode = 'broadcast'`,
   `hold_id`, `payment_mode` persisted; **INSERT … ON CONFLICT DO NOTHING**
   on `ux_bookings_no_duplicate_submit` (partial unique) so a duplicate never
   aborts the outer transaction — then lookup existing row if no id returned;
   snapshot hold primitives as locals before any write. Snapshot addon prices into
-  booking_addons; create
-  Razorpay order for **`total_charged_online`** (= `amount_due_online` +
-  `platform_fee_gross` from hold snapshot) BEFORE commit (Razorpay
-  failure = full rollback); persist `razorpay_order_id` on the booking row
+  booking_addons; create Razorpay order for **`booking_fee` only** BEFORE commit
+  (Razorpay failure = full rollback); persist `razorpay_order_id` on the booking row
   (migration 004); extend hold to now()+15 min.
   422 if the address has no `geom` (coordinates not geocoded).
   **201** response: `{booking_id, booking_class, razorpay_order_id, amount_due_online,
-  amount_due_offline, total_amount, total_charged_online, platform_fee_gross,
-  tax_statutory_config_id, tax_commercial_config_id, payment_mode, hold_expires_at}`.
+  amount_due_offline, total_amount, booking_fee, booking_fee_label, razorpay_amount,
+  payment_mode, hold_expires_at}`.
   `booking_class` is **frozen** at insert (§21.6.A) — client uses it for tracking UX
   (instant → active search; advance → calm booked state). **409** idempotent duplicate
   (double-tap / active booking for same slot): same fields plus `"idempotent": true` —
-  **same fee and config ids as original**; client opens Razorpay with the returned
+  **same frozen `booking_fee` as original**; client opens Razorpay with the returned
   `razorpay_order_id` or navigates to `GET /v1/bookings/{id}`.
 - `POST /v1/bookings/{id}/cancel`              caller must be the booking's customer.
   State-gated (see DISPATCH_FLOW.md cancellation table). Refund amount is
-  ALWAYS capped at `amount_due_online` — offline balance is never refunded
-  via Razorpay. Atomically: cancelled_at + status flip + history row +
-  `refunds` row. Returns refund amount + ETA copy.
+  capped at platform-collected money (`booking_fee` at launch; legacy modes use
+  `amount_due_online`) — offline puja balance is never refunded via Razorpay.
+  Atomically: cancelled_at + status flip + history row + `refunds` row.
+  Returns refund amount + ETA copy.
 - `GET  /v1/bookings`                          customer's bookings, cursor-paginated,
   newest first (`status`, `booking_class`, `scheduled_date`, `scheduled_time`,
   `total_amount`, `payment_mode` summary per row)
@@ -238,7 +242,11 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `POST /v1/pujari/documents/{document_id}/confirm`  After presigned PUT — HEAD/S3 fetch, strip JPEG
   EXIF/GPS, set `uploaded_at`. **200** `{document_id, doc_type, status, file_url}`.
   **422** if object missing in S3.
-- `POST /v1/pujari/kyc/pan`                    Phase 4 — deferred.
+- `POST /v1/pujari/kyc/pan`                    `{pan, entity_type, consent, reason}` (reason ≥20 chars) — Setu `POST /api/verify/pan` when `KYC_SETU_PAN_PRODUCT_ID` set; stores `pan_hash`, sets `pan_status` (`operative` on success, `unverified` in non-prod without Setu). Response may include `verified_name`. Prod without product id → **503**.
+- `GET  /v1/me/tax-profile`                    entity type + PAN on file + completeness
+- `PUT  /v1/me/tax-profile`                    `{entity_type}` — PAN via `/kyc/pan`
+- `GET  /v1/me/tax-summary`                    FY facilitation gross (collected bookings, TDS-aligned `total_amount` sum), TDS accrued, ₹5L threshold copy, **`fy_pan_gate_level`** (`ok`|`warn`|`block`), **`individual_fy_pan_warn_inr`** (default ₹4.5L), **`requires_pan_before_continue`**. See `spec/plans/PAN_FY_GATES.md`.
+- **FY PAN enforcement** (`PUJARI_FY_PAN_GATE_ENABLED`, default false): **422** `FY_PAN_GATE_BLOCKED` on `PUT /v1/me/heartbeat` and offer accept at ₹5L+ without operative PAN; confirm-balance **warn+allow** with `tds.message_code=FY_PAN_GATE_WARN` (no FY 422). See `PAN_FY_GATES.md`.
 - `POST /v1/me/devices`                        {device_token, platform} — FCM target
   (customer or pujari token). Upsert by `device_token` (globally unique).
 - `DELETE /v1/me/devices/{device_token}`         unregister (owner only)
@@ -277,11 +285,12 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `POST /v1/bookings/{id}/start`               assigned pujari only; booking must be 'confirmed' AND now() within ±60 min of scheduled_time (Asia/Kolkata)
 - `POST /v1/bookings/{id}/confirm-balance-collected`  assigned pujari only;
   body `{method: 'cash'|'upi_direct'}`. Required before `complete` when
-  `payment_mode='advance_balance'` AND `amount_due_offline > 0`. Sets
-  `balance_collected_at/by/method` — acknowledgement only, not a gateway
-  payment. Idempotent if already collected.
+  (`payment_mode='advance_balance'` OR `payment_mode='booking_fee'`) AND
+  `amount_due_offline > 0`. Sets `balance_collected_at/by/method` and
+  `balance_collected_amount` — acknowledgement only, not a gateway payment.
+  Idempotent if already collected.
 - `POST /v1/bookings/{id}/complete`            assigned pujari only; booking
-  must be 'in_progress'. 409 if `advance_balance` with
+  must be 'in_progress'. 409 if (`advance_balance` OR `booking_fee`) with
   `amount_due_offline > 0` and `balance_collected_at` IS NULL.
 - `POST /v1/bookings/{id}/pujari-cancel`       assigned pujari only; booking must
   be 'confirmed' (not yet `in_progress`). Clears assignment per DISPATCH_FLOW.md
@@ -317,9 +326,18 @@ Admin auth: JWT `app_context=admin` **and** `user_roles` contains `admin` or
   -> `{amount, currency, updated_at}` from `platform_settings` key
   `advance_booking_amount`.
 - `PUT  /v1/admin/settings/advance-booking-amount`  `{amount}` — updates
+  `platform_settings` (validation: `1 <= amount <= 10000`). Legacy mode only;
+  launch checkout uses `booking_fee` below.
+- `GET  /v1/admin/settings/booking-fee`
+  -> `{amount, currency, label, updated_at}` from `platform_settings` key `booking_fee`.
+- `PUT  /v1/admin/settings/booking-fee`  `{amount, label?, change_reason?}` — updates
   `platform_settings` (validation: `1 <= amount <= 10000`). Takes effect on
   the next `checkout/quote` and new bookings immediately. Does NOT rewrite
-  amounts on existing bookings (those were snapshotted at checkout).
+  frozen `booking_fee` on existing bookings.
+- **TDS compliance (Sprint 2 §0.S):**
+  - `GET /v1/admin/tds/compliance-backlog` — parked/pending/failed accrual intents + pujari readiness (admin/support read)
+  - `GET /v1/admin/tds/fy-reconcile` — accumulator vs ledger drift report
+  - `POST /v1/admin/tds/bookings/{id}/correct-offline-collection` — `{action: clear|set_amount, amount?, change_reason}` (admin only); reverses TDS when collection cleared/reduced
 - `GET  /v1/admin/tax-config/current` — commercial + statutory (read-only) + tax preview (§16)
 - `GET  /v1/admin/tax-config/history` — append-only audit, cursor paginated
 - `POST /v1/admin/tax-config/commercial` — **only** `platform_fee_gross`,
@@ -348,7 +366,9 @@ Admin auth: JWT `app_context=admin` **and** `user_roles` contains `admin` or
 - **Relationship managers (§21.4):** `GET/POST/PUT /v1/admin/relationship-managers` —
   CRUD RM rows (name, phone, `is_active`, optional `city`). Assign default RM per city in
   `platform_settings` or per booking (`bookings.relationship_manager_id`, migration 012).
+- **Booking search:** `GET /v1/admin/bookings` — `status`, `booking_class` (`instant`|`advance`), phone, dates
 - **Booking detail:** `GET /v1/admin/bookings/{id}` — 360° view for ops.
+- **Partner FY report:** `GET /v1/admin/pujaris/fy-earnings` — FY facilitation gross (`fy_gross_facilitation_inr`), collections, ledger columns, **`fy_pan_gate_level`** per row (`spec/plans/PAN_FY_GATES.md`)
 - **Money read-only (pre–Phase 3):** `GET /v1/admin/bookings/{id}/money` — payments +
   refunds; label **"Collected online — settlement pending"** (never "earnings" until splits).
 

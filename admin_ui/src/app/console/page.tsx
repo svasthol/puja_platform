@@ -60,6 +60,12 @@ export default function ConsoleHomePage() {
               — categories, pujas, content, addons, media
             </li>
             <li>
+              <Link href="/console/tds" className="text-brand-glow hover:underline">
+                TDS hub
+              </Link>{" "}
+              — slabs, FY earnings, accrual backlog, ledger reconcile
+            </li>
+            <li>
               <Link href="/console/settings/advance" className="text-brand-glow hover:underline">
                 Advance booking amount
               </Link>{" "}

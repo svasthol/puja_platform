@@ -16,7 +16,7 @@ import structlog
 from app.services.fcm_client import FcmOutcome, send_push_sync
 from app.services.sms_router import send_transactional_sms_sync
 from app.workers.celery_app import celery_app
-from app.workers.sweep import get_connection
+from app.workers.sweep import _agent_dbg, get_connection
 
 log = structlog.get_logger("notifications")
 
@@ -107,6 +107,12 @@ def _push_to_user(
 
 
 def _notify_offers_impl(booking_id: str) -> dict:
+    _agent_dbg(
+        "H5",
+        "notifications.py:_notify_offers_impl",
+        "notify_offers_enter",
+        {"booking_id": booking_id},
+    )
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -119,6 +125,12 @@ def _notify_offers_impl(booking_id: str) -> dict:
             rows = cur.fetchall()
             if not rows:
                 log.info("notify_offers_none_live", booking_id=booking_id)
+                _agent_dbg(
+                    "H6",
+                    "notifications.py:_notify_offers_impl",
+                    "notify_offers_no_live_assignments",
+                    {"booking_id": booking_id},
+                )
                 return {"booking_id": booking_id, "targets": 0}
 
             total_sent = total_failed = total_deleted = 0
@@ -165,6 +177,18 @@ def _notify_offers_impl(booking_id: str) -> dict:
                 fcm_failed=total_failed,
                 devices_deleted=total_deleted,
                 sms_fallback=sms_sent,
+            )
+            _agent_dbg(
+                "H6",
+                "notifications.py:_notify_offers_impl",
+                "notify_offers_done",
+                {
+                    "booking_id": booking_id,
+                    "targets": len(rows),
+                    "fcm_sent": total_sent,
+                    "fcm_failed": total_failed,
+                    "devices_deleted": total_deleted,
+                },
             )
             return {
                 "booking_id": booking_id,

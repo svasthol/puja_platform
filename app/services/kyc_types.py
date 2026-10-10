@@ -72,6 +72,21 @@ class KycWebhookEvent:
     raw: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class KycPanVerifyResult:
+    """Setu POST /api/verify/pan — normalized (no raw PAN in logs)."""
+
+    verification: str  # success | failed
+    message: str
+    full_name: str | None = None
+    category: str | None = None
+    trace_id: str | None = None
+
+    @property
+    def is_success(self) -> bool:
+        return self.verification.lower() == "success"
+
+
 @runtime_checkable
 class KycVendor(Protocol):
     vendor_name: str

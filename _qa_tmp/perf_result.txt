@@ -1,0 +1,13 @@
+== HOT ENDPOINT LATENCY (sequential, warm) ==
+/v1/pujas?limit=20: n=25 p50=54ms p95=64ms max=67ms
+/v1/pujas/14b01635-1d65-4e97-89f5-dc0b4a8ca2b1: n=25 p50=18ms p95=33ms max=35ms
+/v1/checkout/quote?puja_id=14b01635-1d65-4e97-89f5-dc0b4a8ca2b1: n=25 p50=12ms p95=12ms max=14ms
+
+== CONCURRENT CATALOG LOAD (20 parallel GET /v1/pujas) ==
+20 parallel: total=1032ms ok=20/20 nonzero_codes=set()
+
+== DB ACTIVITY SNAPSHOT ==
+pg_stat_activity by state: [('active', 1), ('idle', 12)]
+idle_in_transaction: 0
+ungranted_locks(waiters): 0
+transactions_open_gt_5s: 0

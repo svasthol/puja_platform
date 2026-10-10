@@ -286,3 +286,83 @@ label:has(.ops-id-input) {
   max-width: 36rem;
   font-family: ui-monospace, monospace;
 }
+
+.settlement-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: #121a24;
+}
+
+.settlement-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 1rem 0 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #121a24;
+}
+
+.flow-step {
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  background: #243044;
+  font-size: 0.85rem;
+  text-align: center;
+  min-width: 5.5rem;
+}
+
+.flow-step small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.72rem;
+}
+
+.flow-platform {
+  border: 1px solid var(--accent);
+  color: #fde68a;
+}
+
+.flow-pujari {
+  border: 1px solid var(--ok);
+  color: #a7f3d0;
+}
+
+.flow-arrow {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* External tab link (TDS guide) */
+a.tab.tab-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--muted);
+  font: inherit;
+  padding: 0.5rem 0.85rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+a.tab.tab-link:hover {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.flow-sep {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.settlement-pre {
+  max-width: 100%;
+  max-height: 28rem;
+  overflow: auto;
+}

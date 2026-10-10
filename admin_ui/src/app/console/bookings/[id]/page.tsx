@@ -12,7 +12,13 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { fetchBookingDetail, fetchBookingMoney, reassignBooking, disputeBooking } from "@/lib/api/bookings";
+import {
+  fetchBookingDetail,
+  fetchBookingMoney,
+  fetchBookingTds,
+  reassignBooking,
+  disputeBooking,
+} from "@/lib/api/bookings";
 import { createRefundOverride } from "@/lib/api/refunds";
 import { canDisputeBooking, canReassignBooking, canRefundOverride } from "@/lib/auth/roles";
 import { useAdminMe } from "@/lib/hooks/use-admin-me";
@@ -54,6 +60,12 @@ export default function BookingDetailPage({
   const { data: money } = useQuery({
     queryKey: ["admin", "booking", id, "money"],
     queryFn: () => fetchBookingMoney(id),
+    enabled: Boolean(id),
+  });
+
+  const { data: tds } = useQuery({
+    queryKey: ["admin", "booking", id, "tds"],
+    queryFn: () => fetchBookingTds(id),
     enabled: Boolean(id),
   });
 
@@ -303,9 +315,105 @@ export default function BookingDetailPage({
                   {money.offline_balance_note ? (
                     <Row label="Offline">{money.offline_balance_note}</Row>
                   ) : null}
+                  {money.balance_collected_at ? (
+                    <Row label="Collected in app">
+                      {new Date(money.balance_collected_at).toLocaleString()}
+                      {tds?.balance_collected_amount_inr
+                        ? ` · ₹${tds.balance_collected_amount_inr}`
+                        : ""}
+                    </Row>
+                  ) : (
+                    <Row label="Collected in app">
+                      <span className="text-ink-muted">Not confirmed yet</span>
+                    </Row>
+                  )}
                 </dl>
               ) : (
                 <p className="mt-3 text-sm text-ink-muted">Loading money view…</p>
+              )}
+            </Card>
+
+            <Card>
+              <CardTitle className="text-base">TDS &amp; collection</CardTitle>
+              <CardDescription className="mt-1">
+                Read-only — same data as backlog / reconcile, no database queries needed.
+              </CardDescription>
+              {!tds ? (
+                <p className="mt-3 text-sm text-ink-muted">Loading…</p>
+              ) : (
+                <>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {tds.ops_status === "ok" ? (
+                      <Badge tone="success">OK</Badge>
+                    ) : tds.ops_status === "needs_attention" ? (
+                      <Badge tone="error">Needs attention</Badge>
+                    ) : tds.ops_status === "pending_accrual" ? (
+                      <Badge tone="warning">Pending accrual</Badge>
+                    ) : (
+                      <Badge>{tds.ops_status}</Badge>
+                    )}
+                    {!tds.accrual_enabled && <Badge tone="warning">Accrual off (env)</Badge>}
+                  </div>
+                  <dl className="mt-3">
+                    <Row label="Accept snapshot">
+                      {tds.accept_tds_snapshot_at
+                        ? new Date(tds.accept_tds_snapshot_at).toLocaleString()
+                        : "— not applied —"}
+                    </Row>
+                    <Row label="TDS at accept">
+                      {tds.tds_liability_inr != null
+                        ? `₹${tds.tds_liability_inr} (base ₹${tds.tds_taxable_base_inr ?? "0"})`
+                        : "—"}
+                    </Row>
+                    <Row label="Ledger accrual">
+                      {tds.ledger_accrual_present
+                        ? `Yes · FY ${tds.ledger_fy_start ?? "—"} · TDS ₹${tds.ledger_tds_amount_inr ?? "0"}`
+                        : "No"}
+                    </Row>
+                    <Row label="Accrual intent">
+                      {tds.accrual_intent_status ?? "— none —"}
+                      {tds.accrual_intent_attempt_count != null
+                        ? ` · attempts ${tds.accrual_intent_attempt_count}`
+                        : ""}
+                    </Row>
+                    {tds.accrual_intent_last_error ? (
+                      <Row label="Intent error">
+                        <span className="text-xs text-red-300/90">{tds.accrual_intent_last_error}</span>
+                      </Row>
+                    ) : null}
+                  </dl>
+                  <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-muted">
+                    {tds.hints.map((h) => (
+                      <li key={h}>{h}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-4 text-xs text-ink-faint">
+                    <Link href="/console/tds/backlog" className="text-brand-glow hover:underline">
+                      TDS accrual backlog
+                    </Link>
+                    {tds.pujari_id && tds.ledger_fy_start ? (
+                      <>
+                        {" · "}
+                        <Link
+                          href={`/console/tds/reconcile/troubleshoot?pujari_id=${tds.pujari_id}&fy_start=${tds.ledger_fy_start}`}
+                          className="text-brand-glow hover:underline"
+                        >
+                          Partner troubleshoot
+                        </Link>
+                      </>
+                    ) : tds.pujari_id ? (
+                      <>
+                        {" · "}
+                        <Link
+                          href={`/console/partners/${tds.pujari_id}`}
+                          className="text-brand-glow hover:underline"
+                        >
+                          Partner
+                        </Link>
+                      </>
+                    ) : null}
+                  </p>
+                </>
               )}
             </Card>
 

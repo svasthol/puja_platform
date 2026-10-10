@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.services.kyc_types import (
     KycAadhaarAddress,
     KycIdentity,
+    KycPanVerifyResult,
     KycStartResult,
     KycStatusResult,
     KycVendorError,
@@ -41,14 +42,33 @@ def _parse_iso(ts: str | None) -> dt.datetime | None:
         return None
 
 
-def _headers() -> dict[str, str]:
+def _headers(*, product_instance_id: str | None = None) -> dict[str, str]:
     settings = get_settings()
+    instance = (product_instance_id or settings.KYC_SETU_DIGILOCKER_PRODUCT_ID or "").strip()
+    if not instance:
+        raise KycVendorError(
+            "Setu product instance id not configured",
+            code="vendor_config",
+            retryable=False,
+        )
     return {
         "x-client-id": settings.KYC_SETU_CLIENT_ID,
         "x-client-secret": settings.KYC_SETU_CLIENT_SECRET,
-        "x-product-instance-id": settings.KYC_SETU_DIGILOCKER_PRODUCT_ID,
+        "x-product-instance-id": instance,
         "Content-Type": "application/json",
     }
+
+
+def _pan_headers() -> dict[str, str]:
+    settings = get_settings()
+    pid = (settings.KYC_SETU_PAN_PRODUCT_ID or "").strip()
+    if not pid:
+        raise KycVendorError(
+            "KYC_SETU_PAN_PRODUCT_ID not configured",
+            code="vendor_config",
+            retryable=False,
+        )
+    return _headers(product_instance_id=pid)
 
 
 def _base_url() -> str:
@@ -68,11 +88,15 @@ class SetuDigiLockerClient:
         path: str,
         *,
         json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        not_found_code: str = "request_not_found",
+        not_found_message: str = "Setu request not found",
     ) -> dict[str, Any]:
         url = urljoin(_base_url() + "/", path.lstrip("/"))
+        hdrs = headers if headers is not None else _headers()
         try:
             async with httpx.AsyncClient(timeout=_timeout()) as client:
-                resp = await client.request(method, url, headers=_headers(), json=json)
+                resp = await client.request(method, url, headers=hdrs, json=json)
         except httpx.ReadTimeout as exc:
             log.error(
                 "kyc_vendor_error",
@@ -117,7 +141,11 @@ class SetuDigiLockerClient:
                 retryable=True,
             )
         if resp.status_code == 404:
-            raise KycVendorError("Setu request not found", code="request_not_found", retryable=False)
+            raise KycVendorError(
+                not_found_message,
+                code=not_found_code,
+                retryable=False,
+            )
 
         try:
             body = resp.json()
@@ -205,6 +233,45 @@ class SetuDigiLockerClient:
                 )
                 return
             raise
+
+    async def verify_pan(
+        self, *, pan: str, consent: bool, reason: str
+    ) -> KycPanVerifyResult:
+        """Setu PAN verification (POST /api/verify/pan). Docs: docs.setu.co/data/pan/quickstart."""
+        if not consent:
+            raise KycVendorError(
+                "Consent must be Y for Setu PAN verification",
+                code="consent_required",
+                retryable=False,
+            )
+        reason = reason.strip()
+        if len(reason) < 20:
+            raise KycVendorError(
+                "Reason must be at least 20 characters for Setu PAN verification",
+                code="reason_too_short",
+                retryable=False,
+            )
+        body = await self._request(
+            "POST",
+            "/api/verify/pan",
+            json={
+                "pan": pan.strip().upper(),
+                "consent": "Y",
+                "reason": reason,
+            },
+            headers=_pan_headers(),
+            not_found_code="pan_not_found",
+            not_found_message="PAN not found with income tax authority",
+        )
+        verification = str(body.get("verification") or "").lower()
+        data = body.get("data") if isinstance(body.get("data"), dict) else {}
+        return KycPanVerifyResult(
+            verification=verification or "failed",
+            message=str(body.get("message") or ""),
+            full_name=data.get("full_name") if isinstance(data, dict) else None,
+            category=data.get("category") if isinstance(data, dict) else None,
+            trace_id=str(body.get("traceId") or body.get("trace_id") or "") or None,
+        )
 
     def verify_webhook_signature(self, body: bytes, signature: str) -> bool:
         return False

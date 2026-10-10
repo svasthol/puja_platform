@@ -12,9 +12,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import Principal, require_pujari
+from app.core.redis_keys import presence_redis_key
 from app.core.redis_client import redis_delete, redis_set
 from app.db.engine import get_db, get_db_txn
-from app.schemas.booking import BalanceCollected
+from app.schemas.tax import PujariTaxSummary
+from app.schemas.tax_profile import (
+    PujariTaxProfileResponse,
+    PujariTaxProfileUpdateRequest,
+)
+from app.services import tds_accrual_service
+from app.services.pujari_compliance import update_tax_compliance
+from app.services.pujari_fy_pan_gate import assert_fy_pan_gate_allowed
 
 router = APIRouter(prefix="/me", tags=["pujari-self"])
 settings = get_settings()
@@ -41,6 +49,87 @@ async def _pujari_id(db: AsyncSession, user_id: uuid.UUID) -> uuid.UUID:
     return pid
 
 
+@router.get("/tax-summary", response_model=PujariTaxSummary)
+async def tax_summary(
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db),
+):
+    """Current FY facilitation gross, TDS accrued, and ₹5L threshold nudge."""
+    pid = await _pujari_id(db, p.user_id)
+    data = await tds_accrual_service.pujari_fy_tax_summary(db, pujari_id=pid)
+    return PujariTaxSummary(**data)
+
+
+@router.get("/tax-profile", response_model=PujariTaxProfileResponse)
+async def get_tax_profile(
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db),
+):
+    pid = await _pujari_id(db, p.user_id)
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT entity_type, pan_hash IS NOT NULL AS pan_on_file, pan_status
+                FROM pujaris WHERE id = :pid
+                """
+            ),
+            {"pid": str(pid)},
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(http.HTTP_403_FORBIDDEN, "Not a pujari account.")
+    complete = row["entity_type"] is not None and bool(row["pan_on_file"])
+    return PujariTaxProfileResponse(
+        entity_type=row["entity_type"],
+        pan_on_file=bool(row["pan_on_file"]),
+        pan_status=row["pan_status"],
+        tax_profile_complete=complete,
+    )
+
+
+@router.put("/tax-profile", response_model=PujariTaxProfileResponse)
+async def put_tax_profile(
+    payload: PujariTaxProfileUpdateRequest,
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    pid = await _pujari_id(db, p.user_id)
+    existing = (
+        await db.execute(
+            text("SELECT pan_hash FROM pujaris WHERE id = :pid"),
+            {"pid": str(pid)},
+        )
+    ).scalar_one_or_none()
+    result = await update_tax_compliance(
+        db,
+        pujari_id=pid,
+        entity_type=payload.entity_type,
+        pan=None,
+        clear_pan=False,
+    )
+    if existing is None and not result["pan_on_file"]:
+        pass
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT entity_type, pan_hash IS NOT NULL AS pan_on_file, pan_status
+                FROM pujaris WHERE id = :pid
+                """
+            ),
+            {"pid": str(pid)},
+        )
+    ).mappings().first()
+    complete = row["entity_type"] is not None and bool(row["pan_on_file"])
+    return PujariTaxProfileResponse(
+        entity_type=row["entity_type"],
+        pan_on_file=bool(row["pan_on_file"]),
+        pan_status=row["pan_status"],
+        tax_profile_complete=complete,
+    )
+
+
 @router.put("/heartbeat")
 async def heartbeat(
     body: Heartbeat | None = None,
@@ -49,6 +138,7 @@ async def heartbeat(
 ):
     payload = body or Heartbeat()
     pid = await _pujari_id(db, p.user_id)
+    await assert_fy_pan_gate_allowed(db, pujari_id=pid)
     if payload.lat is not None and payload.lng is not None:
         await db.execute(
             text(
@@ -59,14 +149,14 @@ async def heartbeat(
             ),
             {"pid": str(pid), "lat": payload.lat, "lng": payload.lng},
         )
-    await redis_set(f"presence:{pid}", "1", ex=settings.PUJARI_PRESENCE_TTL_SECONDS)
+    await redis_set(presence_redis_key(pid), "1", ex=settings.PUJARI_PRESENCE_TTL_SECONDS)
     return {"status": "ok"}
 
 
 @router.delete("/heartbeat")
 async def go_offline(p: Principal = Depends(require_pujari), db: AsyncSession = Depends(get_db_txn)):
     pid = await _pujari_id(db, p.user_id)
-    await redis_delete(f"presence:{pid}")
+    await redis_delete(presence_redis_key(pid))
     return {"status": "offline"}
 
 

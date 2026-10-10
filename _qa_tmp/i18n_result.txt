@@ -1,0 +1,18 @@
+idx | slug | EN name | TE name | te_has_telugu | en_has_telugu | te_empty
+0 | detail-puja-42c88390 | 'Premium Puja' | '' | False | False | True
+1 | detail-puja-92c7153b | 'Detail Puja' | '' | False | False | True
+2 |  | 'Test Puja' | '' | False | False | True
+3 | griha-pravesham | 'Griha Pravesham' | 'గృహప్రవేశం' | True | False | False
+4 | addon-img-6f7c3b3e | 'Addon Img Puja' | '' | False | False | True
+5 | addon-img-c3de0094 | 'Addon Img Puja' | '' | False | False | True
+6 |  | 'Max Test' | '' | False | False | True
+7 | launch-price-eb8c9273 | 'Launch Price Puja' | '' | False | False | True
+8 | detail-puja-73072514 | 'Detail Puja' | '' | False | False | True
+9 |  | 'Resolver Test' | '' | False | False | True
+10 |  | 'Range Puja' | '' | False | False | True
+11 |  | 'Range Puja' | '' | False | False | True
+
+-- categories EN --
+['Vratams', 'Griha Pravesh & Vastu', 'Sanskaras', 'Homams', 'Daily & Special', 'Pitru Karyam', 'Cat-b6434491', 'Cat-73338cc3', 'Cat-6ea4300c', 'Cat-274600a4', 'Cat-fc003063', 'Cat-64dece23', 'Cat-861bbbf6']
+-- categories TE --
+['వ్రతాలు', 'గృహప్రవేశం మరియు వాస్తు', 'సంస్కారాలు', 'హోమాలు', 'రోజువారీ మరియు ప్రత్యేక', 'పితృకార్యం']

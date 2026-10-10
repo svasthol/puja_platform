@@ -34,7 +34,7 @@ Read `spec/plans/LAUNCH_POLICY.md` before any dispatch, heartbeat, or booking-fl
 | **Area** | `service_area_id` required on address; display-only on offers — citywide dispatch. |
 | **RM** | No customer↔pujari direct phone at launch. Both sides get RM after confirm. |
 | **Soft buffer** | `dispatch_buffer_minutes` in eligibility + accept — **not** in exclusion constraint. |
-| **Payments** | Keep `full_online` / `advance_balance` — no Razorpay auth/capture-on-accept. |
+| **Payments (Sprint 1)** | Launch: `payment_mode='booking_fee'` only — Razorpay = frozen `booking_fee` (default ₹61); puja offline. `FULL_ONLINE_ENABLED=false`. Legacy `full_online` / `advance_balance` DDL retained; re-enable via flag + admin. |
 
 Implementation tasks: `plans/STATUS.md` §Puja MVP launch. Migration **012** when implementing schema.
 
@@ -66,6 +66,22 @@ before any dispatch, booking-gate, offer-TTL, or reconfirmation change. Migratio
 | **Flutter deep link** | `managuruji://kyc/complete` — Android partner manifest + iOS `CFBundleURLSchemes`. |
 
 Apply migration **023**: `python scripts/apply_migration_023.py`
+
+## TDS Sprint 2 (runtime — same code prod/staging)
+
+| Rule | Requirement |
+|------|-------------|
+| **Config SSOT** | Read `spec/plans/TDS_RUNTIME_CONFIG.md`, **`spec/plans/TDS_ACCRUAL_POLICY.md`**, and **`spec/plans/TDS_V3_IMPLEMENTATION.md`** (incl. **close-out § platform-bears + `export_tds_26q.py`**) before changing accrual math, flags, or mobile copy. |
+| **Env flags** | `TDS_ACCRUAL_ENABLED`, **`TDS_ACCEPT_STUB_COLLECT`** (must be **`false`** for platform-bears), `PAN_ACCEPT_GATE_ENABLED`, `PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT`, `PUJARI_FY_PAN_GATE_ENABLED` — `.env` only; mirrored on `GET /v1/app-config`. |
+| **FY ₹5L gate** | Block tier requires **`pan_status = 'operative'`** (not `pan_hash` alone) — `pujari_fy_pan_gate.py`. **422** `detail.code` = **`FY_PAN_GATE_BLOCKED`** on accept + go-online; confirm-balance **warn+allow** with **`tds.message_code` = `FY_PAN_GATE_WARN`** (localize by code, same as booking gate). |
+| **Slabs / ₹4.5L–₹5L** | `platform_settings.tds_facilitation` + `tax_statutory_config` — not hardcoded in apps. |
+| **Setu PAN prod** | `KYC_SETU_PAN_PRODUCT_ID` + prod `KYC_SETU_BASE_URL`; never `pan_status=operative` without verify in production. |
+| **v3 migrations** | **028–034** (TDS engine DDL); apply `python scripts/apply_migrations_028_032.py` on fresh/staging DBs. Alembic head stays **011** — do not add Alembic revision for 028+. |
+| **Readiness / CA export** | `scripts/check_tds_readiness.py --strict`; read-only **`scripts/export_tds_26q.py`** (ledger net → CSV; PAN out-of-band). |
+| **Platform-bears** | Accrual on, stub off, full offline puja cash; `pujari_tds_recovery` **pending** = platform owes TDS — deposit total from **ledger export**, not recovery sum. |
+| **Flutter alignment** | `spec/plans/FLUTTER_TDS_ALIGNMENT_PLAN.md` + `MOBILE_FLUTTER.md`; **Phase 0b** FY gate codes + confirm-balance warn; regenerate OpenAPI client after contract changes. |
+| **Backend Sprint 2 TDS** | **Accrual engine + close-out shipped** — production still **`TDS_ACCRUAL_ENABLED=false`** until §0.C + S14 staging. |
+| **Phase 3** | No in-app withhold/deposit/TAN/**`pan_enc`**/automated 26Q unless `P-TDS-393` explicitly scoped. Dormant: `tds_v3_online_charge.py`, Razorpay TDS order, stub drills. |
 
 ## Non-negotiable coding rules
 
@@ -181,6 +197,21 @@ Apply migration **023**: `python scripts/apply_migration_023.py`
   fields (§23.6); chains after 017. Adds `vaaram`, `yama_gandam`, `sunrise`, `sunset` on `panchangam_daily`.
 - **Migration 024**: `op.execute(open("spec/db/migration_024.sql").read())` — `worker_heartbeats`
   (sweep liveness, P-SWEEP-RELIABILITY); chains after 023. Apply: `python scripts/apply_migration_024.py`.
+- **Migration 025**: `op.execute(open("spec/db/migration_025.sql").read())` — Sprint 1 `booking_fee`
+  launch model, PAN/TDS DDL; chains after 024. Apply: `python scripts/apply_migration_025.py`.
+- **Migration 026**: `op.execute(open("spec/db/migration_026.sql").read())` — point-in-time `entity_type`
+  + PAN-presence snapshot at balance collection (`L-SPRINT-2-TDS-CLASSIFICATION-CAPTURE`; fail-open write).
+  Chains after 025. Apply: `python scripts/apply_migration_026.py`.
+- **Migration 027**: `op.execute(open("spec/db/migration_027.sql").read())` — TDS accrual decouple
+  (intent queue, `pan_status`, `tax_statutory_config`, reversal unique index). Chains after 026.
+  Apply: `python scripts/apply_migration_027.py`. Worker: `app.workers.tds_accrual` (beat 60s).
+  TDS launch posture + exit gate: `spec/plans/TDS_LAUNCH_STATUS.md` (TDS is **OFF** at MVP —
+  `TDS_ACCRUAL_ENABLED=false`; accrual/shadow and withholding are later milestones, do not conflate).
+  **Accrual policy (CA v2/v3):** `spec/plans/TDS_ACCRUAL_POLICY.md` · **v3 engine + close-out:** `spec/plans/TDS_V3_IMPLEMENTATION.md`.
+  **Migrations 028–034:** `python scripts/apply_migrations_028_032.py` (idempotent TDS v3 chain).
+  Launch prep flags (default false): `PAN_ACCEPT_GATE_ENABLED`, `PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT`,
+  `PUJARI_FY_PAN_GATE_ENABLED` (₹5L without **operative PAN** — see `spec/plans/PAN_FY_GATES.md`);
+  **`TDS_ACCEPT_STUB_COLLECT=false`** for platform-bears staging.
 - **Never let `alembic revision --autogenerate` produce the first migration.**
 - Review every autogenerated migration for attempted DROPs of: exclusion constraints,
   partial unique indexes, triggers, PostGIS geography columns. If found: migration is wrong.

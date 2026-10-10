@@ -58,10 +58,24 @@ def test_instant_deadline_not_slot_minus_three_hours():
         booking_class="instant",
         now=now,
     )
-    assert deadline == now + dt.timedelta(minutes=30)
-    assert deadline != slot_datetime(dt.date(2026, 7, 21), dt.time(12, 0)) - dt.timedelta(
-        hours=3
+    slot = slot_datetime(dt.date(2026, 7, 21), dt.time(12, 0))
+    pre_slot = slot - dt.timedelta(minutes=settings.dispatch_buffer_minutes)
+    assert deadline == max(now + dt.timedelta(minutes=30), pre_slot)
+    assert deadline != slot - dt.timedelta(hours=3)
+
+
+def test_instant_deadline_extends_until_pre_slot_for_same_day_booking():
+    """Premium Puja pattern: pay ~3h before slot — dispatch until slot − buffer, not 30m only."""
+    settings = LaunchDispatchSettings()
+    now = dt.datetime(2026, 10, 4, 3, 36, tzinfo=_TZ)
+    _, deadline = compute_dispatch_windows(
+        dt.date(2026, 10, 4),
+        dt.time(6, 0),
+        settings,
+        booking_class="instant",
+        now=now,
     )
+    assert deadline == dt.datetime(2026, 10, 4, 5, 0, tzinfo=_TZ)
 
 
 def _unique_slot_time(uniq) -> str:

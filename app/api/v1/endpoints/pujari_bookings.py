@@ -21,6 +21,7 @@ from app.schemas.pujari_booking import (
 from app.schemas.pujari_reconfirm import PujariReconfirmResponse
 from app.schemas.relationship_manager import RelationshipManagerPublic
 from app.services.pujari_reconfirm import pujari_reconfirm_booking
+from app.services.pricing import BOOKING_FEE_LABEL
 from app.services.relationship_manager import fetch_rm_public, status_exposes_rm
 
 router = APIRouter(prefix="/pujari/bookings", tags=["pujari-bookings"])
@@ -172,7 +173,8 @@ async def get_pujari_booking(
                     b.id, st.code AS status, b.booking_class,
                     b.scheduled_date, b.scheduled_time,
                     b.duration_minutes, b.payment_mode, b.total_amount,
-                    b.amount_due_online, b.amount_due_offline, b.balance_collected_at,
+                    b.booking_fee, b.amount_due_online, b.amount_due_offline,
+                    b.balance_collected_at, b.balance_collected_amount,
                     b.pujari_id, pj_user.id AS pujari_user_id,
                     pu.name AS puja_name,
                     a.line1, a.line2, a.city, a.pincode,
@@ -224,9 +226,16 @@ async def get_pujari_booking(
         duration_minutes=row["duration_minutes"],
         payment_mode=row["payment_mode"],
         total_amount=Decimal(str(row["total_amount"])),
+        booking_fee=Decimal(str(row.get("booking_fee") or 0)),
+        booking_fee_label=BOOKING_FEE_LABEL if row["payment_mode"] == "booking_fee" else None,
         amount_due_online=Decimal(str(row["amount_due_online"])),
         amount_due_offline=Decimal(str(row["amount_due_offline"])),
         balance_collected_at=row["balance_collected_at"],
+        balance_collected_amount=(
+            Decimal(str(row["balance_collected_amount"]))
+            if row.get("balance_collected_amount") is not None
+            else None
+        ),
         area_label=row["area_label"],
         address=PujariBookingAddress(
             line1=row["line1"],
