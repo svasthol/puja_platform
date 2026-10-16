@@ -40,7 +40,8 @@ Run **once** on `stg-aio-1` (SSH):
 
 ```bash
 sudo mkdir -p /opt/mana-guruji && sudo chown opc:opc /opt/mana-guruji
-git clone https://github.com/svasthol/Guruji.git /opt/mana-guruji/src
+mkdir -p /opt/mana-guruji/src
+git clone -b dev https://github.com/svasthol/puja_platform.git /opt/mana-guruji/src/puja_platform
 cd /opt/mana-guruji/src/puja_platform
 
 # S3 — data services

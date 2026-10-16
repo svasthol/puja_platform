@@ -50,9 +50,47 @@ jobs:
           python-version: "3.12"
       - run: python scripts/deploy_preflight_repo.py
 
+  deploy-self-hosted:
+    name: Deploy on VM (self-hosted)
+    needs: [preflight]
+    if: vars.STAGING_DEPLOY_MODE == 'self-hosted'
+    runs-on: [self-hosted, linux, arm64, staging]
+    environment: staging
+    steps:
+      - name: Run staging deploy script on this host
+        env:
+          REPO_ROOT: ${{ vars.STAGING_REPO_DIR || '/opt/mana-guruji/src/puja_platform' }}
+        run: |
+          GIT_REF="${{ github.event_name == 'workflow_dispatch' && inputs.git_ref || 'dev' }}"
+          RUN_DATA_SERVICES=0
+          RUN_DB_BOOTSTRAP=0
+          RUN_MIGRATE=1
+          RUN_PYTHON_BOOTSTRAP=1
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ inputs.run_data_services }}" == "true" ]] && RUN_DATA_SERVICES=1
+            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && RUN_DB_BOOTSTRAP=1
+            [[ "${{ inputs.run_migrate }}" == "false" ]] && RUN_MIGRATE=0
+            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && RUN_PYTHON_BOOTSTRAP=0
+          fi
+          if [[ ! -d "${REPO_ROOT}/.git" ]]; then
+            echo "Clone first: git clone -b dev https://github.com/svasthol/puja_platform.git ${REPO_ROOT}"
+            exit 1
+          fi
+          cd "${REPO_ROOT}"
+          export GIT_REF="origin/${GIT_REF}" RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1 VENV_DIR=/opt/mana-guruji/venv
+          chmod +x scripts/linux/remote_staging_deploy.sh
+          ./scripts/linux/remote_staging_deploy.sh
+
+      - name: Health check (localhost)
+        continue-on-error: true
+        run: |
+          curl -fsS http://127.0.0.1:8000/health/live && echo "health/live OK" \
+            || echo "WARN: API not up — finish api.env + systemd (STAGING_DEPLOY_PIPELINE.md)"
+
   deploy:
     name: SSH deploy stg-aio-1
     needs: [preflight]
+    if: vars.STAGING_DEPLOY_MODE != 'self-hosted'
     runs-on: ubuntu-latest
     environment: staging
     steps:
@@ -88,7 +126,7 @@ jobs:
           set -euo pipefail
           if [[ ! -d "${REPO_ROOT}/.git" ]]; then
             echo "First-time: sudo mkdir -p /opt/mana-guruji && sudo chown opc:opc /opt/mana-guruji"
-            echo "git clone https://github.com/svasthol/Guruji.git /opt/mana-guruji/src && cd ${REPO_ROOT}"
+            echo "git clone -b dev https://github.com/svasthol/puja_platform.git ${REPO_ROOT} && cd ${REPO_ROOT}"
             exit 1
           fi
           cd "${REPO_ROOT}"

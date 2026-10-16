@@ -27,6 +27,18 @@ Optional **OCI_*** secrets for CI terraform plan: `OCI_TENANCY_OCID`, `OCI_USER_
 
 **Variable** `STAGING_REPO_DIR` (optional): `/opt/mana-guruji/src/puja_platform`
 
+**Variable** `STAGING_DEPLOY_MODE` (optional): set to `self-hosted` when a runner is installed on `stg-aio-1` — see [`STAGING_SELF_HOSTED_RUNNER.md`](./STAGING_SELF_HOSTED_RUNNER.md). Default (unset) uses SSH from GitHub (blocked if OCI ingress is laptop-only).
+
+---
+
+## CI vs deploy — where Python installs
+
+| Workflow | Machine | Installs on staging VM? |
+|----------|---------|-------------------------|
+| **CI** | GitHub `ubuntu-24.04-arm` | **No** — only tests `requirements.txt` + imports |
+| **Deploy staging** (SSH) | GitHub → SSH → VM | **Yes** — `remote_staging_deploy.sh` / `bootstrap_python_runtime.sh` |
+| **Deploy staging** (`STAGING_DEPLOY_MODE=self-hosted`) | Job runs **on VM** | **Yes** — same scripts |
+
 ---
 
 ## Terraform on staging
