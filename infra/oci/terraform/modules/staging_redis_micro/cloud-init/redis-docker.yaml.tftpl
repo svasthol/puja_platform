@@ -1,0 +1,10 @@
+#cloud-config
+package_update: true
+packages:
+  - docker
+runcmd:
+  - systemctl enable --now docker
+  - usermod -aG docker opc
+  - docker pull ${redis_image}
+  - docker rm -f mana-guruji-redis 2>/dev/null || true
+  - docker run -d --name mana-guruji-redis --restart unless-stopped -p 6379:6379 ${redis_image} redis-server --appendonly yes

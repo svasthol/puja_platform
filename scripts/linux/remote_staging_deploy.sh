@@ -26,6 +26,7 @@ fi
 chmod +x scripts/linux/*.sh scripts/migrate.sh scripts/bootstrap.sh 2>/dev/null || true
 
 if [[ "$RUN_DATA_SERVICES" == "1" ]]; then
+  export SKIP_REDIS="${SKIP_REDIS:-0}"
   ./scripts/linux/install_data_services_ol9.sh
 fi
 

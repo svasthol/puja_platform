@@ -54,7 +54,7 @@ jobs:
     name: Deploy on VM (self-hosted)
     needs: [preflight]
     if: vars.STAGING_DEPLOY_MODE == 'self-hosted'
-    runs-on: [self-hosted, linux, arm64, staging]
+    runs-on: [self-hosted, Linux, ARM64, staging]
     environment: staging
     steps:
       - name: Run staging deploy script on this host
@@ -78,6 +78,7 @@ jobs:
           fi
           cd "${REPO_ROOT}"
           export GIT_REF="origin/${GIT_REF}" RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1 VENV_DIR=/opt/mana-guruji/venv
+          export SKIP_REDIS="${{ vars.STAGING_SKIP_HOST_REDIS == 'true' && '1' || '0' }}"
           chmod +x scripts/linux/remote_staging_deploy.sh
           ./scripts/linux/remote_staging_deploy.sh
 
