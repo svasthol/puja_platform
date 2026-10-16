@@ -56,6 +56,7 @@ class KycPujariStatusResponse(BaseModel):
     required_doc_types: list[str]
     documents: list[KycPujariDocSummary]
     all_required_verified: bool
+    digilocker_review_flags: list[str] = Field(default_factory=list)
 
 
 class KycReviewResponse(BaseModel):

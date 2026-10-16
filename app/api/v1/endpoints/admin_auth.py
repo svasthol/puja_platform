@@ -109,6 +109,6 @@ async def admin_login(
         cred.activated_at = now  # first successful login activates the credential
 
     log.info("admin_login_ok", user_id=str(user.id), roles=list(roles))
-    return _issue_token_pair(
+    return await _issue_token_pair(
         db, user_id=user.id, app_context="admin", device_id=None, now=now
     )

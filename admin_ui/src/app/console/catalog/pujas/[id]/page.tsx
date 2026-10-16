@@ -158,6 +158,7 @@ export default function PujaBuilderPage() {
     onSuccess: async () => {
       setMessage(`Puja saved (${editLocale.toUpperCase()}).`);
       await qc.invalidateQueries({ queryKey: ["admin", "catalog", "pujas"] });
+      await qc.invalidateQueries({ queryKey: ["admin", "catalog", "puja-impact", pujaId] });
       await refetchI18n();
     },
     onError: (e: Error) => setMessage(e.message),
@@ -466,9 +467,13 @@ export default function PujaBuilderPage() {
                   disabled={!canEdit || editLocale !== "en"}
                   className="mt-1.5"
                 />
+                <p className="mt-1 text-xs text-ink-muted">
+                  Customer catalog and checkout price at launch. Save with locale{" "}
+                  <strong>EN</strong> (price fields are English-only).
+                </p>
               </div>
               <div>
-                <Label htmlFor="puja-price-max">Price max (₹)</Label>
+                <Label htmlFor="puja-price-max">Price max (₹, optional display cap)</Label>
                 <Input
                   id="puja-price-max"
                   value={form.price_max ?? ""}
@@ -477,6 +482,41 @@ export default function PujaBuilderPage() {
                   className="mt-1.5"
                 />
               </div>
+              {impact ? (
+                <div className="sm:col-span-2 rounded-lg border border-border bg-surface-muted p-3 text-sm">
+                  <p className="font-medium text-ink">What the customer app shows</p>
+                  <p className="mt-1 text-ink-muted">
+                    Card &amp; checkout:{" "}
+                    <strong>From ₹{impact.customer_price_from}</strong>
+                    {impact.customer_price_to !== impact.customer_price_from
+                      ? ` (display up to ₹${impact.customer_price_to}; you pay ₹${impact.customer_price_from} at launch)`
+                      : ""}{" "}
+                    — matches catalog default price.
+                  </p>
+                  {impact.verified_pujari_pricing_count > 0 ? (
+                    <p className="mt-2 text-ink-muted">
+                      {impact.verified_pujari_pricing_count} verified pujari
+                      {impact.verified_pujari_pricing_count === 1 ? "" : "s"} have pricing rows
+                      {impact.lowest_pujari_base_price != null
+                        ? ` (lowest priest row ₹${impact.lowest_pujari_base_price})`
+                        : ""}{" "}
+                      — used for <strong>dispatch offers</strong>, not customer display. Manage in{" "}
+                      <Link href="/console/pujaris" className="text-brand underline">
+                        Pujari → Pricing
+                      </Link>
+                      .
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-ink-muted">
+                      No verified pujari pricing yet — add{" "}
+                      <Link href="/console/pujaris" className="text-brand underline">
+                        Pujari → Pricing
+                      </Link>{" "}
+                      before go-live so priests can receive offers.
+                    </p>
+                  )}
+                </div>
+              ) : null}
               {canEdit && (
                 <div className="sm:col-span-2 pt-2">
                   <Button type="submit" disabled={savePujaMutation.isPending}>

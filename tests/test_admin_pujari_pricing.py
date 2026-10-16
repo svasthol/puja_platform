@@ -10,7 +10,11 @@ from sqlalchemy import text
 
 from app.api.v1.endpoints import admin_pujaris as pj_ep
 from app.core.dependencies import Principal
-from app.schemas.admin_pujaris import PujariPricingItemInput, PujariPricingReplaceRequest
+from app.schemas.admin_pujaris import (
+    PujariPricingItemInput,
+    PujariPricingReplaceRequest,
+    PujariTaxComplianceUpdate,
+)
 from app.services.pricing_resolver import resolve_puja_unit_price
 
 
@@ -125,3 +129,26 @@ async def test_get_pricing_matrix(session):
     assert matrix.pujari_id == pujari_id
     assert len(matrix.items) >= 1
     assert matrix.items[0].puja_name
+
+
+@pytest.mark.asyncio
+async def test_patch_tax_compliance(session):
+    actor = await _mk_admin(session)
+    pujari_id = await _mk_pujari(session)
+    await session.commit()
+
+    pan = f"ABCDE{int(uuid.uuid4().hex[:8], 16) % 10000:04d}F"
+    resp = await pj_ep.patch_pujari_tax_compliance(
+        pujari_id,
+        PujariTaxComplianceUpdate(
+            entity_type="individual",
+            pan=pan,
+            change_reason="test setup",
+        ),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    await session.commit()
+    assert resp.entity_type == "individual"
+    assert resp.pan_on_file is True

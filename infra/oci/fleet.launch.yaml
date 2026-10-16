@@ -1,0 +1,131 @@
+# Canonical OCI compute fleet — Option B (corrected). DO NOT duplicate elsewhere.
+# Human doc: spec/plans/OCI_COMPUTE_FLEET.md
+# IaC: Terraform/Ansible should import or generate from this file.
+version: 1
+profile: option_b_corrected
+status: chosen
+region: ap-hyderabad-1
+
+defaults:
+  shape: VM.Standard.A1.Flex
+  processor: ampere_aarch64
+  os_image: Oracle Linux 9
+  os_arch: aarch64
+  ssh_user: opc
+  boot_volume_gb: 50
+  boot_volume_performance: balanced
+  assign_public_ip: false
+
+environments:
+  production:
+    compartment_key: production  # map to TF var / OCI compartment OCID at apply time
+    hosts:
+      - hostname: app-1
+        role: app
+        ocpu: 2
+        memory_gb: 12
+        assign_public_ip: optional
+        services:
+          - nginx
+          - fastapi
+          - celery_worker
+          - celery_redbeat
+          - pgbouncer
+          - haproxy_pg
+          - etcd
+          - sentinel
+      - hostname: app-2
+        role: app
+        ocpu: 2
+        memory_gb: 12
+        assign_public_ip: optional
+        services:
+          - nginx
+          - fastapi
+          - celery_worker
+          - pgbouncer
+          - haproxy_pg
+          - etcd
+          - sentinel
+          - redis_replica
+      - hostname: db-1
+        role: database
+        ocpu: 2
+        memory_gb: 12
+        subnet: data-private
+        block_volumes:
+          - size_gb: 100
+            mount: /var/lib/postgresql
+            performance: balanced
+            vpus: 10
+        services:
+          - postgresql16
+          - postgis
+          - patroni
+      - hostname: db-2
+        role: database
+        ocpu: 2
+        memory_gb: 12
+        subnet: data-private
+        block_volumes:
+          - size_gb: 100
+            mount: /var/lib/postgresql
+            performance: balanced
+            vpus: 10
+        services:
+          - postgresql16
+          - postgis
+          - patroni
+      - hostname: cache-1
+        role: cache
+        ocpu: 1
+        memory_gb: 6
+        subnet: data-private
+        services:
+          - redis_primary
+          - etcd
+          - sentinel
+          - pgbackrest
+
+  staging:
+    always_on: true
+    hosts:
+      - hostname: stg-aio-1
+        role: all_in_one
+        ocpu: 1
+        memory_gb: 6
+        boot_volume_gb: 50
+        assign_public_ip: bastion_ssh
+
+load_balancer:
+  type: network_load_balancer
+  backends: [app-1, app-2]
+  listener_ports: [443, 80]
+  health_check:
+    path: /health/live
+    protocol: HTTP
+
+scale_steps:
+  - id: app_ocpu_x2
+    status: post_launch_not_day_one
+    hosts: [app-1, app-2]
+    shape: VM.Standard.A1.Flex
+    ocpu_from: 2
+    ocpu_to: 4
+    memory_gb: 12
+    trigger: after_load_test
+
+software:
+  python: "3.12"
+  postgresql: "16"
+  postgis_min: "3.4"
+  redis: "7"
+
+ci_cd:
+  container_platform: linux/arm64
+  build_once_promote: true
+  deploy_targets:
+    production: [app-1, app-2]
+  migrate_host: any_app_with_haproxy_5000
+  runtime_database_url: "postgresql+psycopg://puja_app@127.0.0.1:6432/Mana_Guruji"
+  migrate_database_url: "postgresql://puja_migrate@<haproxy>:5000/Mana_Guruji"

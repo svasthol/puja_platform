@@ -77,6 +77,8 @@ def create_app() -> FastAPI:
     async def health():
         """Liveness + DB/Redis readiness (so LBs don't route to a broken pod)."""
         db_ok = redis_ok = False
+        sweep_age_seconds: float | None = None
+        sweep_stale = False
         try:
             async with engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
@@ -87,10 +89,36 @@ def create_app() -> FastAPI:
             redis_ok = await redis_ping()
         except Exception as exc:  # noqa: BLE001
             log.error("health_redis_fail", error=str(exc))
-        status = "ok" if (db_ok and redis_ok) else "degraded"
+        if db_ok:
+            try:
+                from app.workers.sweep import get_connection
+                from app.workers.sweep_heartbeat import (
+                    SWEEP_STALE_SECONDS,
+                    sweep_age_seconds as read_sweep_age_seconds,
+                )
+
+                sync_conn = get_connection()
+                try:
+                    sweep_age_seconds = read_sweep_age_seconds(sync_conn)
+                    if sweep_age_seconds is not None:
+                        sweep_stale = sweep_age_seconds > SWEEP_STALE_SECONDS
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("health_sweep_heartbeat_unavailable", error=str(exc))
+                finally:
+                    sync_conn.close()
+            except Exception as exc:  # noqa: BLE001
+                log.debug("health_sweep_check_failed", error=str(exc))
+        status = "ok" if (db_ok and redis_ok and not sweep_stale) else "degraded"
         return ORJSONResponse(
             status_code=200 if status == "ok" else 503,
-            content={"status": status, "db": db_ok, "redis": redis_ok, "env": settings.APP_ENV},
+            content={
+                "status": status,
+                "db": db_ok,
+                "redis": redis_ok,
+                "env": settings.APP_ENV,
+                "sweep_age_seconds": sweep_age_seconds,
+                "sweep_stale": sweep_stale,
+            },
         )
 
     if settings.METRICS_ENABLED:

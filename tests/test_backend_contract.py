@@ -47,6 +47,9 @@ async def test_app_config_public_read(session):
     assert resp.instant_lead_hours >= 1
     assert resp.advance_booking_amount == Decimal(str(resp.advance_booking_amount))
     assert isinstance(resp.payments_enabled, bool)
+    assert isinstance(resp.tds_accrual_enabled, bool)
+    assert isinstance(resp.pujari_fy_pan_gate_enabled, bool)
+    assert isinstance(resp.setu_pan_verify_configured, bool)
     if resp.payments_enabled:
         assert resp.razorpay_key_id and resp.razorpay_key_id.startswith("rzp_")
 

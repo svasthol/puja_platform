@@ -24,6 +24,8 @@ from app.services.dispatch_launch import (
     offer_expires_interval,
 )
 from app.workers.celery_app import celery_app
+from app.core.redis_keys import presence_redis_key
+from app.workers.redis_sync import get_sync_redis, namespaced_key, new_lock_token, release_lock
 from app.workers.sweep import get_connection
 
 log = structlog.get_logger("dispatch")
@@ -42,11 +44,9 @@ def _status_id(cur, domain: str, code: str) -> int:
 
 
 def _redis():
-    import redis as redis_lib
+    from app.workers.redis_sync import get_sync_redis
 
-    from app.core.config import get_settings
-
-    return redis_lib.from_url(str(get_settings().REDIS_URL))
+    return get_sync_redis()
 
 
 def _ensure_dispatch_state(cur, booking_id: str) -> None:
@@ -92,11 +92,19 @@ def exhaust_booking_no_pujari(cur, conn, booking_id: str) -> dict:
         """
         INSERT INTO refunds (id, payment_id, booking_id, amount, reason, status,
                              attempt_count, next_attempt_at, created_at)
-        SELECT gen_random_uuid(), p.id, b.id, b.amount_due_online, 'no_pujari',
-               'pending', 0, now(), now()
+        SELECT gen_random_uuid(), p.id, b.id,
+               CASE
+                 WHEN b.payment_mode = 'booking_fee' THEN b.booking_fee
+                 ELSE b.amount_due_online
+               END,
+               'no_pujari', 'pending', 0, now(), now()
         FROM bookings b
         JOIN payments p ON p.booking_id = b.id AND p.status = 'success'
-        WHERE b.id = %s AND b.amount_due_online > 0
+        WHERE b.id = %s
+          AND (
+            (b.payment_mode = 'booking_fee' AND b.booking_fee > 0)
+            OR (b.payment_mode <> 'booking_fee' AND b.amount_due_online > 0)
+          )
         ON CONFLICT DO NOTHING
         """,
         (booking_id,),
@@ -120,8 +128,9 @@ def exhaust_booking_no_pujari(cur, conn, booking_id: str) -> dict:
 
 def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
     r = _redis()
-    lock_key = f"dispatch_lock:{booking_id}"
-    if not r.set(lock_key, "1", nx=True, ex=60):
+    lock_key = namespaced_key(f"dispatch_lock:{booking_id}")
+    lock_token = new_lock_token()
+    if not r.set(lock_key, lock_token, nx=True, ex=60):
         log.info("dispatch_skipped_locked", booking_id=booking_id)
         return {"skipped": "locked"}
 
@@ -145,13 +154,22 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                 return exhaust_booking_no_pujari(cur, conn, booking_id)
 
             cur.execute(
-                "SELECT round FROM booking_dispatch_state WHERE booking_id=%s",
+                "SELECT round, max_rounds FROM booking_dispatch_state WHERE booking_id=%s",
                 (booking_id,),
             )
             row = cur.fetchone()
             if row is None:
                 return {"error": "no_dispatch_state"}
-            expected = row[0]
+            expected, max_rounds = row[0], row[1]
+            if expected >= max_rounds:
+                log.info(
+                    "dispatch_round_cap_reached",
+                    booking_id=booking_id,
+                    round=expected,
+                    max_rounds=max_rounds,
+                )
+                return exhaust_booking_no_pujari(cur, conn, booking_id)
+
             next_round = expected + 1
             radius = RADIUS_SCHEDULE.get(next_round, 15.0)
 
@@ -180,9 +198,38 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
 
             live = []
             if candidates:
-                keys = [f"presence:{c}" for c in candidates]
+                keys = [presence_redis_key(c) for c in candidates]
                 vals = r.mget(keys)
                 live = [c for c, v in zip(candidates, vals) if v is not None]
+
+            if not live and candidates:
+                cur.execute("SELECT id FROM pujaris WHERE is_online = true")
+                online_ids = [str(row[0]) for row in cur.fetchall()]
+                cand_set = {str(c) for c in candidates}
+                redis_online: list[str] = []
+                if online_ids:
+                    okeys = [presence_redis_key(pid) for pid in online_ids]
+                    ovals = r.mget(okeys)
+                    redis_online = [
+                        pid for pid, val in zip(online_ids, ovals) if val is not None
+                    ]
+                overlap = [pid for pid in redis_online if pid in cand_set]
+                if redis_online and not overlap:
+                    log.warning(
+                        "dispatch_online_pujari_not_in_candidate_pool",
+                        booking_id=booking_id,
+                        candidates=len(candidates),
+                        redis_online=len(redis_online),
+                        hint="pujari needs pujari_pricing for this puja, service area, "
+                        "and availability covering the booked slot",
+                    )
+                elif not redis_online:
+                    log.info(
+                        "dispatch_no_redis_presence",
+                        booking_id=booking_id,
+                        candidates=len(candidates),
+                        hint="no pujari heartbeat keys in Redis at dispatch time",
+                    )
 
             inserted = 0
             offer_ttl = offer_expires_interval(booking_class, settings)
@@ -219,14 +266,15 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
             return {"round": next_round, "offers": inserted}
     finally:
         conn.close()
-        r.delete(lock_key)
+        release_lock(r, lock_key, lock_token)
 
 
 def _direct_dispatch(booking_id: str) -> dict:
     """Single offer to intended_pujari_id, 10 min expiry (direct dispatch mode)."""
     r = _redis()
-    lock_key = f"dispatch_lock:{booking_id}"
-    if not r.set(lock_key, "1", nx=True, ex=60):
+    lock_key = namespaced_key(f"dispatch_lock:{booking_id}")
+    lock_token = new_lock_token()
+    if not r.set(lock_key, lock_token, nx=True, ex=60):
         log.info("direct_dispatch_skipped_locked", booking_id=booking_id)
         return {"skipped": "locked"}
 
@@ -277,7 +325,7 @@ def _direct_dispatch(booking_id: str) -> dict:
             return {"status": "direct_offer", "pujari_id": str(intended_id)}
     finally:
         conn.close()
-        r.delete(lock_key)
+        release_lock(r, lock_key, lock_token)
 
 
 @celery_app.task(name="app.workers.dispatch.broadcast_booking")

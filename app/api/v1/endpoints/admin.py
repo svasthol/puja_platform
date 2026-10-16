@@ -11,6 +11,7 @@ if the write rolls back, its audit row rolls back too.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import uuid
 from decimal import Decimal
 
@@ -34,10 +35,20 @@ from app.models.lookups import Role
 from app.schemas.admin import (
     AdvanceAmountResponse,
     AdvanceAmountUpdate,
+    BookingFeeResponse,
+    BookingFeeUpdate,
     AdminMeResponse,
     CredentialProvisionResponse,
     RoleAssignRequest,
+    TdsFacilitationResponse,
+    TdsFacilitationUpdate,
     UserRolesResponse,
+)
+from app.services.pricing import (
+    ALLOWED_ENTITY_TYPES,
+    TDS_FACILITATION_SETTINGS_KEY,
+    default_tds_facilitation_config,
+    parse_tds_facilitation_config,
 )
 from app.services.audit import record_admin_action
 
@@ -130,6 +141,176 @@ async def set_advance(
         ip=request.client.host if request.client else None,
     )
     return AdvanceAmountResponse(amount=payload.amount, currency="INR")
+
+
+@router.get("/settings/booking-fee", response_model=BookingFeeResponse)
+async def get_booking_fee(_p: Principal = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    row = (
+        await db.execute(
+            text(
+                "SELECT value_json, updated_at FROM platform_settings WHERE key='booking_fee'"
+            )
+        )
+    ).mappings().first()
+    if row is None:
+        from app.services.pricing import BOOKING_FEE_LABEL
+
+        return BookingFeeResponse(
+            amount=Decimal(str(settings.DEFAULT_BOOKING_FEE)),
+            currency="INR",
+            label=BOOKING_FEE_LABEL,
+        )
+    payload = row["value_json"]
+    return BookingFeeResponse(
+        amount=Decimal(str(payload["amount"])),
+        currency=payload.get("currency", "INR"),
+        label=payload.get("label", "Muhurat & Slot Lock Token"),
+        updated_at=str(row["updated_at"]) if row.get("updated_at") else None,
+    )
+
+
+@router.put("/settings/booking-fee", response_model=BookingFeeResponse)
+async def set_booking_fee(
+    payload: BookingFeeUpdate,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    before = (
+        await db.execute(
+            text("SELECT value_json FROM platform_settings WHERE key='booking_fee'")
+        )
+    ).scalar_one_or_none()
+    label = payload.label or (before or {}).get("label") or "Muhurat & Slot Lock Token"
+    await db.execute(
+        text(
+            """
+            INSERT INTO platform_settings (key, value_json, updated_at)
+            VALUES (
+                'booking_fee',
+                jsonb_build_object(
+                    'amount', CAST(:amt AS numeric),
+                    'currency', 'INR',
+                    'label', :label
+                ),
+                now()
+            )
+            ON CONFLICT (key) DO UPDATE SET
+                value_json = jsonb_build_object(
+                    'amount', CAST(:amt AS numeric),
+                    'currency', 'INR',
+                    'label', :label
+                ),
+                updated_at = now()
+            """
+        ),
+        {"amt": str(payload.amount), "label": label},
+    )
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="update",
+        entity_type="platform_settings",
+        entity_id="booking_fee",
+        before={"value": before} if before is not None else None,
+        after={"amount": str(payload.amount), "currency": "INR", "label": label},
+        change_reason=payload.change_reason,
+        ip=request.client.host if request.client else None,
+    )
+    return BookingFeeResponse(amount=payload.amount, currency="INR", label=label)
+
+
+def _tds_facilitation_response(
+    cfg,
+    *,
+    updated_at: str | None = None,
+) -> TdsFacilitationResponse:
+    return TdsFacilitationResponse(
+        no_pan_rate_pct=cfg.no_pan_rate_pct,
+        pan_entity_rate_pct=cfg.pan_entity_rate_pct,
+        individual_fy_threshold_inr=cfg.individual_fy_threshold_inr,
+        fy_turnover_warn_inr=cfg.fy_turnover_warn_inr,
+        fy_turnover_block_inr=cfg.fy_turnover_block_inr,
+        always_taxed_entity_types=sorted(cfg.always_taxed_entity_types),
+        updated_at=updated_at,
+    )
+
+
+@router.get("/settings/tds-facilitation", response_model=TdsFacilitationResponse)
+async def get_tds_facilitation(
+    _p: Principal = Depends(require_admin), db: AsyncSession = Depends(get_db)
+):
+    row = (
+        await db.execute(
+            text(
+                "SELECT value_json, updated_at FROM platform_settings "
+                "WHERE key=:key"
+            ),
+            {"key": TDS_FACILITATION_SETTINGS_KEY},
+        )
+    ).mappings().first()
+    cfg = parse_tds_facilitation_config(row["value_json"] if row else None)
+    updated_at = str(row["updated_at"]) if row and row.get("updated_at") else None
+    return _tds_facilitation_response(cfg, updated_at=updated_at)
+
+
+@router.put("/settings/tds-facilitation", response_model=TdsFacilitationResponse)
+async def set_tds_facilitation(
+    payload: TdsFacilitationUpdate,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    if payload.fy_turnover_warn_inr >= payload.fy_turnover_block_inr:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "fy_turnover_warn_inr must be less than fy_turnover_block_inr",
+        )
+    invalid = [t for t in payload.always_taxed_entity_types if t not in ALLOWED_ENTITY_TYPES]
+    if invalid:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"Invalid entity types: {', '.join(invalid)}",
+        )
+    before = (
+        await db.execute(
+            text("SELECT value_json FROM platform_settings WHERE key=:key"),
+            {"key": TDS_FACILITATION_SETTINGS_KEY},
+        )
+    ).scalar_one_or_none()
+    value_json = {
+        "no_pan_rate_pct": str(payload.no_pan_rate_pct),
+        "pan_entity_rate_pct": str(payload.pan_entity_rate_pct),
+        "individual_fy_threshold_inr": str(payload.individual_fy_threshold_inr),
+        "fy_turnover_warn_inr": str(payload.fy_turnover_warn_inr),
+        "fy_turnover_block_inr": str(payload.fy_turnover_block_inr),
+        "always_taxed_entity_types": payload.always_taxed_entity_types,
+    }
+    await db.execute(
+        text(
+            """
+            INSERT INTO platform_settings (key, value_json, updated_at)
+            VALUES (:key, CAST(:value_json AS jsonb), now())
+            ON CONFLICT (key) DO UPDATE SET
+                value_json = CAST(:value_json AS jsonb),
+                updated_at = now()
+            """
+        ),
+        {"key": TDS_FACILITATION_SETTINGS_KEY, "value_json": json.dumps(value_json)},
+    )
+    cfg = parse_tds_facilitation_config(value_json)
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="update",
+        entity_type="platform_settings",
+        entity_id=TDS_FACILITATION_SETTINGS_KEY,
+        before={"value": before} if before is not None else None,
+        after=value_json,
+        change_reason=payload.change_reason,
+        ip=request.client.host if request.client else None,
+    )
+    return _tds_facilitation_response(cfg)
 
 
 # --------------------------------------------------------------------------- #

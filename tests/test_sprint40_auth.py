@@ -66,7 +66,7 @@ async def _mk_user(session, phone: str) -> uuid.UUID:
 
 
 async def _issue(session, user_id: uuid.UUID, ctx: str = "customer"):
-    pair = auth_ep._issue_token_pair(
+    pair = await auth_ep._issue_token_pair(
         session,
         user_id=user_id,
         app_context=ctx,

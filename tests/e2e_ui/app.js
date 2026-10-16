@@ -24,6 +24,9 @@
     msg91Enabled: false,
     smsProviderOrder: "fast2sms,msg91",
     lastOtpSmsSent: null,
+    sprint1BookingFee: 61,
+    simulatedBooking: false,
+    e2eUiVersion: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -31,6 +34,46 @@
 
   /** Always route via local proxy (serve.py) — never call :8000 directly from browser. */
   const API_PREFIX = "/proxy/v1";
+  const E2E_UI_MIN_VERSION_SPRINT2 = 17;
+
+  async function parseTestJson(res) {
+    const text = await res.text();
+    const trimmed = text.trimStart();
+    if (trimmed.startsWith("<")) {
+      const ver = state.e2eUiVersion ?? "?";
+      throw new Error(
+        `Test server returned HTML (stale serve.py on port 8765 — running v${ver}, Sprint 2 needs v${E2E_UI_MIN_VERSION_SPRINT2}). ` +
+          "Stop the old server (Ctrl+C) and restart: python tests/e2e_ui/serve.py"
+      );
+    }
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON from test server: ${text.slice(0, 120)}`);
+    }
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    return data;
+  }
+
+  async function refreshE2eVersion() {
+    const res = await fetch("/e2e-ui-version.json");
+    const data = await parseTestJson(res);
+    state.e2eUiVersion = Number(data.version) || data.version;
+    const el = $("e2eVersion");
+    if (el) el.textContent = `v${data.version}`;
+    return state.e2eUiVersion;
+  }
+
+  async function ensureSprint2Server() {
+    const ver = Number(await refreshE2eVersion());
+    if (!ver || ver < E2E_UI_MIN_VERSION_SPRINT2) {
+      throw new Error(
+        `E2E UI server is v${state.e2eUiVersion ?? "?"} — Sprint 2 needs v${E2E_UI_MIN_VERSION_SPRINT2}. ` +
+          "Stop old serve.py (Ctrl+C), run: powershell -ExecutionPolicy Bypass -File tests/e2e_ui/run_serve.ps1, then hard-refresh this page (Ctrl+Shift+R)."
+      );
+    }
+  }
 
   function apiBase() {
     const v = ($("apiBase")?.value || API_PREFIX).trim().replace(/\/$/, "");
@@ -731,6 +774,11 @@
     } else {
       stopOpsPoll();
     }
+    if (tabName === "sprint2") {
+      refreshE2eVersion()
+        .then(() => loadSprint2Config())
+        .catch((err) => log(`Sprint 2 refresh failed: ${err.message}`, "log-err"));
+    }
   }
 
   document.querySelectorAll(".tab").forEach((btn) => {
@@ -947,6 +995,40 @@
     if (!state.addressId) return log("Create address first", "log-err");
     if (!state.holdId) return log("Create hold first", "log-err");
     if (!$("pujaId").value) return log("Set puja ID", "log-err");
+
+    const mode = $("payMode").value;
+    if (mode === "booking_fee_preview") {
+      try {
+        const res = await fetch("/test-sprint1-simulate-booking.json", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            puja_price: Number($("s1PujaPrice")?.value || 2100),
+            booking_fee: Number($("s1BookingFee")?.value || state.sprint1BookingFee),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || res.statusText);
+        state.simulatedBooking = true;
+        applyBookingResponse(data, { simulated: true });
+        if ($("sprint1CheckoutPanel")) $("sprint1CheckoutPanel").hidden = false;
+        if ($("sprint1CheckoutJson")) {
+          $("sprint1CheckoutJson").textContent = JSON.stringify(data, null, 2);
+        }
+        log(data.note || "Sprint 1 simulated booking — not in DB", "log-ok");
+      } catch (err) {
+        log(`Sprint 1 simulate failed: ${err.message}`, "log-err");
+      }
+      return;
+    }
+
+    state.simulatedBooking = false;
+    if ($("sprint1CheckoutPanel")) $("sprint1CheckoutPanel").hidden = true;
+    const liveMode = mode === "booking_fee" ? "booking_fee" : mode;
+    if (liveMode === "advance_balance" || liveMode === "full_online") {
+      log("Legacy payment modes disabled at launch — use booking_fee", "log-err");
+      return;
+    }
     try {
       const data = await api("POST", "/bookings", {
         token: state.customerToken,
@@ -954,7 +1036,7 @@
           hold_id: state.holdId,
           puja_id: $("pujaId").value.trim(),
           address_id: state.addressId,
-          payment_mode: $("payMode").value,
+          payment_mode: "booking_fee",
           addon_ids: [],
         },
       });
@@ -967,17 +1049,39 @@
     }
   });
 
-  function applyBookingResponse(data) {
+  function applyBookingResponse(data, { simulated = false } = {}) {
     state.bookingId = data.booking_id;
     state.orderId = data.razorpay_order_id;
-    state.amountPaise = Math.round(Number(data.amount_due_online) * 100);
+    const online =
+      data.booking_fee != null && (data.payment_mode === "booking_fee" || simulated)
+        ? Number(data.booking_fee)
+        : Number(data.amount_due_online);
+    const offline =
+      data.amount_due_offline != null
+        ? Number(data.amount_due_offline)
+        : Math.max(Number(data.total_amount || 0) - online, 0);
+    state.amountPaise = Math.round(online * 100);
     $("bookingId").textContent = data.booking_id;
     $("orderId").textContent = data.razorpay_order_id || "—";
-    $("amountOnline").textContent = `₹${data.amount_due_online} (${state.amountPaise} paise)`;
-    $("btnMockWebhook").disabled = !data.booking_id;
-    $("btnConfirmPayTest").disabled = !data.booking_id;
+    const simTag = simulated ? " (simulated)" : "";
+    $("amountOnline").textContent = `₹${online} (${state.amountPaise} paise)${simTag}`;
+    if ($("amountOffline")) {
+      $("amountOffline").textContent = `₹${offline}${simTag}`;
+    }
+    $("btnMockWebhook").disabled = simulated || !data.booking_id;
+    $("btnConfirmPayTest").disabled = simulated || !data.booking_id;
     syncRzpPayButton();
   }
+
+  $("payMode")?.addEventListener("change", () => {
+    const preview = $("payMode").value === "booking_fee_preview";
+    if ($("payModeHint")) {
+      $("payModeHint").hidden = !preview;
+    }
+    if ($("sprint1CheckoutPanel") && !preview) {
+      $("sprint1CheckoutPanel").hidden = true;
+    }
+  });
 
   async function confirmPaymentTest(bookingId) {
     const bid = (bookingId || state.bookingId || "").trim();
@@ -1150,6 +1254,95 @@
       await api("POST", `/offers/${aid}/reject`, { token: state.pujariToken });
     } catch (_) {}
   });
+
+  async function refreshPjPanEnvStatus() {
+    const el = $("pjPanEnvStatus");
+    if (!el) return;
+    try {
+      const data = await parseTestJson(await fetch("/test-setu-pan-status.json"));
+      if (data.pan_product_configured) {
+        el.className = "hint log-ok";
+        el.textContent = `Setu PAN product configured · ${data.setu_base_url || "base URL set"} · ${data.hint}`;
+      } else {
+        el.className = "hint warn";
+        el.textContent = data.hint || "KYC_SETU_PAN_PRODUCT_ID not set in API .env";
+      }
+    } catch (err) {
+      el.className = "hint warn";
+      el.textContent = `Could not read Setu status: ${err.message}`;
+    }
+  }
+
+  $("btnPjPanSandboxValid")?.addEventListener("click", () => {
+    if ($("pjPan")) $("pjPan").value = "ABCDE1234A";
+  });
+  $("btnPjPanSandboxInvalid")?.addEventListener("click", () => {
+    if ($("pjPan")) $("pjPan").value = "ABCDE1234B";
+  });
+
+  $("btnPjPanSubmit")?.addEventListener("click", async () => {
+    if (!state.pujariToken) {
+      log("Login partner first (Request OTP → Verify)", "log-err");
+      return;
+    }
+    const consent = $("pjPanConsent")?.checked;
+    if (!consent) {
+      log("Consent checkbox required", "log-err");
+      return;
+    }
+    const reason = ($("pjPanReason")?.value || "").trim();
+    if (reason.length < 20) {
+      log("Reason must be at least 20 characters for Setu", "log-err");
+      return;
+    }
+    try {
+      const data = await api("POST", "/pujari/kyc/pan", {
+        token: state.pujariToken,
+        body: {
+          pan: ($("pjPan")?.value || "").trim().toUpperCase(),
+          entity_type: $("pjPanEntity")?.value || "individual",
+          consent: true,
+          reason,
+        },
+      });
+      $("pjPanOut").textContent = JSON.stringify(data, null, 2);
+      if (data.pan_status === "operative") {
+        log("PAN verified — operative. Try Heartbeat / Accept if gates enabled.", "log-ok");
+      } else {
+        log(`PAN stored with status ${data.pan_status}`, "log-ok");
+      }
+    } catch (err) {
+      $("pjPanOut").textContent = err.data ? JSON.stringify(err.data, null, 2) : err.message;
+    }
+  });
+
+  $("btnPjTaxProfile")?.addEventListener("click", async () => {
+    if (!state.pujariToken) return log("Login partner first", "log-err");
+    try {
+      const data = await api("GET", "/me/tax-profile", { token: state.pujariToken });
+      $("pjPanOut").textContent = JSON.stringify(data, null, 2);
+    } catch (err) {
+      $("pjPanOut").textContent = err.data ? JSON.stringify(err.data, null, 2) : err.message;
+    }
+  });
+
+  $("btnPjTaxSummary")?.addEventListener("click", async () => {
+    if (!state.pujariToken) return log("Login partner first", "log-err");
+    try {
+      const data = await api("GET", "/me/tax-summary", { token: state.pujariToken });
+      $("pjPanOut").textContent = JSON.stringify(data, null, 2);
+      const level = data.fy_pan_gate_level;
+      if (level === "warn") {
+        log("FY PAN gate: warn (≥ ₹4.5L) — same as partner app banner", "log-ok");
+      } else if (level === "block") {
+        log("FY PAN gate: block (≥ ₹5L without PAN)", "log-err");
+      }
+    } catch (err) {
+      $("pjPanOut").textContent = err.data ? JSON.stringify(err.data, null, 2) : err.message;
+    }
+  });
+
+  refreshPjPanEnvStatus();
 
   // Admin (Phase 4 — TOTP)
   $("btnAdminFillCode")?.addEventListener("click", async () => {
@@ -1458,10 +1651,16 @@
     return "";
   }
 
+  function sprint1TokenPreview(b) {
+    if (b.booking_fee != null) return b.booking_fee;
+    return state.sprint1BookingFee;
+  }
+
   function renderOpsTable(bookings) {
     const body = $("opsTableBody");
     if (!bookings.length) {
-      body.innerHTML = '<tr><td colspan="11" class="ops-empty">No bookings yet — create one on Customer tab.</td></tr>';
+      body.innerHTML =
+        '<tr><td colspan="15" class="ops-empty">No bookings yet — create one on Customer tab.</td></tr>';
       return;
     }
     body.innerHTML = bookings
@@ -1473,10 +1672,14 @@
         <td>${b.customer_phone || "—"}</td>
         <td>${b.puja_name || "—"}</td>
         <td>${fmtSlot(b.scheduled_date, b.scheduled_time)}</td>
+        <td class="mono">${b.payment_mode || "—"}</td>
+        <td>${sprint1TokenPreview(b)}</td>
         <td>${b.amount_due_online != null ? b.amount_due_online : "—"}</td>
+        <td>${b.amount_due_offline != null ? b.amount_due_offline : "—"}</td>
         <td>${b.paid_at ? "✓" : "—"}</td>
+        <td>${b.balance_collected_at ? "✓" : "—"}</td>
         <td class="mono">${b.razorpay_payment_id || "—"}</td>
-        <td>${b.offers_live ?? 0} live / ${b.offers_sent ?? 0} total</td>
+        <td>${b.offers_live ?? 0} live offers / ${b.offers_sent ?? 0} assignment rows</td>
         <td>${b.assigned_pujari_name || b.assigned_pujari_phone || "—"}</td>
         <td class="mono ops-booking-id" data-booking-id="${b.booking_id}">${b.booking_id}</td>
       </tr>`
@@ -1484,9 +1687,11 @@
       .join("");
     body.querySelectorAll(".ops-booking-id").forEach((cell) => {
       cell.style.cursor = "pointer";
-      cell.title = "Click to copy booking id into Re-dispatch field";
+      cell.title = "Click to copy booking id — open Sprint 1 tab to inspect settlement";
       cell.addEventListener("click", () => {
-        $("opsRedispatchId").value = cell.dataset.bookingId || cell.textContent.trim();
+        const id = cell.dataset.bookingId || cell.textContent.trim();
+        $("opsRedispatchId").value = id;
+        if ($("s1InspectId")) $("s1InspectId").value = id;
       });
     });
   }
@@ -1666,15 +1871,284 @@
   }
   loadTestEnv().then(() => syncRzpPayButton());
 
-  fetch("/e2e-ui-version.json")
-    .then((r) => r.json())
-    .then((v) => {
-      const el = $("e2eVersion");
-      if (el) el.textContent = `v${v.version}`;
-      log(`E2E UI v${v.version} (media upload uses API proxy)`, "log-ok");
+  refreshE2eVersion()
+    .then((ver) => {
+      log(`E2E UI v${ver} (media upload uses API proxy)`, "log-ok");
+      if (Number(ver) < E2E_UI_MIN_VERSION_SPRINT2) {
+        log(
+          `Sprint 2 tab needs serve.py v${E2E_UI_MIN_VERSION_SPRINT2}+ — restart test server (currently v${ver})`,
+          "log-err"
+        );
+      }
     })
-    .catch(() => {});
+    .catch((err) => log(`E2E version check failed: ${err.message}`, "log-err"));
 
   applyE2eSlotDefaults();
-  log("E2E test UI ready — Admin tab: TOTP + catalogue smoke (4B); OTP / SMS for customer/partner.", "log-ok");
+  log(
+    "E2E test UI ready — Sprint 1 Settlements + Sprint 2 TDS preview; Customer tab for live API.",
+    "log-ok"
+  );
+
+  // Sprint 1 — settlement preview (test server only)
+  async function loadSprint1Quote() {
+    const puja = $("s1PujaPrice")?.value || "2100";
+    const addon = $("s1AddonTotal")?.value || "0";
+    const fee = $("s1BookingFee")?.value || "61";
+    state.sprint1BookingFee = Number(fee);
+    const res = await fetch(
+      `/test-sprint1-quote.json?puja_price=${encodeURIComponent(puja)}&addon_total=${encodeURIComponent(addon)}&booking_fee=${encodeURIComponent(fee)}`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    $("s1QuoteOut").textContent = JSON.stringify(data.quote, null, 2);
+    return data.quote;
+  }
+
+  $("btnS1Quote")?.addEventListener("click", async () => {
+    try {
+      await loadSprint1Quote();
+      log("Sprint 1 quote computed", "log-ok");
+    } catch (err) {
+      log(`Sprint 1 quote failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS1SimulateBook")?.addEventListener("click", async () => {
+    try {
+      const fee = $("s1BookingFee")?.value || "61";
+      const puja = $("s1PujaPrice")?.value || "2100";
+      const res = await fetch("/test-sprint1-simulate-booking.json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ puja_price: Number(puja), booking_fee: Number(fee) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      $("s1QuoteOut").textContent = JSON.stringify(data, null, 2);
+      log("Simulated Sprint 1 booking (no DB write)", "log-ok");
+    } catch (err) {
+      log(`Simulate booking failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS1Refunds")?.addEventListener("click", async () => {
+    try {
+      const fee = $("s1BookingFee")?.value || "61";
+      const res = await fetch(`/test-sprint1-refunds.json?booking_fee=${encodeURIComponent(fee)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      const body = $("s1RefundBody");
+      if (!body) return;
+      body.innerHTML = (data.scenarios || [])
+        .map(
+          (s) => `
+        <tr>
+          <td>${s.label}</td>
+          <td><code>${s.status}</code></td>
+          <td>₹${s.refund_inr} (${s.refund_pct}%)</td>
+        </tr>`
+        )
+        .join("");
+      log("Refund matrix loaded", "log-ok");
+    } catch (err) {
+      log(`Refund matrix failed: ${err.message}`, "log-err");
+    }
+  });
+
+  function formatSettlementView(view) {
+    const lines = [];
+    lines.push(`Implementation: ${view.implementation}`);
+    lines.push("");
+    lines.push("=== Current API ===");
+    lines.push(JSON.stringify(view.current, null, 2));
+    lines.push("");
+    lines.push("=== Sprint 1 settlement ===");
+    lines.push(JSON.stringify(view.settlement, null, 2));
+    if (view.sprint1_preview) {
+      lines.push("");
+      lines.push("=== Sprint 1 preview (if not live yet) ===");
+      lines.push(JSON.stringify(view.sprint1_preview, null, 2));
+    }
+    return lines.join("\n");
+  }
+
+  $("btnS1Inspect")?.addEventListener("click", async () => {
+    const id = ($("s1InspectId")?.value || "").trim();
+    if (!id) return log("Enter booking id", "log-err");
+    try {
+      const res = await fetch(`/test-sprint1-settlement.json?booking_id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      $("s1SettlementOut").textContent = formatSettlementView(data);
+      log(`Settlement view for ${id}`, "log-ok");
+    } catch (err) {
+      log(`Inspect settlement failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS1CopyFromOps")?.addEventListener("click", () => {
+    const id = ($("opsRedispatchId")?.value || state.bookingId || "").trim();
+    if (!id) return log("No booking id in ops field yet", "log-err");
+    if ($("s1InspectId")) $("s1InspectId").value = id;
+    log(`Copied ${id} to inspect field`, "log-ok");
+  });
+
+  loadSprint1Quote().catch(() => {});
+
+  async function loadSprint2Config() {
+    const res = await fetch("/test-sprint2-tds-config.json");
+    const data = await parseTestJson(res);
+    const cfg = data.config || {};
+    state.sprint2Config = cfg;
+    if ($("s2FyGross") && cfg.individual_fy_threshold_inr) {
+      const threshold = Number(cfg.individual_fy_threshold_inr);
+      $("s2FyGross").value = String(Math.max(0, threshold - 10000));
+      $("s2FyGross").title = `Admin threshold: ₹${cfg.individual_fy_threshold_inr}`;
+    }
+    const hint = $("s2ConfigHint");
+    if (hint) {
+      hint.textContent =
+        `Using admin slabs — no-PAN ${cfg.no_pan_rate_pct}% · PAN entity ${cfg.pan_entity_rate_pct}% · ` +
+        `FY threshold ₹${cfg.individual_fy_threshold_inr} · turnover warn/block ₹${cfg.fy_turnover_warn_inr}/₹${cfg.fy_turnover_block_inr}`;
+    }
+    return cfg;
+  }
+
+  // Sprint 2 — TDS & compliance preview (test server only)
+  $("btnS2Tds")?.addEventListener("click", async () => {
+    try {
+      await ensureSprint2Server();
+      const entity = $("s2EntityType")?.value || "individual";
+      const pan = $("s2PanOnFile")?.checked ? "true" : "false";
+      const fy = $("s2FyGross")?.value || "0";
+      const txn = $("s2TxnAmount")?.value || "2100";
+      const res = await fetch(
+        `/test-sprint2-tds.json?entity_type=${encodeURIComponent(entity)}&pan_on_file=${pan}&fy_gross_before=${encodeURIComponent(fy)}&transaction_amount=${encodeURIComponent(txn)}`
+      );
+      const data = await parseTestJson(res);
+      $("s2TdsOut").textContent = JSON.stringify(data.preview, null, 2);
+      log("Sprint 2 TDS computed", "log-ok");
+    } catch (err) {
+      log(`Sprint 2 TDS failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS2Accrual")?.addEventListener("click", async () => {
+    try {
+      await ensureSprint2Server();
+      const entity = $("s2EntityType")?.value || "individual";
+      const body = {
+        entity_type: entity,
+        pan_on_file: $("s2PanOnFile")?.checked ?? true,
+        gross_amount: Number($("s2TxnAmount")?.value || "2100"),
+        tds_accrual_enabled: $("s2AccrualEnabled")?.checked ?? true,
+        reset_ledger: $("s2AccrualReset")?.checked ?? false,
+      };
+      const bid = ($("s2AccrualBookingId")?.value || "").trim();
+      if (bid) body.booking_id = bid;
+      const res = await fetch("/test-sprint2-accrual.json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await parseTestJson(res);
+      $("s2AccrualOut").textContent = JSON.stringify(data, null, 2);
+      if (data.booking_id && $("s2AccrualBookingId")) {
+        $("s2AccrualBookingId").value = data.ledger_entry?.booking_id || data.booking_id;
+      }
+      log("Sprint 2 accrual simulated", "log-ok");
+    } catch (err) {
+      log(`Sprint 2 accrual failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS2Reversal")?.addEventListener("click", async () => {
+    try {
+      await ensureSprint2Server();
+      const bookingId = ($("s2AccrualBookingId")?.value || "").trim();
+      if (!bookingId) return log("Enter booking id from accrual first", "log-err");
+      const res = await fetch("/test-sprint2-reversal.json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          booking_id: bookingId,
+          pujari_id: "00000000-0000-4000-8000-000000000099",
+        }),
+      });
+      const data = await parseTestJson(res);
+      $("s2AccrualOut").textContent = JSON.stringify(data, null, 2);
+      log("Sprint 2 reversal simulated", "log-ok");
+    } catch (err) {
+      log(`Sprint 2 reversal failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS2Turnover")?.addEventListener("click", async () => {
+    try {
+      await ensureSprint2Server();
+      const amt = $("s2TurnoverAmount")?.value || "0";
+      const res = await fetch(
+        `/test-sprint2-turnover.json?fy_fee_revenue=${encodeURIComponent(amt)}`
+      );
+      const data = await parseTestJson(res);
+      $("s2TurnoverOut").textContent = JSON.stringify(data.turnover, null, 2);
+      log("Turnover preview loaded", "log-ok");
+    } catch (err) {
+      log(`Turnover preview failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS2TurnoverDb")?.addEventListener("click", async () => {
+    try {
+      await ensureSprint2Server();
+      const res = await fetch("/test-sprint2-turnover.json?from_db=true");
+      const data = await parseTestJson(res);
+      $("s2TurnoverOut").textContent = JSON.stringify(data, null, 2);
+      if (data.turnover?.fy_fee_revenue_inr && $("s2TurnoverAmount")) {
+        $("s2TurnoverAmount").value = data.turnover.fy_fee_revenue_inr;
+      }
+      log("FY fee revenue loaded from DB", "log-ok");
+    } catch (err) {
+      log(`DB turnover load failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS2PanGate")?.addEventListener("click", async () => {
+    try {
+      await ensureSprint2Server();
+      const enabled = $("s2PanGateEnabled")?.checked ? "true" : "false";
+      const pan = $("s2PanGateOnFile")?.checked ? "true" : "false";
+      const res = await fetch(
+        `/test-sprint2-pan-gate.json?gate_enabled=${enabled}&pan_on_file=${pan}`
+      );
+      const data = await parseTestJson(res);
+      $("s2PanGateOut").textContent = JSON.stringify(data.gate, null, 2);
+      log("PAN gate preview loaded", "log-ok");
+    } catch (err) {
+      log(`PAN gate preview failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS2Inspect")?.addEventListener("click", async () => {
+    const id = ($("s2InspectId")?.value || "").trim();
+    if (!id) return log("Enter booking id", "log-err");
+    try {
+      await ensureSprint2Server();
+      const res = await fetch(`/test-sprint2-settlement.json?booking_id=${encodeURIComponent(id)}`);
+      const data = await parseTestJson(res);
+      $("s2SettlementOut").textContent = JSON.stringify(data, null, 2);
+      log(`TDS settlement view for ${id}`, "log-ok");
+    } catch (err) {
+      log(`Inspect TDS settlement failed: ${err.message}`, "log-err");
+    }
+  });
+
+  $("btnS2CopyFromOps")?.addEventListener("click", () => {
+    const id = ($("opsRedispatchId")?.value || state.bookingId || "").trim();
+    if (!id) return log("No booking id in ops field yet", "log-err");
+    if ($("s2InspectId")) $("s2InspectId").value = id;
+    log(`Copied ${id} to Sprint 2 inspect field`, "log-ok");
+  });
+
+  loadSprint2Config().catch((err) => log(`Sprint 2 config load failed: ${err.message}`, "log-err"));
 })();

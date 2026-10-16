@@ -31,7 +31,9 @@ async def fetch_booking_money(
                     b.total_amount,
                     b.amount_due_online,
                     b.amount_due_offline,
-                    b.balance_collected_at
+                    b.booking_fee,
+                    b.balance_collected_at,
+                    b.balance_collected_amount
                 FROM bookings b
                 WHERE b.id = :bid
                 """
@@ -122,14 +124,18 @@ async def fetch_booking_money(
             )
         )
 
-    refundable_remaining = max(total_paid_online - total_refunded_online, Decimal("0"))
     offline_due = Decimal(str(booking["amount_due_offline"] or 0))
+    booking_fee = Decimal(str(booking.get("booking_fee") or 0))
     offline_note: str | None = None
-    if booking["payment_mode"] == "advance_balance" and offline_due > 0:
+    if booking["payment_mode"] in ("advance_balance", "booking_fee") and offline_due > 0:
         offline_note = (
             f"Offline balance (₹{offline_due}) is collected directly by the pujari — "
             "not processed or refunded through the platform."
         )
+
+    refundable_remaining = max(total_paid_online - total_refunded_online, Decimal("0"))
+    if booking["payment_mode"] == "booking_fee" and booking_fee > 0:
+        refundable_remaining = min(refundable_remaining, booking_fee)
 
     return AdminBookingMoneyResponse(
         booking_id=booking_id,
@@ -143,6 +149,7 @@ async def fetch_booking_money(
         total_paid_online=total_paid_online,
         total_refunded_online=total_refunded_online,
         refundable_remaining_online=refundable_remaining,
+        booking_fee=booking_fee if booking["payment_mode"] == "booking_fee" else None,
         payments=payments,
         refunds=refunds,
     )

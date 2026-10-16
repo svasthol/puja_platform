@@ -47,6 +47,7 @@ celery_app = Celery(
         "app.workers.rm_escalation",
         "app.workers.panchangam",
         "app.workers.kyc",
+        "app.workers.tds_accrual",
     ],
 )
 
@@ -59,6 +60,14 @@ celery_app.conf.update(
     task_acks_late=True,               # redeliver on worker crash (tasks are idempotent)
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,      # fair dispatch for long-ish tasks
+    broker_connection_retry_on_startup=True,
+    broker_transport_options={
+        "visibility_timeout": 3600,
+        "socket_timeout": 30,
+        "socket_connect_timeout": 5,
+        "retry_on_timeout": True,
+        "health_check_interval": 30,
+    },
     task_default_queue="sweep",
     task_routes={
         "app.workers.sweep.*": {"queue": "sweep"},
@@ -70,6 +79,7 @@ celery_app.conf.update(
         "app.workers.notifications.*": {"queue": "notifications"},
         "app.workers.panchangam.*": {"queue": "sweep"},
         "app.workers.kyc.*": {"queue": "sweep"},
+        "app.workers.tds_accrual.*": {"queue": "sweep"},
     },
     beat_schedule={
         "sweep-every-30s": {
@@ -104,6 +114,16 @@ celery_app.conf.update(
         "expire-kyc-requests-every-5m": {
             "task": "app.workers.kyc.expire_kyc_requests_task",
             "schedule": 300.0,
+            "options": {"queue": "sweep"},
+        },
+        "process-tds-accrual-intents-every-60s": {
+            "task": "app.workers.tds_accrual.process_tds_accrual_intents",
+            "schedule": 60.0,
+            "options": {"queue": "sweep"},
+        },
+        "sweep-never-collected-tds-every-6h": {
+            "task": "app.workers.tds_accrual.sweep_never_collected_tds",
+            "schedule": 21600.0,
             "options": {"queue": "sweep"},
         },
     },

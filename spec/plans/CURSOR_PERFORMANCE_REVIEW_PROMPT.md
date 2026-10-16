@@ -66,7 +66,7 @@ Hunt for:
 
 **N+1 queries.** The catalogue is the worst offender by design: `GET /v1/pujas` returns categories + pujas, and each puja detail pulls `puja_content_items`, `puja_addons`, `puja_media`, plus a price range. Trace every loop that touches the DB. Check `selectinload` / `joinedload` usage — and check the *opposite* failure too: a `joinedload` on a one-to-many that produces a cartesian row explosion. Trace `media_urls_by_ids()` — it batches `.in_(media_ids)` per call, but batched-per-call is not batched-per-request. Trace the **call site** in the catalogue list endpoint (`GET /v1/pujas` via `app/api/v1/endpoints/catalog.py`) to confirm it is not invoked once per puja inside a loop.
 
-**The price-range subquery.** `resolve_catalog_display_range()` computes `MIN(verified pujari_pricing.base_price)` per puja. Confirm this is not executed per-row across the whole catalogue list. This is the single most likely list-endpoint killer.
+**Catalog display pricing.** `resolve_catalog_display_range()` reads `pujas.default_price` / `price_max` only (delegates to `resolve_puja_unit_price` for `price_from`). List endpoints call it once per puja in `build_puja_summaries` — still worth keeping an eye on N+1 if the catalogue grows.
 
 **Missing indexes / sequential scans.** For every query on a hot path, get the real plan:
 ```sql

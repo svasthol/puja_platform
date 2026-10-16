@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.dependencies import Principal
 from app.models.payment import Refund
+from app.services.pricing import platform_charge_amount
 
 _CAP_KEYS = ("support_refund_cap_per_action", "support_refund_cap_daily")
 
@@ -124,6 +125,18 @@ async def create_refund_override(
     if payment["status"] != "success":
         raise HTTPException(status.HTTP_409_CONFLICT, "Payment is not in success state.")
 
+    booking = (
+        await db.execute(
+            text(
+                """
+                SELECT payment_mode, booking_fee, amount_due_online
+                FROM bookings WHERE id = :bid
+                """
+            ),
+            {"bid": str(payment["booking_id"])},
+        )
+    ).mappings().first()
+
     refunded = (
         await db.execute(
             text(
@@ -137,6 +150,13 @@ async def create_refund_override(
         )
     ).scalar_one()
     remaining = Decimal(str(payment["amount"])) - Decimal(str(refunded))
+    if booking is not None:
+        platform_cap = platform_charge_amount(
+            payment_mode=str(booking["payment_mode"]),
+            booking_fee=Decimal(str(booking.get("booking_fee") or 0)),
+            amount_due_online=Decimal(str(booking["amount_due_online"] or 0)),
+        )
+        remaining = min(remaining, platform_cap - Decimal(str(refunded)))
     if amount > remaining:
         raise HTTPException(
             status.HTTP_409_CONFLICT,

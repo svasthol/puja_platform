@@ -1,0 +1,16 @@
+[admin login] OK token_len=239
+[GET /v1/admin/bookings] 200 keys=['next_cursor', 'bookings'] list_len=20
+[GET /v1/admin/bookings?status=confirmed&limit=5] 200 keys=['next_cursor', 'bookings'] list_len=5
+[GET /v1/admin/bookings?booking_class=advance&limit=3] 200 keys=['next_cursor', 'bookings'] list_len=3
+[GET /v1/admin/bookings/1373d9aa-b97f-4430-90a9-fbb104961383] 200 keys=['id', 'status', 'puja_name', 'scheduled_date', 'scheduled_time', 'duration_minutes'] list_len=0
+[GET /v1/admin/refunds] 422 {"detail":[{"type":"missing","loc":["query","status"],"msg":"Field required","input":null}]}
+[GET /v1/admin/refunds?status=pending&limit=5] 200 keys=['refunds', 'next_cursor'] list_len=5
+[GET /v1/admin/pujaris?limit=5] 200 keys=['pujaris', 'next_cursor'] list_len=5
+[GET /v1/admin/pujaris/982b80cc-6c43-4338-a036-2b3f3f654dee] 404 {"detail":"Not Found"}
+[GET /v1/admin/kyc?limit=5] 404 {"detail":"Not Found"}
+[GET /v1/admin/catalog] 404 {"detail":"Not Found"}
+[GET /v1/admin/relationship-managers?limit=5] 200 keys=['next_cursor', 'items'] list_len=143
+[GET /v1/admin/service-areas] 200 keys=['next_cursor', 'areas'] list_len=0
+[GET /v1/admin/promos] 200 keys=['promos', 'next_cursor'] list_len=0
+[GET /v1/admin/tds/fy-reconcile] 200 keys=['green', 'rows'] list_len=0
+[GET /v1/admin/tds/compliance-backlog] 200 keys=['parked_count', 'pending_count', 'failed_count', 'intents', 'pujari_readiness'] list_len=0

@@ -195,6 +195,7 @@ async def pujari_kyc_status(
             )
 
     all_ok = await required_docs_verified(db, pujari_id)
+    review_flags = await kyc_svc.latest_digilocker_review_flags(db, pujari_id)
     return KycPujariStatusResponse(
         pujari_id=pujari_id,
         full_name=pujari["full_name"],
@@ -203,6 +204,7 @@ async def pujari_kyc_status(
         required_doc_types=list(REQUIRED_DOC_TYPES),
         documents=summaries,
         all_required_verified=all_ok,
+        digilocker_review_flags=review_flags,
     )
 
 

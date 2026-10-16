@@ -13,7 +13,6 @@ from app.workers.sweep import get_connection
 
 log = structlog.get_logger("advance_offers")
 
-REFRESH_LOCK_KEY = "refresh_lock"
 REFRESH_LOCK_TTL_SECONDS = 280  # beat cadence 5m; release before next tick
 
 
@@ -53,14 +52,20 @@ def refresh_advance_offers(conn) -> int:
 try:
     from app.workers.celery_app import celery_app
 
+    from app.workers.redis_sync import (
+        acquire_lock,
+        get_sync_redis,
+        namespaced_key,
+        new_lock_token,
+        release_lock,
+    )
+
     @celery_app.task(name="app.workers.advance_offers.refresh_advance_offers_task")
     def refresh_advance_offers_task() -> dict:
-        import redis as redis_lib
-
-        from app.core.config import get_settings
-
-        r = redis_lib.from_url(str(get_settings().REDIS_URL))
-        if not r.set(REFRESH_LOCK_KEY, "1", nx=True, ex=REFRESH_LOCK_TTL_SECONDS):
+        lock_key = namespaced_key("refresh_advance_offers_lock")
+        lock_token = new_lock_token()
+        r = get_sync_redis()
+        if not acquire_lock(r, lock_key, lock_token, ttl_seconds=REFRESH_LOCK_TTL_SECONDS):
             log.info("refresh_advance_offers_skipped_locked")
             return {"skipped": "locked"}
 
@@ -70,7 +75,7 @@ try:
             return {"refreshed": count}
         finally:
             conn.close()
-            r.delete(REFRESH_LOCK_KEY)
+            release_lock(r, lock_key, lock_token)
 
 except ImportError:
     pass

@@ -76,9 +76,29 @@ async def test_resolve_unit_price_direct_falls_back_to_default(session):
 
 
 @pytest.mark.asyncio
-async def test_resolve_display_range(session):
+async def test_resolve_display_range_matches_catalog_default(session):
     puja_id = (
         await session.execute(text("SELECT id FROM pujas LIMIT 1"))
     ).scalar_one()
     low, high = await resolve_catalog_display_range(session, puja_id)
+    unit = await resolve_puja_unit_price(session, puja_id, None)
+    assert low == unit
     assert low <= high
+
+
+@pytest.mark.asyncio
+async def test_resolve_display_range_uses_price_max(session):
+    puja_id = uuid.uuid4()
+    cat_id = (await session.execute(text("SELECT id FROM puja_categories LIMIT 1"))).scalar_one()
+    await session.execute(
+        text(
+            "INSERT INTO pujas (id, category_id, name, default_price, price_max, "
+            "duration_minutes, is_active, created_at, updated_at) "
+            "VALUES (:id, :cat, 'Range Puja', 2000.00, 3500.00, 60, true, now(), now())"
+        ),
+        {"id": str(puja_id), "cat": cat_id},
+    )
+    await session.commit()
+    low, high = await resolve_catalog_display_range(session, puja_id)
+    assert low == Decimal("2000.00")
+    assert high == Decimal("3500.00")

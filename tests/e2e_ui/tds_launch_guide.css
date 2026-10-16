@@ -1,0 +1,233 @@
+/* TDS Launch Guide — tests/e2e_ui only */
+
+.tds-guide {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+}
+
+.tds-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-top: 1rem;
+}
+
+.tds-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+}
+
+.hold-banner {
+  flex: 1 1 280px;
+  max-width: 420px;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #b45309;
+  background: #422006;
+  color: #fde68a;
+  font-size: 0.85rem;
+}
+
+.tds-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .tds-layout {
+    grid-template-columns: 1fr;
+  }
+  .tds-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+}
+
+.tds-nav {
+  position: sticky;
+  top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tds-nav-link {
+  display: block;
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.88rem;
+  border: 1px solid transparent;
+}
+
+.tds-nav-link:hover,
+.tds-nav-link.active {
+  color: var(--text);
+  background: #1e293b;
+  border-color: var(--border);
+}
+
+.tds-section {
+  scroll-margin-top: 1rem;
+}
+
+.tds-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.tds-card {
+  padding: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.tds-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.tds-card p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.tds-card--ok { border-color: #166534; background: #052e16; }
+.tds-card--warn { border-color: #b45309; background: #422006; }
+.tds-card--hold { border-color: #64748b; background: #1e293b; }
+
+.tds-figure {
+  margin: 1rem 0;
+}
+
+.tds-figure figcaption {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.tds-svg {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  background: #121a24;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.svg-box { fill: #243044; stroke: #475569; stroke-width: 1; }
+.svg-launch { fill: #1e3a5f; stroke: #3b82f6; }
+.svg-blocked { fill: #450a0a; stroke: #ef4444; }
+.svg-hold { fill: #334155; stroke: #94a3b8; }
+.svg-muted { fill: #1e293b; stroke: #64748b; }
+.svg-ok { fill: #14532d; stroke: #22c55e; }
+.svg-fail { fill: #450a0a; stroke: #f87171; }
+.svg-pujari { fill: #14532d; stroke: #4ade80; }
+.svg-label { fill: #f1f5f9; font-size: 13px; font-family: system-ui, sans-serif; }
+.svg-sublabel { fill: #cbd5e1; font-size: 12px; font-family: system-ui, sans-serif; }
+.svg-tiny { fill: #94a3b8; font-size: 10px; font-family: system-ui, sans-serif; }
+.svg-arrow { stroke: #94a3b8; stroke-width: 2; fill: none; }
+.svg-arrow-dashed { stroke: #f59e0b; stroke-width: 2; stroke-dasharray: 4 3; fill: none; }
+
+.tds-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin: 0.75rem 0;
+}
+
+.tds-table th,
+.tds-table td {
+  border: 1px solid var(--border);
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.tds-table th {
+  background: #1e293b;
+}
+
+.tds-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.tds-scenario {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #121a24;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.tds-scenario:hover {
+  border-color: var(--accent);
+}
+
+.tds-scenario.active {
+  border-color: var(--accent);
+  background: #1e293b;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.tds-scenario-id {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tds-scenario-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.tds-scenario-http {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.tds-scenario-detail {
+  margin-top: 0.5rem;
+}
+
+.tds-scenario-detail h3 {
+  margin-top: 0;
+}
+
+.tds-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.tds-checklist li {
+  padding: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.tds-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: default;
+}

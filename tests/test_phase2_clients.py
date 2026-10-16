@@ -116,14 +116,15 @@ class TestFcmClient:
         url = post_call.args[0]
         assert "/v1/projects/manapujari/messages:send" in url
         payload = post_call.kwargs["json"]["message"]
-        assert payload["android"]["notification"]["channel_id"] == "mana_guruji_offers_high"
-        assert payload["android"]["notification"]["sound"] == "offer_instant_bell"
+        assert "notification" in payload
+        assert payload["android"]["notification"]["channel_id"] == "mana_guruji_offers_ghanta"
+        assert payload["android"]["notification"]["sound"] == "offer_instant_ghanta"
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")
     @patch("app.services.fcm_client._service_account_path")
     @patch("app.services.fcm_client.httpx.Client")
-    def test_v1_advance_offer_uses_default_notification(
+    def test_v1_advance_offer_is_data_only_silent(
         self, mock_client_cls, mock_path, mock_load_sa, mock_token
     ):
         mock_path.return_value = MagicMock()
@@ -137,14 +138,17 @@ class TestFcmClient:
             title="Offer",
             body="Advance inbox",
             priority="normal",
+            data={"type": "offer_advance", "booking_id": "b-1"},
         )
         assert result.outcome == FcmOutcome.SENT
         payload = mock_client_cls.return_value.__enter__.return_value.post.call_args.kwargs[
             "json"
         ]["message"]
+        assert "notification" not in payload
         android = payload["android"]
         assert "notification" not in android
         assert android["priority"] == "NORMAL"
+        assert payload["data"]["type"] == "offer_advance"
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")

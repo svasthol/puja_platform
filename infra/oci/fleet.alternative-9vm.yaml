@@ -1,0 +1,50 @@
+# NOT CHOSEN — reference / cost comparison only. Do not provision for launch.
+# See spec/plans/OCI_COMPUTE_FLEET.md § Alternative fleets
+version: 1
+profile: nine_vm_split_e4_primary
+status: not_chosen
+region: ap-hyderabad-1
+
+roles:
+  - name: nginx
+    shape: VM.Standard.A1.Flex
+    processor: ampere_aarch64
+    ocpu: 2
+    memory_gb: 2
+    block_gb: 30
+    count: 2
+  - name: fastapi_pgbouncer
+    shape: VM.Standard.A1.Flex
+    processor: ampere_aarch64
+    ocpu: 2
+    memory_gb: 4
+    block_gb: 40
+    count: 2
+  - name: celery_beat
+    shape: VM.Standard.A1.Flex
+    processor: ampere_aarch64
+    ocpu: 2
+    memory_gb: 4
+    block_gb: 40
+    count: 1
+  - name: redis
+    shape: VM.Standard.A1.Flex
+    processor: ampere_aarch64
+    ocpu: 2
+    memory_gb: 2
+    block_gb: 30
+    count: 2
+  - name: postgres_primary
+    shape: VM.Standard.E4.Flex
+    processor: amd_x86_64
+    ocpu: 4
+    memory_gb: 16
+    block_gb: 200
+    count: 1
+  - name: postgres_replica
+    shape: VM.Standard.A1.Flex
+    processor: ampere_aarch64
+    ocpu: 2
+    memory_gb: 8
+    block_gb: 200
+    count: 1

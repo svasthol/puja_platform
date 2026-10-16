@@ -14,6 +14,8 @@ from app.services import booking_service, razorpay_client
 
 pytestmark = pytest.mark.asyncio
 
+FEE = Decimal("61.00")
+
 
 async def test_duplicate_booking_submit_savepoint_lookup(session, seed, uniq, monkeypatch):
     """Second create for the same active slot raises DuplicateBookingSubmit with existing row."""
@@ -30,7 +32,7 @@ async def test_duplicate_booking_submit_savepoint_lookup(session, seed, uniq, mo
         await session.execute(
             text("""
                 INSERT INTO platform_settings (key, value_json) VALUES
-                ('advance_booking_amount', '{"amount": 250.00, "currency": "INR"}')
+                ('booking_fee', '{"amount": 61.00, "currency": "INR", "label": "Muhurat & Slot Lock Token"}')
                 ON CONFLICT (key) DO NOTHING
             """)
         )
@@ -68,11 +70,11 @@ async def test_duplicate_booking_submit_savepoint_lookup(session, seed, uniq, mo
                 INSERT INTO bookings (
                     id, user_id, puja_id, address_id, status_id, cancellation_policy_id,
                     scheduled_date, scheduled_time, duration_minutes, total_amount,
-                    amount_due_online, amount_due_offline, payment_mode, hold_id,
+                    amount_due_online, amount_due_offline, booking_fee, payment_mode, hold_id,
                     booking_class, razorpay_order_id, created_at, updated_at
                 ) VALUES (
                     :bid, :uid, :pid, :aid, :sid, :cpid,
-                    :sd, :st, 90, 2100, 2100, 0, 'full_online', :hid,
+                    :sd, :st, 90, 2100, 0, 2100, 61, 'booking_fee', :hid,
                     'advance', :oid, :now, :now
                 )
             """),
@@ -100,7 +102,7 @@ async def test_duplicate_booking_submit_savepoint_lookup(session, seed, uniq, mo
         hold_id=hold_id,
         puja_id=puja_id,
         address_id=address_id,
-        payment_mode="full_online",
+        payment_mode="booking_fee",
     )
 
     with pytest.raises(DuplicateBookingSubmit) as exc_info:
@@ -111,4 +113,6 @@ async def test_duplicate_booking_submit_savepoint_lookup(session, seed, uniq, mo
     assert dup.idempotent is True
     assert dup.booking_id == existing_id
     assert dup.razorpay_order_id == order_id
-    assert dup.amount_due_online == Decimal("2100")
+    assert dup.amount_due_online == Decimal("0")
+    assert dup.booking_fee == FEE
+    assert dup.razorpay_amount == FEE

@@ -205,10 +205,11 @@ role rows must exist before anything checks them).
 - **Spec:** DISPATCH_FLOW.md step 8; §16
 - **Acceptance:** INSERT splits from **snapshotted** `tax_*_config_id` on booking; `Decimal` math; IGST branch when interstate
 
-### P-TDS-393 — Income-tax withholding (s.393)
-- **Spec:** §16; GST model v1.2 §9
+### P-TDS-393 — Income-tax withholding (s.393, ex-194-O)
+- **Spec:** §16; GST model v1.2 §9. **Launch status + exit gate:** [`TDS_LAUNCH_STATUS.md`](./TDS_LAUNCH_STATUS.md); CA memo [`TDS_CA_DECISION_MEMO.md`](./TDS_CA_DECISION_MEMO.md)
 - **Priority:** **P0** — not gated on GST memo
-- **Acceptance:** FY counters, recoverable ledger, Form 140/131 paths; TAN required
+- **Launch posture:** TDS is **OFF** at MVP (`TDS_ACCRUAL_ENABLED=false`). Milestones: **L** (launch, off) → **S** (shadow — decouple PR, accrue but withhold nothing) → **P3 = this task** (deduction/deposit). Do not conflate accrual (shadow) with withholding (P3).
+- **Acceptance (P3):** FY counters (built), recoverable ledger, **recovery mechanism** (platform never holds offline funds — Q-recovery), **TAN**, deposit by 7th of next month, **26Q quarterly + Form 16A + TRACES** (supersedes the earlier Form 140/131 reference — pending CA confirmation), operative-PAN verification, `pan_enc` populated for filing
 
 ### P-RAZORPAY-ROUTE — Split settlement
 - **Spec:** GST model v1.2 §15

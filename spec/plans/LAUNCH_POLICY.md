@@ -28,6 +28,7 @@ follow the amendment + dispatch flow + API contracts.
 | **Reconfirmation** | **Mandatory** for advance bookings (≥24h lead); ping + escalation **shifted out of quiet hours** 22:00–08:00 (§21.6.H); partner **Yes** via `POST /v1/pujari/bookings/{id}/reconfirm`, **No** via `pujari-cancel` |
 | **Panchangam** | **Server-cached** `GET /v1/panchangam` for customer **home ribbon** at launch (§23.6); calendar tab Phase 2 (`C-PANCHANGAM-CALENDAR`); vendor keys server-side only; Drik/Vakya labeled; home-ribbon fields (`vaaram`, `tithi`, `nakshatram`, `rahu_kalam`, `yama_gandam`, `sunrise`, `sunset`); accuracy gate before launch |
 | **Contact** | **RM mediator** — both sides see RM name/phone; **no** customer↔pujari direct phone |
+| **TDS (income-tax s.393)** | **OFF at launch** (`TDS_ACCRUAL_ENABLED=false`) — nothing accrued/withheld/deposited. Owner-accepted s.201 exposure uses **v3 model**: TDS on facilitation **after ₹5L FY** at **0.1%** on the crossing slice (operative PAN); **5% fail-safe** only above ₹5L without operative PAN — **not** 5%×all offline GMV from ₹1. Status + staging gates: [`TDS_LAUNCH_STATUS.md`](./TDS_LAUNCH_STATUS.md), [`TDS_STAGING_ROLLOUT.md`](./TDS_STAGING_ROLLOUT.md). **Primary mitigation: PAN drive + Setu verify.** |
 | **After confirm** | Customer: pujari name + RM. Pujari: full address + static map link + RM |
 | **DB safety nets** | **Keep** `intended_pujari_id`, trigger 3, `ex_bookings_intended_no_overlap` |
 
@@ -52,4 +53,4 @@ ops and manual intervention. Automated waitlist is **Phase 2+**.
 
 ## Implementation checklist (code — not done by spec-only pass)
 
-See `plans/STATUS.md` §Puja MVP launch (P-LAUNCH-*).
+See `plans/STATUS.md` §Puja MVP launch (P-LAUNCH-*). **Production go/no-go (OCI/Linux, migrations, TDS OFF):** [`MVP_GO_NO_GO_CHECKLIST.md`](./MVP_GO_NO_GO_CHECKLIST.md).

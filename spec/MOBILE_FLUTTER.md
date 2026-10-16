@@ -6,6 +6,8 @@
 **Repo:** `mana_guruji/mana_guruji_mobile` (sibling of `puja_platform`).
 
 **Related:** [`MOBILE_FIREBASE.md`](./MOBILE_FIREBASE.md) · [`API_CONTRACTS.md`](./API_CONTRACTS.md) v3.4 ·
+[`plans/FLUTTER_TDS_ALIGNMENT_PLAN.md`](./plans/FLUTTER_TDS_ALIGNMENT_PLAN.md) ·
+[`plans/TDS_RUNTIME_CONFIG.md`](./plans/TDS_RUNTIME_CONFIG.md) ·
 [`STACK_VERSIONS.md`](./STACK_VERSIONS.md) · [`plans/LAUNCH_POLICY.md`](./plans/LAUNCH_POLICY.md) ·
 [`plans/PARTNER.md`](./plans/PARTNER.md) · [`plans/CUSTOMER.md`](./plans/CUSTOMER.md) ·
 [`plans/STATUS.md`](./plans/STATUS.md) · [`openapi.json`](./openapi.json)
@@ -61,6 +63,9 @@ not a plan reference.
 | Endpoint / field | STATUS task | State | Mobile may bind? |
 |------------------|-------------|-------|------------------|
 | `GET /v1/app-config` | `P-APP-CONFIG` | LIVE | Yes |
+| `GET /v1/me/tax-summary` | `L-SPRINT-2-TDS-PARTNER-TAX-UI` | LIVE | Yes (partner) |
+| `POST /v1/pujari/kyc/pan` | `L-SPRINT-2-TDS-KYC-PAN` | LIVE | Yes (partner) |
+| `GET/PUT /v1/me/tax-profile` | `L-SPRINT-2-TDS-PAN-PROFILE` | LIVE | Yes (partner) |
 | `GET /v1/panchangam` | `P-PANCHANGAM-API` | LIVE (contract) | Yes¹ (ribbon UI **IN_PROGRESS** — `C-PANCHANGAM-UI`) |
 | `booking_class` (C-GET/list/create) | `P-FLUTTER-CONTRACT` | LIVE | Yes |
 | `POST /v1/pujari/bookings/{id}/reconfirm` | `P-RECONFIRM-API` | LIVE | Yes |
@@ -197,7 +202,8 @@ python mana_guruji_mobile/tool/check_stack_versions_sync.py
 | **A** | Flavors, OTP, FCM, partner heartbeat/offers/bookings list | Done |
 | **B** | Design system, partner shell, customer catalogue + checkout + bookings | **IN_PROGRESS** |
 | **B shipped** | Catalogue, address, checkout E2E, booking list/detail, **customer + partner cancel UX** | Done (2026-08-09) |
-| **B next** | Customer FCM (`C-FLUTTER-FCM`); partner FCM sound QA | **IN_PROGRESS** |
+| **B shipped (TDS UX)** | Payment breakdown; partner FY tax summary + PAN profile; **FY PAN gates** (₹4.5L ⚠ / ₹5L block) — `PAN_FY_GATES.md` | Done (2026-09-14) |
+| **B next (TDS QA)** | **Phase 0b + Flutter alignment COMPLETED** (2026-09-29): openapi sync, `FY_PAN_GATE_*` l10n by code, confirm-balance warn; staging device QA per `FLUTTER_TDS_ALIGNMENT_PLAN.md` Phase 1 | **COMPLETED** (code); device QA on staging |
 | **B shipped** | Partner register + KYC onboarding UI (`P-FLUTTER-REGISTER`, `P-FLUTTER-KYC`) — device QA pending |
 | **Blocked** | Razorpay tax UI (Phase 3), earnings strip | HOLD |
 
@@ -218,4 +224,5 @@ Track mobile tasks only in [`STATUS.md`](./plans/STATUS.md) (`C-FLUTTER-*`, `P-F
 
 - Earnings / payout money UI (Phase 3)
 - Phase 3 tax snapshot / Razorpay Route settlement UI (basic checkout is **shipped** — `C-FLUTTER-CHECKOUT`)
+- **Shipped (2026-09):** checkout/detail **payment breakdown** (puja vs platform fee vs total); partner **tax summary** + **PAN profile** screens — see `lib/core/booking_payment_breakdown.dart`, `partner_tax_summary_screen.dart`, `partner_pan_profile_screen.dart`
 - `google_maps_flutter` until booking-detail maps slice (see STACK_VERSIONS PLANNED)

@@ -38,9 +38,9 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    hash_secret,
+    hash_secret_async,
     refresh_ttl_days,
-    verify_secret,
+    verify_secret_async,
 )
 from app.db.engine import get_db_txn
 from app.models.identity import AuthSession, OtpVerification, User
@@ -100,7 +100,7 @@ async def otp_request(payload: OtpRequest, db: AsyncSession = Depends(get_db_txn
             id=uuid.uuid4(),
             user_id=None,
             phone=payload.phone,
-            otp_hash=hash_secret(otp),
+            otp_hash=await hash_secret_async(otp),
             purpose="login",
             attempts=0,
             expires_at=now + dt.timedelta(minutes=settings.OTP_EXPIRE_MINUTES),
@@ -152,7 +152,7 @@ async def otp_verify(payload: OtpVerify, db: AsyncSession = Depends(get_db_txn))
     if failures >= settings.OTP_MAX_ATTEMPTS or row.attempts >= settings.OTP_MAX_ATTEMPTS:
         raise HTTPException(http.HTTP_400_BAD_REQUEST, "Too many attempts. Request a new OTP.")
 
-    if not verify_secret(payload.otp, row.otp_hash):
+    if not await verify_secret_async(payload.otp, row.otp_hash):
         count = await _record_otp_failure(row.id)
         log.warning("otp_verify_failed", phone=payload.phone, failures=count)
         raise HTTPException(http.HTTP_401_UNAUTHORIZED, "Incorrect OTP.")
@@ -178,12 +178,12 @@ async def otp_verify(payload: OtpVerify, db: AsyncSession = Depends(get_db_txn))
 
     # app_context comes from the validated body — Literal["customer","pujari"].
     # 'admin' is impossible here by construction (P-ADMIN-AUTH-FIX).
-    return _issue_token_pair(
+    return await _issue_token_pair(
         db, user_id=user.id, app_context=payload.app_context, device_id=None, now=now
     )
 
 
-def _issue_token_pair(
+async def _issue_token_pair(
     db: AsyncSession,
     *,
     user_id: uuid.UUID,
@@ -201,7 +201,7 @@ def _issue_token_pair(
             user_id=user_id,
             device_id=device_id,
             app_context=app_context,
-            refresh_token_hash=hash_secret(refresh),
+            refresh_token_hash=await hash_secret_async(refresh),
             refresh_jti=jti,
             issued_at=now,
             expires_at=now + dt.timedelta(days=refresh_ttl_days(app_context)),
@@ -265,7 +265,7 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db_txn
     if sess.expires_at <= now:
         raise HTTPException(http.HTTP_401_UNAUTHORIZED, "Session expired")
 
-    if not verify_secret(payload.refresh_token, sess.refresh_token_hash):
+    if not await verify_secret_async(payload.refresh_token, sess.refresh_token_hash):
         # jti matched but the token bytes don't — forged/corrupted token.
         log.warning("refresh_hash_mismatch", user_id=str(sess.user_id))
         raise HTTPException(http.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
@@ -274,7 +274,7 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db_txn
     # pre-existing behaviour; per-context TTL caps land with P-ADMIN-AUTH.
     sess.revoked_at = now
     sess.revoked_reason = "rotated"
-    return _issue_token_pair(
+    return await _issue_token_pair(
         db,
         user_id=sess.user_id,
         app_context=sess.app_context,
@@ -289,7 +289,7 @@ async def logout(payload: RefreshRequest, db: AsyncSession = Depends(get_db_txn)
     # logout idempotent. The signature is still verified.
     _claims, sess = await _resolve_refresh_session(db, payload.refresh_token, verify_exp=False)
     if sess is not None and sess.revoked_at is None:
-        if not verify_secret(payload.refresh_token, sess.refresh_token_hash):
+        if not await verify_secret_async(payload.refresh_token, sess.refresh_token_hash):
             raise HTTPException(http.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
         sess.revoked_at = dt.datetime.now(dt.UTC)
         sess.revoked_reason = "logout"

@@ -23,17 +23,43 @@ from psycopg.rows import dict_row
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-BOOKING_FOR_PAYMENT_SQL = """
+def _booking_for_payment_sql(conn) -> str:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'bookings'
+              AND column_name = 'booking_fee'
+            LIMIT 1
+            """
+        )
+        has_fee = cur.fetchone() is not None
+    fee_col = "b.booking_fee," if has_fee else "NULL::numeric AS booking_fee,"
+    return f"""
 SELECT
   b.id::text AS booking_id,
   st.code AS status,
   b.amount_due_online,
+  {fee_col}
+  b.payment_mode,
   b.paid_at
 FROM bookings b
 JOIN status_types st ON st.id = b.status_id
 WHERE b.id = %s::uuid
 LIMIT 1
 """
+
+
+def _payment_amount_paise(row: dict) -> int:
+    """Sprint 1: Razorpay = booking_fee. Legacy: amount_due_online."""
+    mode = row.get("payment_mode") or ""
+    fee = row.get("booking_fee")
+    if mode == "booking_fee" and fee is not None:
+        return int(Decimal(str(fee)) * 100)
+    if fee is not None and Decimal(str(row.get("amount_due_online") or 0)) == 0:
+        return int(Decimal(str(fee)) * 100)
+    return int(Decimal(str(row.get("amount_due_online") or 0)) * 100)
 
 
 def _normalize_db_url(url: str) -> str:
@@ -67,8 +93,9 @@ def confirm_booking_payment(
         )
 
     with psycopg.connect(_normalize_db_url(db_url), row_factory=dict_row) as conn:
+        sql = _booking_for_payment_sql(conn)
         with conn.cursor() as cur:
-            cur.execute(BOOKING_FOR_PAYMENT_SQL, (booking_id,))
+            cur.execute(sql, (booking_id,))
             row = cur.fetchone()
     if row is None:
         raise ValueError(f"Booking not found: {booking_id}")
@@ -81,8 +108,7 @@ def confirm_booking_payment(
             "message": "Booking already has paid_at set",
         }
 
-    amount_online = Decimal(str(row["amount_due_online"]))
-    amount_paise = int(amount_online * 100)
+    amount_paise = _payment_amount_paise(row)
     payment_id = f"pay_e2e_{uuid.uuid4().hex[:12]}"
     body = {
         "event": "payment.captured",

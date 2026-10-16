@@ -1,0 +1,13 @@
+[setup] puja='Griha Pravesham' price=4200.00 pujari=5f12ff01-8674-44c7-9f16-9a4ba7826f19 addr=ca6c9ba2-16d8-4556-ab9b-dae243b511e6
+[GET /v1/pujas] 200 count=5
+[GET /v1/pujas/id] 200 name='గృహప్రవేశం' content_items=5 addons=4
+[GET /v1/panchangam] 404 body_keys={"detail":"Panchangam not available for this city and date yet."}
+[GET /v1/checkout/quote] 200 total=4200.00 booking_fee=61.00 razorpay_amount=61.00 mode=booking_fee
+[POST /v1/slot-holds] 201 class=advance warnings=[]
+[POST /v1/bookings] 201 booking_id=71fe108f-c6ee-44b1-86ed-b067bb13f5ca class=advance order=order_TjwfERJUAhqxmb razorpay_amount=61.00 total=4200.00
+[POST /v1/webhooks/razorpay] 200 {"status":"ok","result":"confirmed"}
+[dispatch.broadcast_booking] -> {'round': 2, 'offers': 0}
+[GET /v1/bookings/id] 200 status=requested payment_mode=booking_fee razorpay_amount=61.00 history=['requested']
+[notifications] rows_for_booking=1 sample=[('pujari', 'New puja offer')] offers=1 offer_status=['offered']
+[POST /v1/bookings/id/cancel] 200 {"booking_id":"71fe108f-c6ee-44b1-86ed-b067bb13f5ca","status":"cancelled","refund_amount":"61.00","refund_eta":"5–7 business days"}
+[refund row] [('pending', Decimal('61.00'))]  offers_after_cancel=['expired']

@@ -28,25 +28,64 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.booking import Booking, SlotHold
 from app.models.payment import Payment, Refund
 from app.services import booking_events
+from app.services.pricing import platform_charge_amount
 from app.services.status import status_id
 
 log = structlog.get_logger()
 
 
-async def _insert_late_refund(db: AsyncSession, *, payment: Payment, booking: Booking) -> None:
-    """Full auto-refund of the online amount for late/double-paid cases."""
+def _refund_cap(booking: Booking) -> Decimal:
+    return platform_charge_amount(
+        payment_mode=booking.payment_mode,
+        booking_fee=Decimal(str(booking.booking_fee or 0)),
+        amount_due_online=Decimal(str(booking.amount_due_online)),
+    )
+
+
+async def _insert_late_refund(
+    db: AsyncSession,
+    *,
+    payment: Payment,
+    booking: Booking,
+    amount: Decimal | None = None,
+) -> None:
+    """Auto-refund for late/double-paid/mismatched captures."""
+    refund_amt = amount if amount is not None else _refund_cap(booking)
+    if refund_amt <= 0:
+        return
     db.add(
         Refund(
             id=uuid.uuid4(),
             payment_id=payment.id,
             booking_id=booking.id,
-            amount=Decimal(str(booking.amount_due_online)),
+            amount=refund_amt,
             reason="late_payment",
             status="pending",
             attempt_count=0,
             next_attempt_at=dt.datetime.now(dt.UTC),
             created_at=dt.datetime.now(dt.UTC),
         )
+    )
+
+
+async def _insert_payment_split(
+    db: AsyncSession, *, payment_id: uuid.UUID, booking: Booking
+) -> None:
+    """Platform revenue split — trigger 1 computes net_pujari_amount."""
+    if booking.payment_mode != "booking_fee":
+        return
+    fee = Decimal(str(booking.booking_fee or 0))
+    if fee <= 0:
+        return
+    await db.execute(
+        text(
+            """
+            INSERT INTO payment_splits (id, payment_id, platform_fee, gst_amount)
+            VALUES (gen_random_uuid(), :pid, :fee, 0)
+            ON CONFLICT (payment_id) DO NOTHING
+            """
+        ),
+        {"pid": str(payment_id), "fee": str(fee)},
     )
 
 
@@ -60,11 +99,21 @@ async def handle_payment_captured(
 ) -> dict:
     now = dt.datetime.now(dt.UTC)
 
-    # (a) record payment — idempotency_key UNIQUE dedupes retries
+    booking_row = (
+        await db.execute(select(Booking).where(Booking.id == booking_id).with_for_update())
+    ).scalar_one_or_none()
+    if booking_row is None:
+        log.error("webhook_booking_missing", booking_id=str(booking_id))
+        return {"status": "booking_missing"}
+
+    expected_paise = int((_refund_cap(booking_row) * 100).quantize(Decimal("1")))
+    captured = Decimal(amount_paise) / Decimal(100)
+    amount_mismatch = expected_paise > 0 and amount_paise != expected_paise
+
     payment = Payment(
         id=uuid.uuid4(),
         booking_id=booking_id,
-        amount=Decimal(amount_paise) / Decimal(100),
+        amount=captured,
         idempotency_key=idempotency_key,
         gateway_txn_id=gateway_txn_id,
         status="success",
@@ -81,33 +130,32 @@ async def handle_payment_captured(
             return {"status": "already_processed"}
         raise
 
-    # (b) lock booking
-    booking = (
-        await db.execute(select(Booking).where(Booking.id == booking_id).with_for_update())
-    ).scalar_one_or_none()
-    if booking is None:
-        log.error("webhook_booking_missing", booking_id=str(booking_id))
-        return {"status": "booking_missing"}
-
+    booking = booking_row
     pending_id = await status_id(db, "booking", "payment_pending")
     requested_id = await status_id(db, "booking", "requested")
 
-    # (d) sweep already abandoned it, or it's terminal -> auto-refund, no resurrect
+    if amount_mismatch:
+        await _insert_late_refund(db, payment=payment, booking=booking, amount=captured)
+        log.warning(
+            "webhook_amount_mismatch_autorefund",
+            booking_id=str(booking_id),
+            expected_paise=expected_paise,
+            got_paise=amount_paise,
+        )
+        return {"status": "auto_refund_initiated", "reason": "amount_mismatch"}
+
     if booking.status_id != pending_id or booking.cancelled_at is not None:
         await _insert_late_refund(db, payment=payment, booking=booking)
         log.info("webhook_late_autorefund", booking_id=str(booking_id))
         return {"status": "auto_refund_initiated"}
 
-    # (c) happy path — arm paid_at, flip to requested. The intended-overlap
-    # exclusion may fire here if another customer paid this window first.
-    # Wrap ONLY the flip in a SAVEPOINT so a violation rolls back the flip but
-    # keeps the payment row (which we must retain), then we auto-refund.
     try:
-        async with db.begin_nested():  # SAVEPOINT
+        async with db.begin_nested():
             booking.paid_at = now
             booking.status_id = requested_id
             booking.updated_at = now
             await db.flush()
+            await _insert_payment_split(db, payment_id=payment.id, booking=booking)
     except IntegrityError as exc:
         if isinstance(getattr(exc, "orig", None), ExclusionViolation):
             await _insert_late_refund(db, payment=payment, booking=booking)
@@ -115,7 +163,6 @@ async def handle_payment_captured(
             return {"status": "auto_refund_initiated"}
         raise
 
-    # history + convert hold
     await db.execute(
         text(
             "INSERT INTO booking_status_history (id, booking_id, status_id, changed_by, changed_at) "

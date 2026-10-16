@@ -20,8 +20,17 @@ class PartnerRegisterResponse(BaseModel):
 
 class DigilockerStartResponse(BaseModel):
     request_id: uuid.UUID
-    url: str
+    url: str | None = None
     expires_at: dt.datetime
+    status: str = "created"
+
+
+class KycActiveDigilockerRequest(BaseModel):
+    request_id: uuid.UUID
+    status: str
+    expires_at: dt.datetime
+    url: str | None = None
+    review_flags: list[str] = Field(default_factory=list)
 
 
 class KycRequestStatusResponse(BaseModel):
@@ -43,6 +52,7 @@ class KycDocRequirement(BaseModel):
 class PartnerKycStatusResponse(BaseModel):
     verification_status: str
     required: list[KycDocRequirement]
+    active_digilocker_request: KycActiveDigilockerRequest | None = None
 
 
 class SelfiePresignRequest(BaseModel):

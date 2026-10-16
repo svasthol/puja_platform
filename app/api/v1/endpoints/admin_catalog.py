@@ -43,6 +43,7 @@ from app.schemas.catalog_admin import (
     MediaResponse,
 )
 from app.services.audit import record_admin_action
+from app.services.catalog_visibility import assert_puja_customer_launch_complete
 from app.services.partner_dispatch_readiness import ensure_puja_pricing_for_verified_pujaris
 from app.services.catalog_media import (
     CatalogMediaError,
@@ -144,6 +145,14 @@ def _validate_price_max(default_price: Decimal, price_max: Decimal | None) -> No
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "price_max must be greater than or equal to default_price.",
+        )
+
+
+def _validate_default_price(default_price: Decimal) -> None:
+    if default_price <= 0:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "default_price must be greater than zero.",
         )
 
 
@@ -326,6 +335,7 @@ async def create_puja(
     p: Principal = Depends(require_admin_role),
     db: AsyncSession = Depends(get_db_txn),
 ):
+    _validate_default_price(payload.default_price)
     _validate_price_max(payload.default_price, payload.price_max)
     await _require_category(db, payload.category_id)
 
@@ -343,7 +353,7 @@ async def create_puja(
         default_price=payload.default_price,
         price_max=payload.price_max,
         display_order=await _next_puja_order(db, payload.category_id),
-        is_active=True,
+        is_active=False,
         created_at=now,
         updated_at=now,
     )
@@ -391,6 +401,7 @@ async def update_puja(
     new_max = payload.price_max if payload.price_max is not None else (
         Decimal(str(puja.price_max)) if puja.price_max is not None else None
     )
+    _validate_default_price(new_default)
     _validate_price_max(new_default, new_max)
 
     if payload.category_id is not None:
@@ -409,6 +420,8 @@ async def update_puja(
     if "price_max" in payload.model_fields_set:
         puja.price_max = payload.price_max
     if payload.is_active is not None:
+        if payload.is_active and not puja.is_active:
+            await assert_puja_customer_launch_complete(db, puja_id)
         puja.is_active = payload.is_active
     if payload.hero_media_id is not None:
         puja.hero_media_id = payload.hero_media_id
@@ -550,10 +563,41 @@ async def puja_impact(
             )
         )
     ).scalar_one()
+    from app.services.pricing_resolver import resolve_catalog_display_range
+
+    puja_row = (
+        await db.execute(
+            text("SELECT default_price FROM pujas WHERE id = :pid"),
+            {"pid": str(puja_id)},
+        )
+    ).mappings().first()
+    default_price = Decimal(str(puja_row["default_price"]))
+    price_from, price_to = await resolve_catalog_display_range(db, puja_id)
+    pricing_stats = (
+        await db.execute(
+            text(
+                """
+                SELECT count(*)::int AS cnt, MIN(pp.base_price) AS min_price
+                FROM pujari_pricing pp
+                JOIN pujaris pj ON pj.id = pp.pujari_id
+                WHERE pp.puja_id = :pid AND pj.verification_status = 'verified'
+                """
+            ),
+            {"pid": str(puja_id)},
+        )
+    ).mappings().first()
+    min_pujari = pricing_stats["min_price"]
     return PujaImpactResponse(
         puja_id=puja_id,
         active_future_bookings=int(bookings),
         active_holds_unscoped=int(holds),
+        default_price=default_price,
+        customer_price_from=price_from,
+        customer_price_to=price_to,
+        verified_pujari_pricing_count=int(pricing_stats["cnt"] or 0),
+        lowest_pujari_base_price=(
+            Decimal(str(min_pujari)) if min_pujari is not None else None
+        ),
     )
 
 

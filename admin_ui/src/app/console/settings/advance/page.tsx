@@ -7,37 +7,40 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { fetchAdvanceAmount, updateAdvanceAmount } from "@/lib/api/admin";
+import { fetchBookingFee, updateBookingFee } from "@/lib/api/admin";
 import { canEditAdvanceAmount } from "@/lib/auth/roles";
 import { useAdminMe } from "@/lib/hooks/use-admin-me";
 
-export default function AdvanceSettingsPage() {
+export default function BookingFeeSettingsPage() {
   const { data: me } = useAdminMe();
   const qc = useQueryClient();
   const canEdit = canEditAdvanceAmount(me);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["admin", "advance"],
-    queryFn: fetchAdvanceAmount,
+    queryKey: ["admin", "booking-fee"],
+    queryFn: fetchBookingFee,
   });
 
   const [amount, setAmount] = useState("");
+  const [label, setLabel] = useState("");
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (data?.amount != null) setAmount(String(data.amount));
-  }, [data?.amount]);
+    if (data?.label) setLabel(data.label);
+  }, [data?.amount, data?.label]);
 
   const mutation = useMutation({
     mutationFn: () =>
-      updateAdvanceAmount({
+      updateBookingFee({
         amount: Number(amount),
+        label: label.trim() || undefined,
         change_reason: reason.trim() || undefined,
       }),
     onSuccess: async () => {
-      setMessage("Saved — next customer quote will use the new advance amount.");
-      await qc.invalidateQueries({ queryKey: ["admin", "advance"] });
+      setMessage("Saved — next customer quote will use the new booking fee.");
+      await qc.invalidateQueries({ queryKey: ["admin", "booking-fee"] });
     },
     onError: (err: Error) => setMessage(err.message),
   });
@@ -45,8 +48,8 @@ export default function AdvanceSettingsPage() {
   return (
     <>
       <Header
-        title="Advance booking amount"
-        description="Platform-wide default for advance_balance payment mode. Changes are audited."
+        title="Muhurat & Slot Lock Token"
+        description="Platform-wide booking fee collected online at checkout (Sprint 1 launch model)."
       />
       <div className="max-w-xl p-8">
         <Card>
@@ -68,6 +71,7 @@ export default function AdvanceSettingsPage() {
                 ₹{data.amount}{" "}
                 <span className="text-base font-normal text-ink-muted">{data.currency}</span>
               </p>
+              <p className="text-sm text-ink-muted">{data.label}</p>
               {data.updated_at && (
                 <p className="text-xs text-ink-faint">Last updated: {data.updated_at}</p>
               )}
@@ -91,6 +95,16 @@ export default function AdvanceSettingsPage() {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       required
+                    />
+                  </label>
+                  <label className="block text-sm text-ink-muted">
+                    Customer-facing label
+                    <Input
+                      className="mt-1"
+                      value={label}
+                      onChange={(e) => setLabel(e.target.value)}
+                      placeholder="Muhurat & Slot Lock Token"
+                      maxLength={120}
                     />
                   </label>
                   <label className="block text-sm text-ink-muted">

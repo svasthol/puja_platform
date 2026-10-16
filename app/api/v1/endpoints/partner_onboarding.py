@@ -14,6 +14,7 @@ from app.core.dependencies import Principal, require_pujari
 from app.db.engine import get_db, get_db_txn
 from app.schemas.partner_kyc import (
     DigilockerStartResponse,
+    KycActiveDigilockerRequest,
     KycDocRequirement,
     KycRequestStatusResponse,
     PartnerKycStatusResponse,
@@ -23,8 +24,10 @@ from app.schemas.partner_kyc import (
     SelfiePresignRequest,
     SelfiePresignResponse,
 )
+from app.schemas.tax_profile import PujariPanSubmitRequest, PujariPanSubmitResponse
 from app.services import partner_kyc_service as kyc_svc
 from app.services.partner_kyc_service import PartnerKycError
+from app.services.pujari_compliance import submit_partner_pan
 
 router = APIRouter(prefix="/pujari", tags=["pujari-onboarding"])
 callback_router = APIRouter(tags=["pujari-kyc-callback"])
@@ -100,8 +103,9 @@ async def start_digilocker(
         raise _map_kyc_error(exc) from exc
     return DigilockerStartResponse(
         request_id=row.id,
-        url=url,
+        url=url or None,
         expires_at=row.expires_at,
+        status=row.status,
     )
 
 
@@ -212,6 +216,31 @@ async def confirm_selfie_document(
     )
 
 
+@router.post("/kyc/pan", response_model=PujariPanSubmitResponse)
+async def submit_pan(
+    payload: PujariPanSubmitRequest,
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Partner PAN + entity type for TDS (Setu verify when KYC_SETU_PAN_PRODUCT_ID set)."""
+    pid = await _pujari_id(db, p.user_id)
+    result = await submit_partner_pan(
+        db,
+        pujari_id=pid,
+        entity_type=payload.entity_type,
+        pan=payload.pan,
+        consent=payload.consent,
+        reason=payload.reason,
+    )
+    return PujariPanSubmitResponse(
+        entity_type=result["entity_type"],
+        pan_on_file=result["pan_on_file"],
+        pan_status=result["pan_status"],
+        message=result["message"],
+        verified_name=result.get("verified_name"),
+    )
+
+
 @router.get("/kyc/status", response_model=PartnerKycStatusResponse)
 async def partner_kyc_status(
     p: Principal = Depends(require_pujari),
@@ -219,13 +248,29 @@ async def partner_kyc_status(
 ):
     pid = await _pujari_id(db, p.user_id)
     try:
-        verification_status, required = await kyc_svc.get_partner_kyc_status(db, pid)
+        verification_status, required, live = await kyc_svc.get_partner_kyc_status(
+            db, pid
+        )
     except PartnerKycError as exc:
         raise _map_kyc_error(exc) from exc
+
+    active: KycActiveDigilockerRequest | None = None
+    if live is not None:
+        flags = live.review_flags if isinstance(live.review_flags, list) else []
+        resume_url = await kyc_svc.digilocker_resume_url(live)
+        active = KycActiveDigilockerRequest(
+            request_id=live.id,
+            status=live.status,
+            expires_at=live.expires_at,
+            url=resume_url,
+            review_flags=flags,
+        )
+
     return PartnerKycStatusResponse(
         verification_status=verification_status,
         required=[
             KycDocRequirement(doc_type=t, status=st, document_id=doc_id)
             for t, st, doc_id in required
         ],
+        active_digilocker_request=active,
     )

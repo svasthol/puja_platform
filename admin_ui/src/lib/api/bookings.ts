@@ -5,12 +5,14 @@ import {
   type BookingDetail,
 } from "@/lib/schemas/bookings";
 import { bookingMoneySchema } from "@/lib/schemas/money";
+import { bookingTdsSchema } from "@/lib/schemas/booking-tds";
 import { disputeResponseSchema } from "@/lib/schemas/dispute";
 
 export async function fetchBookings(params?: {
   phone?: string;
   booking_id?: string;
   status?: string;
+  booking_class?: string;
   date_from?: string;
   date_to?: string;
   cursor?: string;
@@ -20,6 +22,7 @@ export async function fetchBookings(params?: {
   if (params?.phone) sp.set("phone", params.phone);
   if (params?.booking_id) sp.set("booking_id", params.booking_id);
   if (params?.status) sp.set("status", params.status);
+  if (params?.booking_class) sp.set("booking_class", params.booking_class);
   if (params?.date_from) sp.set("date_from", params.date_from);
   if (params?.date_to) sp.set("date_to", params.date_to);
   if (params?.cursor) sp.set("cursor", params.cursor);
@@ -44,6 +47,10 @@ export async function reassignBooking(
 
 export async function fetchBookingMoney(bookingId: string) {
   return apiFetch(`/admin/bookings/${bookingId}/money`, { schema: bookingMoneySchema });
+}
+
+export async function fetchBookingTds(bookingId: string) {
+  return apiFetch(`/admin/bookings/${bookingId}/tds`, { schema: bookingTdsSchema });
 }
 
 export async function disputeBooking(

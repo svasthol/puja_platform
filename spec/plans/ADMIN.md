@@ -319,6 +319,16 @@ Status: **COMPLETED** in `STATUS.md`.
 - **Spec:** API_CONTRACTS.md; §19 (audit read)
 - **Acceptance:** Search by phone, booking id, date range, status — logs `A-AUDIT-LOG` read
 
+### A-BOOKINGS-OPS — Instant vs advance ops queues
+- **Spec:** API_CONTRACTS.md `GET /v1/admin/bookings` (`booking_class=instant|advance` filter)
+- **Files:** `app/api/v1/endpoints/admin_bookings.py`; `admin_ui/.../bookings/ops/`
+- **Acceptance:** Ops can slice live backlog by booking class without ad-hoc SQL; pairs with Sprint 4C search/detail/reassign
+
+### A-PUJARI-FY-EARNINGS — FY facilitation gross (ops recon)
+- **Spec:** API_CONTRACTS.md `GET /v1/admin/pujaris/fy-earnings`; gate levels in **`PAN_FY_GATES.md`**
+- **Files:** `app/api/v1/endpoints/admin_pujari_fy_report.py`; `admin_ui/.../partners/fy-earnings/`
+- **Acceptance:** Admin lists pujari FY facilitated gross for TDS readiness / PAN-drive prioritization (read-only; not payout)
+
 ### A-BOOKING-DETAIL — Booking 360°
 - **Spec:** §19; mirrors `C-GET` + admin fields
 - **Acceptance:** Status history, assignments, payment, refunds, dispatch state, address

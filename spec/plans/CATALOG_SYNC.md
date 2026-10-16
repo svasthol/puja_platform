@@ -38,6 +38,19 @@ Admin UI  ──write──►  /admin/catalog/*  ──►  pujas, puja_categor
 
 ---
 
+## Pricing (launch broadcast)
+
+| Surface | Source |
+|---------|--------|
+| Customer `GET /v1/pujas` `price_from` / `price_to` | Admin catalog `default_price` + optional `price_max` (display cap) |
+| `GET /checkout/quote` + `POST /bookings` puja line | Same — `pricing_resolver.resolve_puja_unit_price(pujari_id=None)` |
+| `GET /v1/pujaris` `unit_price` (browse) | Same catalog unit at launch — not per-priest marketplace pricing |
+| `pujari_pricing.base_price` | Dispatch eligibility + supply only; auto-seeded from catalog on verify/create |
+
+Changing **Default price** in Admin → Catalogue updates customer display and checkout. **Pujari → Pricing** remains required for offers.
+
+---
+
 ## Endpoint map
 
 | Action | Admin UI | Customer Flutter | Backend |

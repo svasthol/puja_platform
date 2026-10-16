@@ -48,9 +48,12 @@ class PujariBookingDetail(BaseModel):
     duration_minutes: int
     payment_mode: str
     total_amount: Decimal
+    booking_fee: Decimal = Decimal("0")
+    booking_fee_label: str | None = None
     amount_due_online: Decimal
     amount_due_offline: Decimal
     balance_collected_at: dt.datetime | None
+    balance_collected_amount: Decimal | None = None
     area_label: str | None
     address: PujariBookingAddress
     map_url: str | None

@@ -18,6 +18,37 @@ def _customer(uid: uuid.UUID) -> Principal:
     return Principal(user_id=uid, app_context="customer", roles=())
 
 
+async def _attach_customer_launch_visibility(session, puja_id: uuid.UUID) -> None:
+    """te puja_i18n + verified pujari_pricing — required for customer catalogue."""
+    pujari_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    await session.execute(
+        text("INSERT INTO users (id, full_name, phone) VALUES (:id, 'P', :ph)"),
+        {"id": str(user_id), "ph": "+91970" + uuid.uuid4().hex[:7]},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO pujaris (id, user_id, verification_status, created_at, updated_at) "
+            "VALUES (:p, :u, 'verified', now(), now())"
+        ),
+        {"p": str(pujari_id), "u": str(user_id)},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO puja_i18n (puja_id, locale, name) "
+            "VALUES (:pid, 'te', 'తెలుగు పూజా పేరు')"
+        ),
+        {"pid": str(puja_id)},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO pujari_pricing (id, pujari_id, puja_id, base_price) "
+            "VALUES (:id, :pid, :puja, 1500.00)"
+        ),
+        {"id": str(uuid.uuid4()), "pid": str(pujari_id), "puja": str(puja_id)},
+    )
+
+
 @pytest.mark.asyncio
 async def test_list_pujas_includes_price_range_and_categories(session):
     customer_id = uuid.uuid4()
@@ -83,6 +114,7 @@ async def test_get_puja_detail_content_addons(session):
         ),
         {"id": str(uuid.uuid4()), "pid": str(puja_id)},
     )
+    await _attach_customer_launch_visibility(session, puja_id)
     await session.commit()
 
     detail = await cat_ep.get_puja(puja_id, locale="en", _p=_customer(customer_id), db=session)
@@ -92,6 +124,79 @@ async def test_get_puja_detail_content_addons(session):
     assert kinds.get("inclusion") == ["Flowers"]
     assert len(detail.addons) == 1
     assert detail.addons[0].name == "Extra prasad"
+
+
+@pytest.mark.asyncio
+async def test_incomplete_puja_without_te_i18n_hidden_from_customers(session):
+    customer_id = uuid.uuid4()
+    puja_id = uuid.uuid4()
+    cat_id = (await session.execute(text("SELECT id FROM puja_categories LIMIT 1"))).scalar_one()
+    await session.execute(
+        text("INSERT INTO users (id, full_name, phone) VALUES (:id, 'C', :ph)"),
+        {"id": str(customer_id), "ph": "+91982" + uuid.uuid4().hex[:7]},
+    )
+    slug = f"incomplete-{uuid.uuid4().hex[:8]}"
+    await session.execute(
+        text(
+            "INSERT INTO pujas (id, category_id, name, slug, default_price, duration_minutes, "
+            "is_active, display_order, created_at, updated_at) "
+            "VALUES (:id, :cat, 'Incomplete Puja', :slug, 1500.00, 45, true, 0, now(), now())"
+        ),
+        {"id": str(puja_id), "cat": cat_id, "slug": slug},
+    )
+    await session.commit()
+
+    listed = await cat_ep.list_pujas(limit=50, _p=_customer(customer_id), db=session)
+    assert puja_id not in {p.id for p in listed.pujas}
+
+    with pytest.raises(HTTPException) as exc:
+        await cat_ep.get_puja(puja_id, _p=_customer(customer_id), db=session)
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_puja_detail_te_falls_back_content_when_no_te_content(session):
+    """te locale detail must not 500 when only en content rows exist (puja has te i18n name)."""
+    customer_id = uuid.uuid4()
+    puja_id = uuid.uuid4()
+    cat_id = (await session.execute(text("SELECT id FROM puja_categories LIMIT 1"))).scalar_one()
+
+    await session.execute(
+        text("INSERT INTO users (id, full_name, phone) VALUES (:id, 'C', :ph)"),
+        {"id": str(customer_id), "ph": "+91983" + uuid.uuid4().hex[:7]},
+    )
+    slug = f"te-fallback-{uuid.uuid4().hex[:8]}"
+    await session.execute(
+        text(
+            "INSERT INTO pujas (id, category_id, name, slug, default_price, duration_minutes, "
+            "is_active, display_order, created_at, updated_at) "
+            "VALUES (:id, :cat, 'English Only Puja', :slug, 1500.00, 45, true, 0, now(), now())"
+        ),
+        {"id": str(puja_id), "cat": cat_id, "slug": slug},
+    )
+    # en content + en addon, but NO te rows anywhere (and no en puja_i18n row).
+    await session.execute(
+        text(
+            "INSERT INTO puja_content_items (id, puja_id, kind, position, locale, text, is_active) "
+            "VALUES (:id, :pid, 'inclusion', 0, 'en', 'English item', true)"
+        ),
+        {"id": str(uuid.uuid4()), "pid": str(puja_id)},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO puja_addons (id, puja_id, name, price, display_order, is_active) "
+            "VALUES (:id, :pid, 'English Addon', 50.00, 0, true)"
+        ),
+        {"id": str(uuid.uuid4()), "pid": str(puja_id)},
+    )
+    await _attach_customer_launch_visibility(session, puja_id)
+    await session.commit()
+
+    detail = await cat_ep.get_puja(puja_id, locale="te", _p=_customer(customer_id), db=session)
+    assert detail.name == "తెలుగు పూజా పేరు"
+    kinds = {b.kind: b.items for b in detail.content}
+    assert kinds.get("inclusion") == ["English item"]
+    assert detail.addons and detail.addons[0].name == "English Addon"
 
 
 @pytest.mark.asyncio
@@ -183,7 +288,7 @@ async def test_pujaris_unit_price_matches_resolver(session):
     if match is None:
         pytest.skip("Pujari not returned for slot (availability/overlap filters)")
 
-    expected = await resolve_puja_unit_price(session, puja_id, pujari_id)
+    expected = await resolve_puja_unit_price(session, puja_id, None)
     assert match.unit_price == expected
 
 
@@ -233,6 +338,7 @@ async def test_addon_image_url_ready_and_pending(session):
         ),
         {"id": str(addon_id), "pid": str(puja_id), "mid": str(ready_media_id)},
     )
+    await _attach_customer_launch_visibility(session, puja_id)
     await session.commit()
 
     detail = await cat_ep.get_puja(puja_id, locale="en", _p=_customer(customer_id), db=session)

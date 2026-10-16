@@ -3,12 +3,13 @@ Cancellation (spec DISPATCH_FLOW "Cancellation", API_CONTRACTS cancel).
 
 State-gated in the app AND by bu_bookings_cancel_guard trigger. One transaction:
 set cancelled_at + flip status to 'cancelled' + history row + refunds row.
-Refund is ALWAYS capped at amount_due_online; offline balance never refunded.
+Refund is capped at platform-collected money (booking_fee at launch; legacy modes
+use amount_due_online). Offline puja balance is never refunded via Razorpay.
 
 Refund reason/percent by status:
   payment_pending -> void, NO refund row (nothing captured).
-  requested       -> 100% of amount_due_online.
-  confirmed       -> policy % of amount_due_online (before/after 24h, Asia/Kolkata).
+  requested       -> 100% of platform charge (booking_fee or amount_due_online).
+  confirmed       -> booking_fee: 0%; legacy: policy % of amount_due_online.
   terminal/in_progress/completed -> blocked (409/410); admin override only.
 """
 from __future__ import annotations
@@ -29,6 +30,7 @@ from app.models.booking import Booking
 from app.models.lookups import CancellationPolicy
 from app.models.payment import Payment, Refund
 from app.schemas.booking import CancelResponse
+from app.services.pricing import customer_cancel_refund_amount
 from app.services.status import status_id
 
 log = structlog.get_logger()
@@ -68,12 +70,10 @@ async def cancel_booking(
     cancelled_id = await status_id(db, "booking", "cancelled")
     expected_status_id = booking.status_id
 
-    # compute refund of amount_due_online only
+    booking_fee = Decimal(str(booking.booking_fee or 0))
     online = Decimal(str(booking.amount_due_online))
-    refund_amount = Decimal("0")
-    if code == "requested":
-        refund_amount = online
-    elif code == "confirmed":
+    policy_pct = 0
+    if code == "confirmed":
         policy = (
             await db.execute(
                 select(CancellationPolicy).where(
@@ -85,8 +85,16 @@ async def cancel_booking(
             booking.scheduled_date, booking.scheduled_time, tzinfo=_TZ
         )
         hours_out = (scheduled - now.astimezone(_TZ)).total_seconds() / 3600
-        pct = policy.refund_pct_before_24h if hours_out >= 24 else policy.refund_pct_after_24h
-        refund_amount = (online * Decimal(pct) / Decimal(100)).quantize(Decimal("0.01"))
+        policy_pct = (
+            policy.refund_pct_before_24h if hours_out >= 24 else policy.refund_pct_after_24h
+        )
+    refund_amount = customer_cancel_refund_amount(
+        booking_fee=booking_fee,
+        amount_due_online=online,
+        payment_mode=booking.payment_mode,
+        status_code=code,
+        policy_pct=policy_pct,
+    )
 
     # guarded flip + history (trigger guard also protects in_progress/completed)
     result = await db.execute(
@@ -149,6 +157,18 @@ async def cancel_booking(
             )
 
     log.info("booking_cancelled", booking_id=str(booking_id), refund=str(refund_amount))
+
+    if booking.pujari_id is not None and get_settings().TDS_ACCRUAL_ENABLED:
+        from app.services.tds_v3_reversal_service import apply_facilitation_reversal
+
+        await apply_facilitation_reversal(
+            db,
+            booking_id=booking_id,
+            pujari_id=booking.pujari_id,
+            refund_reference=f"cancel:{booking_id}",
+            refund_fraction=Decimal("1"),
+        )
+
     return CancelResponse(
         booking_id=booking_id,
         status="cancelled",

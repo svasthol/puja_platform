@@ -88,7 +88,7 @@ async def test_presign_selfie_creates_document_row(session):
     row = (
         await session.execute(
             text(
-                "SELECT doc_type, file_url, is_current FROM pujari_documents WHERE id = :id"
+                "SELECT doc_type, file_url, is_current, status FROM pujari_documents WHERE id = :id"
             ),
             {"id": str(doc_id)},
         )
@@ -96,6 +96,7 @@ async def test_presign_selfie_creates_document_row(session):
     assert row["doc_type"] == "photo"
     assert row["file_url"] == key
     assert row["is_current"] is True
+    assert row["status"] == "uploading"
 
 
 @pytest.mark.asyncio

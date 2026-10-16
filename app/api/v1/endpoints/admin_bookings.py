@@ -27,7 +27,9 @@ from app.schemas.admin_bookings import (
     AdminReassignResponse,
 )
 from app.schemas.admin_dispute import AdminDisputeRequest, AdminDisputeResponse
+from app.schemas.admin_booking_tds import AdminBookingTdsResponse
 from app.schemas.admin_money import AdminBookingMoneyResponse
+from app.services.admin_booking_tds import fetch_booking_tds_snapshot
 from app.schemas.common import decode_cursor, encode_cursor
 from app.schemas.relationship_manager import RelationshipManagerPublic
 from app.services.admin_dispute import open_dispute
@@ -83,6 +85,7 @@ async def search_bookings(
     phone: str | None = Query(None, max_length=20, description="Customer phone"),
     booking_id: uuid.UUID | None = None,
     booking_status: str | None = Query(None, alias="status", description="Booking status code"),
+    booking_class: str | None = Query(None, description="instant or advance"),
     date_from: dt.date | None = None,
     date_to: dt.date | None = None,
     cursor: str | None = None,
@@ -95,6 +98,11 @@ async def search_bookings(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"status must be one of: {', '.join(sorted(_VALID_STATUSES))}.",
+        )
+    if booking_class is not None and booking_class not in ("instant", "advance"):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "booking_class must be instant or advance.",
         )
     if date_from is not None and date_to is not None and date_from > date_to:
         raise HTTPException(
@@ -113,6 +121,9 @@ async def search_bookings(
     if booking_status:
         params["status"] = booking_status
         filters_sql += "AND st.code = :status "
+    if booking_class:
+        params["booking_class"] = booking_class
+        filters_sql += "AND b.booking_class = :booking_class "
     if date_from is not None:
         params["date_from"] = date_from
         filters_sql += "AND b.scheduled_date >= :date_from "
@@ -179,6 +190,7 @@ async def search_bookings(
             "phone": phone,
             "booking_id": str(booking_id) if booking_id else None,
             "status": booking_status,
+            "booking_class": booking_class,
             "date_from": date_from.isoformat() if date_from else None,
             "date_to": date_to.isoformat() if date_to else None,
         }.items()
@@ -514,6 +526,19 @@ async def get_booking_money(
     return money
 
 
+@router.get("/{booking_id}/tds", response_model=AdminBookingTdsResponse)
+async def get_booking_tds(
+    booking_id: uuid.UUID,
+    request: Request,
+    p: Principal = Depends(require_admin),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Read-only TDS + offline collection snapshot for ops (no SQL)."""
+    data = await fetch_booking_tds_snapshot(db, booking_id=booking_id)
+    await _audit_booking_read(db, actor=p, request=request, booking_id=booking_id)
+    return AdminBookingTdsResponse.model_validate(data)
+
+
 @router.post("/{booking_id}/dispute", response_model=AdminDisputeResponse)
 async def dispute_booking(
     booking_id: uuid.UUID,
@@ -543,4 +568,13 @@ async def dispute_booking(
         change_reason=body.change_reason,
         ip=_client_ip(request),
     )
-    return AdminDisputeResponse(**result)
+    tds = result.get("tds_reversal")
+    return AdminDisputeResponse(
+        booking_id=result["booking_id"],
+        previous_status=result["previous_status"],
+        status=result["status"],
+        dispute_type=result["dispute_type"],
+        disputed_at=result["disputed_at"],
+        offline_balance_note=result.get("offline_balance_note"),
+        tds_reversal=tds,
+    )
