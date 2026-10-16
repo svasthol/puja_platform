@@ -17,10 +17,10 @@ jobs:
     name: Linux arm64 pip + imports
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@0b93645e9fea731ca69bcb57a0580097d81b246 # v5.3.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.12"
 
@@ -37,10 +37,10 @@ jobs:
     name: Deploy preflight repo (G1 G2)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea731ca69bcb57a0580097d81b246 # v5.3.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.12"
 

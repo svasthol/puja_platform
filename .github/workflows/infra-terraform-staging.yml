@@ -20,7 +20,7 @@ jobs:
       run:
         working-directory: infra/oci/terraform/environments/staging
     steps:
-      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Skip when OCI secrets missing
         id: check
@@ -34,7 +34,7 @@ jobs:
 
       - name: Setup Terraform
         if: steps.check.outputs.skip != 'true'
-        uses: hashicorp/setup-terraform@b9cd54bbab870b4bfb3d491fe0f685d21c5fce9 # v3.1.2
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "1.9.0"
 
