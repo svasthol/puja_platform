@@ -42,7 +42,7 @@
 
 | Phase | Step | Status | Date |
 |-------|------|--------|------|
-| **S1** | SSH `opc@140.245.245.201` | ☑ | 2026-10-16 — from laptop |
+| **S1** | SSH `opc@140.245.245.201` | ☑ | 2026-10-16 — `hostnamectl`: **OL 9.8**, **aarch64**, static hostname **`stg-aio-1`** |
 | **S2** | OL9 Python runtime pipeline (`scripts/linux/bootstrap_python_runtime.sh`) | ☐ | **next** — see [`LINUX_RUNTIME_PIPELINE.md`](./LINUX_RUNTIME_PIPELINE.md) |
 | **S3** | PG16 + PostGIS + Redis 7 on host | ☐ | |
 | **S4** | Extensions → `bootstrap.sh` → migrations → `apply_grants.py` | ☐ | |
@@ -64,6 +64,7 @@ Runbook detail: [`OCI_PROD_MANUAL_RUNBOOK.md`](./OCI_PROD_MANUAL_RUNBOOK.md) (si
 | Shape / AD / FD | `VM.Standard.A1.Flex` 1 OCPU / 6 GB · `aeXz:AP-HYDERABAD-1-AD-1` · `FAULT-DOMAIN-1` |
 | Boot volume | 50 GB |
 | SSH | `ssh opc@140.245.245.201` |
+| OS / arch (verified on host) | Oracle Linux Server **9.8** · kernel **6.12** (UEK) · **arm64** · hostname **`stg-aio-1`** |
 
 ---
 
