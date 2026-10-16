@@ -35,6 +35,7 @@ engine: AsyncEngine = create_async_engine(
     pool_pre_ping=True,
     pool_recycle=settings.DATABASE_POOL_RECYCLE,
     echo=settings.DEBUG,
+    connect_args={"prepare_threshold": None},  # P-PGBOUNCER: transaction-mode PgBouncer
 )
 
 AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(

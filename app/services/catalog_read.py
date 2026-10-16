@@ -109,22 +109,27 @@ async def build_puja_summaries(
         for r in rows
     ]
 
+    # Fetch both the requested locale and en so we can fall back te -> en -> base.
     i18n_rows = (
         await db.execute(
             text(
                 """
-                SELECT puja_id, name, tagline
+                SELECT puja_id, locale, name, tagline
                 FROM puja_i18n
-                WHERE puja_id = ANY(:ids) AND locale = :loc
+                WHERE puja_id = ANY(:ids) AND locale IN (:loc, 'en')
                 """
             ),
             {"ids": [str(i) for i in puja_ids], "loc": loc},
         )
     ).mappings().all()
     i18n_map: dict[uuid.UUID, dict] = {}
+    i18n_en_map: dict[uuid.UUID, dict] = {}
     for r in i18n_rows:
         pid = r["puja_id"] if isinstance(r["puja_id"], uuid.UUID) else uuid.UUID(str(r["puja_id"]))
-        i18n_map[pid] = dict(r)
+        if r["locale"] == loc:
+            i18n_map[pid] = dict(r)
+        if r["locale"] == "en":
+            i18n_en_map[pid] = dict(r)
 
     hero_ids = [r["hero_media_id"] for r in rows if r.get("hero_media_id")]
     hero_urls = await media_urls_by_ids(db, hero_ids)
@@ -135,12 +140,11 @@ async def build_puja_summaries(
         price_from, price_to = await puja_price_range(db, puja_id)
         hero_id = r.get("hero_media_id")
         loc_row = i18n_map.get(puja_id, {})
-        if loc == "te":
-            name = loc_row.get("name") or ""
-            tagline = loc_row.get("tagline")
-        else:
-            name = loc_row.get("name") or r["name"]
-            tagline = loc_row.get("tagline") if loc_row.get("tagline") is not None else r.get("tagline")
+        en_row = i18n_en_map.get(puja_id, {})
+        name = loc_row.get("name") or en_row.get("name") or r["name"]
+        tagline = (
+            loc_row.get("tagline") or en_row.get("tagline") or r.get("tagline")
+        )
         summaries.append(
             {
                 "id": puja_id,
@@ -164,42 +168,31 @@ async def fetch_puja_detail_row(
     db: AsyncSession, puja_id: uuid.UUID, *, locale: str | None = None
 ) -> dict | None:
     loc = normalize_locale(locale)
-    if loc == "te":
-        row = (
-            await db.execute(
-                text(
-                    """
-                    SELECT p.id, p.category_id, p.slug,
-                           p.duration_minutes, p.default_price, p.display_order,
-                           p.hero_media_id, p.is_muhurat_bound,
-                           pi.name, pi.tagline, pi.description
-                    FROM pujas p
-                    LEFT JOIN puja_i18n pi ON pi.puja_id = p.id AND pi.locale = 'te'
-                    WHERE p.id = :id AND p.is_active
-                    """
-                ),
-                {"id": str(puja_id)},
-            )
-        ).mappings().first()
-    else:
-        row = (
-            await db.execute(
-                text(
-                    """
-                    SELECT p.id, p.category_id, p.slug,
-                           p.duration_minutes, p.default_price, p.display_order,
-                           p.hero_media_id, p.is_muhurat_bound,
-                           COALESCE(pi.name, p.name) AS name,
-                           COALESCE(pi.tagline, p.tagline) AS tagline,
-                           COALESCE(pi.description, p.description) AS description
-                    FROM pujas p
-                    LEFT JOIN puja_i18n pi ON pi.puja_id = p.id AND pi.locale = 'en'
-                    WHERE p.id = :id AND p.is_active
-                    """
-                ),
-                {"id": str(puja_id)},
-            )
-        ).mappings().first()
+    # i18n fallback chain: requested locale -> en i18n -> base pujas columns.
+    # Base columns (pujas.name/default_price) are NOT NULL, so `name` is never
+    # None -> CustomerPujaDetail.name (required str) can never fail validation.
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT p.id, p.category_id, p.slug,
+                       p.duration_minutes, p.default_price, p.display_order,
+                       p.hero_media_id, p.is_muhurat_bound,
+                       COALESCE(pi.name, pi_en.name, p.name) AS name,
+                       COALESCE(pi.tagline, pi_en.tagline, p.tagline) AS tagline,
+                       COALESCE(pi.description, pi_en.description, p.description)
+                           AS description
+                FROM pujas p
+                LEFT JOIN puja_i18n pi
+                  ON pi.puja_id = p.id AND pi.locale = :loc
+                LEFT JOIN puja_i18n pi_en
+                  ON pi_en.puja_id = p.id AND pi_en.locale = 'en'
+                WHERE p.id = :id AND p.is_active
+                """
+            ),
+            {"id": str(puja_id), "loc": loc},
+        )
+    ).mappings().first()
     if row is None:
         return None
     return dict(row)
@@ -209,24 +202,33 @@ async def fetch_puja_content_blocks(
     db: AsyncSession, puja_id: uuid.UUID, *, locale: str | None = None
 ) -> list[dict]:
     loc = normalize_locale(locale)
+    # Fetch requested locale + en, then prefer the requested locale per
+    # (kind, position), falling back to en for any item missing a translation.
     rows = (
         await db.execute(
             select(
                 PujaContentItem.kind,
                 PujaContentItem.text,
                 PujaContentItem.position,
+                PujaContentItem.locale,
             )
             .where(
                 PujaContentItem.puja_id == puja_id,
                 PujaContentItem.is_active.is_(True),
-                PujaContentItem.locale == loc,
+                PujaContentItem.locale.in_([loc, "en"]),
             )
             .order_by(PujaContentItem.kind, PujaContentItem.position)
         )
     ).all()
 
+    chosen: dict[tuple[str, int], str] = {}
+    for kind, text_val, pos, row_loc in rows:
+        key = (kind, pos)
+        if key not in chosen or row_loc == loc:
+            chosen[key] = text_val
+
     grouped: dict[str, list[tuple[int, str]]] = defaultdict(list)
-    for kind, text_val, pos in rows:
+    for (kind, pos), text_val in chosen.items():
         grouped[kind].append((pos, text_val))
 
     return [
@@ -253,26 +255,31 @@ async def fetch_puja_addons(
         return []
 
     addon_ids = [a.id for a in rows]
+    # Fetch both the requested locale and en so we can fall back te -> en -> base.
     i18n_rows = (
         await db.execute(
             text(
                 """
-                SELECT addon_id, name, description
+                SELECT addon_id, locale, name, description
                 FROM puja_addon_i18n
-                WHERE addon_id = ANY(:ids) AND locale = :loc
+                WHERE addon_id = ANY(:ids) AND locale IN (:loc, 'en')
                 """
             ),
             {"ids": [str(i) for i in addon_ids], "loc": loc},
         )
     ).mappings().all()
     i18n_map: dict[uuid.UUID, dict] = {}
+    i18n_en_map: dict[uuid.UUID, dict] = {}
     for r in i18n_rows:
         aid = (
             r["addon_id"]
             if isinstance(r["addon_id"], uuid.UUID)
             else uuid.UUID(str(r["addon_id"]))
         )
-        i18n_map[aid] = dict(r)
+        if r["locale"] == loc:
+            i18n_map[aid] = dict(r)
+        if r["locale"] == "en":
+            i18n_en_map[aid] = dict(r)
 
     media_ids = [a.image_media_id for a in rows if a.image_media_id]
     urls = await media_urls_by_ids(db, media_ids)
@@ -280,16 +287,13 @@ async def fetch_puja_addons(
     out: list[dict] = []
     for a in rows:
         loc_row = i18n_map.get(a.id, {})
-        if loc == "te":
-            name = loc_row.get("name") or ""
-            description = loc_row.get("description")
-        else:
-            name = loc_row.get("name") or a.name
-            description = (
-                loc_row.get("description")
-                if loc_row.get("description") is not None
-                else a.description
-            )
+        en_row = i18n_en_map.get(a.id, {})
+        name = loc_row.get("name") or en_row.get("name") or a.name
+        description = (
+            loc_row.get("description")
+            or en_row.get("description")
+            or a.description
+        )
         out.append(
             {
                 "id": a.id,

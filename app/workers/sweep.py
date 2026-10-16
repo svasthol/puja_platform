@@ -43,31 +43,6 @@ from app.core.redis_keys import presence_redis_key
 
 log = structlog.get_logger("sweep")
 
-_DEBUG_LOG = r"c:\OM\Guruji\debug-07908a.log"
-
-
-def _agent_dbg(
-    hypothesis_id: str, location: str, message: str, data: dict | None = None
-) -> None:
-    # #region agent log
-    import json
-
-    try:
-        payload = {
-            "sessionId": "07908a",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data or {},
-            "timestamp": int(time.time() * 1000),
-        }
-        with open(_DEBUG_LOG, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-    # #endregion
-
-
 T = TypeVar("T")
 
 EXHAUST_BATCH_LIMIT = 50
@@ -92,7 +67,11 @@ def _database_url() -> str:
 
 
 def get_connection() -> psycopg.Connection:
-    return psycopg.connect(_database_url(), row_factory=tuple_row)
+    return psycopg.connect(
+        _database_url(),
+        row_factory=tuple_row,
+        prepare_threshold=None,  # P-PGBOUNCER: transaction-mode PgBouncer
+    )
 
 
 def _safe_step(name: str, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
@@ -445,26 +424,7 @@ try:
             except Exception:
                 log.exception("sweep_heartbeat_failed")
             broadcast_task = "app.workers.dispatch.broadcast_booking"
-            _agent_dbg(
-                "H1",
-                "sweep.py:sweep_task",
-                "celery_registration_check",
-                {
-                    "broadcast_registered": broadcast_task in celery_app.tasks,
-                    "rebroadcast_registered": "app.workers.dispatch.rebroadcast_booking"
-                    in celery_app.tasks,
-                    "needs_initial_broadcast_count": len(
-                        summary["needs_initial_broadcast"]
-                    ),
-                },
-            )
             for booking_id in summary["needs_initial_broadcast"]:
-                _agent_dbg(
-                    "H1",
-                    "sweep.py:sweep_task",
-                    "send_task_broadcast_booking",
-                    {"booking_id": str(booking_id)},
-                )
                 celery_app.send_task(broadcast_task, args=[str(booking_id)])
             for booking_id in summary["needs_rebroadcast"]:
                 celery_app.send_task(

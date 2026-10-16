@@ -1009,11 +1009,10 @@ async def pujari_fy_tax_summary(
     else:
         message = f"₹{remaining} remaining before ₹5L FY TDS threshold."
 
-    from app.services.pujari_fy_pan_gate import evaluate_fy_pan_gate
-
+    pan_operative = compliance.get("pan_status") == "operative"
     gate = evaluate_fy_pan_gate(
         fy_gross_inr=fy_gross,
-        pan_on_file=bool(compliance["pan_on_file"]),
+        pan_on_file=pan_operative,
         entity_type=compliance["entity_type"],
         cfg=cfg,
     )
@@ -1027,6 +1026,7 @@ async def pujari_fy_tax_summary(
         "individual_fy_threshold_inr": str(threshold),
         "threshold_remaining_inr": str(remaining),
         "pan_on_file": bool(compliance["pan_on_file"]),
+        "pan_status": compliance.get("pan_status"),
         "entity_type": compliance["entity_type"],
         "message": message,
     }

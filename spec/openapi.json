@@ -12335,6 +12335,17 @@
             "type": "boolean",
             "title": "Pan On File"
           },
+          "pan_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan Status"
+          },
           "entity_type": {
             "anyOf": [
               {

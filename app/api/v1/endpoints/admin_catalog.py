@@ -43,6 +43,7 @@ from app.schemas.catalog_admin import (
     MediaResponse,
 )
 from app.services.audit import record_admin_action
+from app.services.catalog_visibility import assert_puja_customer_launch_complete
 from app.services.partner_dispatch_readiness import ensure_puja_pricing_for_verified_pujaris
 from app.services.catalog_media import (
     CatalogMediaError,
@@ -352,7 +353,7 @@ async def create_puja(
         default_price=payload.default_price,
         price_max=payload.price_max,
         display_order=await _next_puja_order(db, payload.category_id),
-        is_active=True,
+        is_active=False,
         created_at=now,
         updated_at=now,
     )
@@ -419,6 +420,8 @@ async def update_puja(
     if "price_max" in payload.model_fields_set:
         puja.price_max = payload.price_max
     if payload.is_active is not None:
+        if payload.is_active and not puja.is_active:
+            await assert_puja_customer_launch_complete(db, puja_id)
         puja.is_active = payload.is_active
     if payload.hero_media_id is not None:
         puja.hero_media_id = payload.hero_media_id

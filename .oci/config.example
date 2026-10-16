@@ -1,0 +1,10 @@
+# Copy to config (same folder) — never commit config or keys/
+# OCI CLI: https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
+
+[DEFAULT]
+user=ocid1.user.oc1..aaaaaaaaxxxxx
+fingerprint=aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99
+key_file=C:\path\to\puja_platform\.oci\keys\oci_api_key.pem
+tenancy=ocid1.tenancy.oc1..aaaaaaaaxxxxx
+region=ap-hyderabad-1
+# pass_phrase=only_if_your_key_is_encrypted

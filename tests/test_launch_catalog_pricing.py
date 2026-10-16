@@ -72,6 +72,13 @@ async def _seed_launch_puja_with_cheaper_pujari(
             "bp": str(pujari_base),
         },
     )
+    await session.execute(
+        text(
+            "INSERT INTO puja_i18n (puja_id, locale, name) "
+            "VALUES (:pid, 'te', 'లాంచ్ ధర పూజ')"
+        ),
+        {"pid": str(puja_id)},
+    )
     await session.commit()
     return customer_id, puja_id, pujari_id
 

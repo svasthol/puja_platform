@@ -12,6 +12,7 @@ class PujariTaxSummary(BaseModel):
     individual_fy_pan_warn_inr: str
     threshold_remaining_inr: str
     pan_on_file: bool
+    pan_status: str | None = None
     entity_type: str | None
     message: str
     fy_pan_gate_level: str

@@ -3,7 +3,7 @@
 **Audience:** Founders / ops shipping **Hyderabad Puja MVP** (`booking_fee`, TDS OFF).  
 **Companion:** [`MVP_GO_NO_GO_CHECKLIST.md`](./MVP_GO_NO_GO_CHECKLIST.md) (sign-off) · [`ARCHITECTURE.md`](../ARCHITECTURE.md) (stack rules) · [`PANCHANGAM_OPS.md`](./PANCHANGAM_OPS.md) (private engine node).
 
-**Repo today:** Application is **OCI-ready** (Linux, Postgres+PostGIS, Redis, Celery, S3 API). There is **no** Dockerfile, Terraform, or CI deploy pipeline in-tree — this plan is what you **provision on OCI** and what to **add to the repo** next.
+**Repo today:** Application is **OCI-ready** (Linux, Postgres+PostGIS, Redis, Celery, S3 API). **Compute SSOT:** [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md) + [`infra/oci/fleet.launch.yaml`](../../infra/oci/fleet.launch.yaml). **CI map:** [`.github/OCI_CI_CD.md`](../../.github/OCI_CI_CD.md). Terraform/Ansible modules are still to be added under `infra/oci/`.
 
 ---
 

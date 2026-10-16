@@ -22,6 +22,7 @@ from app.services.catalog_read import (
     build_puja_summaries,
     list_customer_categories,
 )
+from app.services.catalog_visibility import CUSTOMER_PUJA_VISIBILITY_SQL, customer_puja_is_visible
 from app.services.pricing_resolver import resolve_puja_unit_price
 
 router = APIRouter(tags=["catalog"])
@@ -40,14 +41,7 @@ async def list_pujas(
     categories = await list_customer_categories(db, locale=locale)
 
     params: dict = {"lim": limit + 1}
-    filters = (
-        "WHERE p.is_active "
-        "AND EXISTS ("
-        "  SELECT 1 FROM pujari_pricing pp "
-        "  JOIN pujaris pj ON pj.id = pp.pujari_id "
-        "  WHERE pp.puja_id = p.id AND pj.verification_status = 'verified'"
-        ") "
-    )
+    filters = "WHERE p.is_active " + CUSTOMER_PUJA_VISIBILITY_SQL + " "
     if category_id is not None:
         params["cat"] = category_id
         filters += "AND p.category_id = :cat "
@@ -100,6 +94,8 @@ async def get_puja(
     db: AsyncSession = Depends(get_db),
 ):
     """Puja detail — content blocks, addons, and gallery (ready media only)."""
+    if not await customer_puja_is_visible(db, puja_id):
+        raise HTTPException(http.HTTP_404_NOT_FOUND, "Puja not found.")
     detail = await build_puja_detail(db, puja_id, locale=locale)
     if detail is None:
         raise HTTPException(http.HTTP_404_NOT_FOUND, "Puja not found.")

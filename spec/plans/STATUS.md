@@ -9,7 +9,22 @@ gates: [`MASTER.md`](./MASTER.md).
 this file on every task). Status changes happen here and only here; track files own
 Spec / Files / Acceptance / Depends-on.
 
-**Last audited:** 2026-09-29 (TDS v3 close-out + **Phase 0b FY gate codes** + Flutter TDS alignment shipped in mobile)
+**Last audited:** 2026-10-10 (OCI staging Terraform scaffold + fleet SSOT in git)
+
+---
+
+## OCI infrastructure (IaC)
+
+Tracker: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md). Fleet sizes: [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md).
+
+| ID | Status | Notes |
+|---|---|---|
+| OCI-FLEET-SSOT | COMPLETED | `fleet.launch.yaml` + `OCI_COMPUTE_FLEET.md` |
+| OCI-LOCAL-CLI | COMPLETED | `.oci/` + `infra/oci/LOCAL_OCI_SETUP.md` |
+| OCI-TF-STG-AIO | IN_PROGRESS | `infra/oci/terraform/environments/staging` — **apply pending** |
+| OCI-TF-PROD-5NODE | PENDING | After staging OL9/migrate smoke |
+| OCI-ANSIBLE | PENDING | Patroni, Redis, app roles |
+| OCI-GHA-TERRAFORM | PENDING | `infra-terraform.yml` plan/apply |
 
 ---
 

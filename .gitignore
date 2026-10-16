@@ -1,4 +1,7 @@
 .env
+# OCI API config + keys — never commit real config or .pem
+.oci/*
+!.oci/config.example
 .venv/
 __pycache__/
 *.pyc
@@ -13,3 +16,17 @@ secrets/
 *.pem
 *.key
 firebase-service-account.json
+
+# Terraform (local secrets + state)
+**/terraform.tfvars
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
+**/retry-apply.log
+**/task-run.log
+**/crash.*.log
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json

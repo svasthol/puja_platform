@@ -1,0 +1,58 @@
+# Production deploy — preflight (G1/G2) before any rollout steps are added.
+# Fleet SSOT: spec/plans/OCI_COMPUTE_FLEET.md + infra/oci/fleet.launch.yaml
+# Rolling deploy targets (when wired): app-1, app-2 — linux/arm64 images
+# See: .github/OCI_CI_CD.md
+name: Deploy production
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  preflight-repo:
+    name: Preflight repo (G1 G2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea731ca69bcb57a0580097d81b246 # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Repo gates
+        run: python scripts/deploy_preflight_repo.py
+
+  preflight-live:
+    name: Preflight live DB
+    needs: preflight-repo
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea731ca69bcb57a0580097d81b246 # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install psycopg
+        run: pip install "psycopg[binary]==3.2.13"
+
+      - name: Live gates (PgBouncer URL + pg_roles)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_ADMIN_URL: ${{ secrets.DATABASE_ADMIN_URL }}
+        run: python scripts/deploy_preflight_live.py
+
+  deploy:
+    name: Deploy (placeholder)
+    needs: [preflight-repo, preflight-live]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+      - run: echo "OCI rolling deploy not wired yet — preflight passed."

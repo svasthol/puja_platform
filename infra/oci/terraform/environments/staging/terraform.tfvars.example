@@ -1,0 +1,23 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+# Fleet: spec/plans/OCI_COMPUTE_FLEET.md — stg-aio-1 (A1 1 OCPU / 6 GB / 50 GB boot)
+
+region = "ap-hyderabad-1"
+
+# Compartment: mana-guruji-staging (see spec/plans/OCI_COMPARTMENTS.md)
+# oci iam compartment list --compartment-id-in-subtree true --name mana-guruji-staging --query "data[0].id" --raw-output
+compartment_id = "ocid1.compartment.oc1..aaaaaaaaEXAMPLE"
+
+# Paste one line from: Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
+# Or the public half of your OCI instance SSH key pair
+ssh_public_key = "ssh-ed25519 AAAA...your-key... comment"
+
+# Lock SSH to your IP (find via https://ifconfig.me or similar)
+ssh_allowed_cidrs = ["203.0.113.10/32"]
+
+display_name_prefix = "mana-guruji-stg"
+
+# Boot volume must be >= 50 GB for this OL9 image. If bootVolumeQuota: delete unused boot volumes in Console.
+# boot_volume_gb = 50
+
+# Before terraform: . C:\...\puja_platform\infra\oci\scripts\Set-OciConfig.ps1
+# (exports TF_VAR_* for API auth from .oci/config — do not duplicate tenancy/user/key in tfvars unless needed)

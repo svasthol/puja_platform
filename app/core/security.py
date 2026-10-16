@@ -15,7 +15,9 @@ import base64
 import hashlib
 import hmac
 from datetime import UTC, datetime, timedelta
+from functools import partial
 
+import anyio
 import bcrypt
 import jwt
 
@@ -41,6 +43,15 @@ def verify_secret(secret: str, hashed: str) -> bool:
         return bcrypt.checkpw(_prehash(secret), hashed.encode("utf-8"))
     except (ValueError, TypeError):
         return False
+
+
+async def hash_secret_async(secret: str) -> str:
+    """Offload bcrypt to a worker thread — use from async auth handlers."""
+    return await anyio.to_thread.run_sync(hash_secret, secret)
+
+
+async def verify_secret_async(secret: str, hashed: str) -> bool:
+    return await anyio.to_thread.run_sync(partial(verify_secret, secret, hashed))
 
 
 # ---- Per-app_context token TTL (P-ADMIN-AUTH) ------------------------------

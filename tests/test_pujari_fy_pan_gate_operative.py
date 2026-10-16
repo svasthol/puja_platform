@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 
 from app.core.config import get_settings
-from app.services import pujari_fy_pan_gate
+from app.services import pujari_fy_pan_gate, tds_accrual_service
 from app.services.pujari_fy_pan_gate import assert_fy_pan_gate_allowed
 from tests.test_tds_accrual_decouple import PUJARI_ID
 
@@ -84,3 +84,48 @@ async def test_fy_pan_gate_status_treats_operative_as_pan_on_file(engine, seed, 
         )
         assert status.level == "ok"
         assert status.pan_on_file is True
+
+
+@pytest.mark.asyncio
+async def test_tax_summary_warn_when_unverified_hash_in_warn_band(engine, seed, monkeypatch):
+    maker = __import__(
+        "sqlalchemy.ext.asyncio", fromlist=["async_sessionmaker"]
+    ).async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _warn_band_gross(_db, *, pujari_id, fy_start=None):
+        return Decimal("460000")
+
+    monkeypatch.setattr(
+        pujari_fy_pan_gate, "current_fy_facilitation_gross", _warn_band_gross
+    )
+
+    async with maker() as session:
+        async with session.begin():
+            await session.execute(
+                text(
+                    """
+                    UPDATE pujaris
+                    SET pan_hash = :ph, pan_status = 'unverified', entity_type = 'individual'
+                    WHERE id = :pid
+                    """
+                ),
+                {"ph": "d" * 64, "pid": str(PUJARI_ID)},
+            )
+            await session.execute(
+                text(
+                    """
+                    UPDATE pujari_tax_year
+                    SET gross_facilitation = 0, tds_accrued = 0
+                    WHERE pujari_id = :pid
+                    """
+                ),
+                {"pid": str(PUJARI_ID)},
+            )
+
+    async with maker() as session:
+        summary = await tds_accrual_service.pujari_fy_tax_summary(
+            session, pujari_id=PUJARI_ID
+        )
+        assert summary["fy_pan_gate_level"] == "warn"
+        assert summary["pan_status"] == "unverified"
+        assert summary["requires_pan_before_continue"] is False

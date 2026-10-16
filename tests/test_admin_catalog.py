@@ -18,9 +18,11 @@ from app.schemas.catalog_admin import (
     PujaCategoryCreate,
     PujaCategoryUpdate,
     PujaCreate,
+    PujaI18nUpdate,
     PujaUpdate,
     ReorderRequest,
 )
+from app.services.catalog_visibility import CATALOG_INCOMPLETE_CODE
 
 
 class _FakeRequest:
@@ -104,6 +106,7 @@ async def test_puja_crud_impact_and_price_max_guard(session):
     )
     await session.commit()
     assert puja.slug
+    assert puja.is_active is False
 
     impact = await cat_ep.puja_impact(puja.id, _p=_admin(actor), db=session)
     assert impact.puja_id == puja.id
@@ -122,13 +125,61 @@ async def test_puja_crud_impact_and_price_max_guard(session):
 
     updated = await cat_ep.update_puja(
         puja.id,
-        PujaUpdate(tagline="Blessings at home", is_active=True),
+        PujaUpdate(tagline="Blessings at home"),
         _FakeRequest(),
         p=_admin(actor),
         db=session,
     )
     await session.commit()
     assert updated.tagline == "Blessings at home"
+
+
+@pytest.mark.asyncio
+async def test_activate_puja_without_te_i18n_rejected(session):
+    actor = await _mk_user(session, "+91965" + uuid.uuid4().hex[:7])
+    await session.commit()
+    cat_id = await _category_id(session)
+
+    puja = await cat_ep.create_puja(
+        PujaCreate(
+            category_id=cat_id,
+            name=f"NoTe-{uuid.uuid4().hex[:6]}",
+            default_price=Decimal("1200"),
+        ),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    await session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        await cat_ep.update_puja(
+            puja.id,
+            PujaUpdate(is_active=True),
+            _FakeRequest(),
+            p=_admin(actor),
+            db=session,
+        )
+    assert exc.value.status_code == 422
+    assert exc.value.detail["code"] == CATALOG_INCOMPLETE_CODE
+
+    await cat_ep.upsert_puja_i18n(
+        puja.id,
+        "te",
+        PujaI18nUpdate(name="తెలుగు పూజ"),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    activated = await cat_ep.update_puja(
+        puja.id,
+        PujaUpdate(is_active=True),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    await session.commit()
+    assert activated.is_active is True
 
 
 @pytest.mark.asyncio
@@ -155,6 +206,7 @@ async def test_content_replace_and_addons(session):
             ],
         ),
         _FakeRequest(),
+        locale="en",
         p=_admin(actor),
         db=session,
     )
