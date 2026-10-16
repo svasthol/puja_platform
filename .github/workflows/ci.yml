@@ -1,0 +1,48 @@
+# Backend CI — includes Linux aarch64 runtime gate (matches OCI A1 staging/prod).
+# Fleet: spec/plans/OCI_COMPUTE_FLEET.md · Runtime: spec/plans/LINUX_RUNTIME_PIPELINE.md
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-arm64-runtime:
+    name: Linux arm64 pip + imports
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@0b93645e9fea731ca69bcb57a0580097d81b246 # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install production requirements
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+          pip install 'uvicorn[standard]==0.34.0'
+
+      - name: Verify Linux runtime imports
+        run: python scripts/verify_linux_runtime.py
+
+  preflight-repo:
+    name: Deploy preflight repo (G1 G2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea731ca69bcb57a0580097d81b246 # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Repo gates
+        run: python scripts/deploy_preflight_repo.py

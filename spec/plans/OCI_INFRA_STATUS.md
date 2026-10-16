@@ -1,9 +1,12 @@
 # OCI infrastructure & IaC status
 
 **Single tracker for Oracle Cloud provisioning and Terraform.** Update in the same change as infra work.  
+**PM / Excel:** [Staging CSV](./project_pm/Mana_Guruji_OCI_PM_Tracker_Staging.csv) · [Production CSV](./project_pm/Mana_Guruji_OCI_PM_Tracker_Production.csv) · [`PROJECT_PM_TRACKER.md`](./project_pm/PROJECT_PM_TRACKER.md)  
 **Compute SSOT:** [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md) · [`infra/oci/fleet.launch.yaml`](../../infra/oci/fleet.launch.yaml)
 
-**Region:** `ap-hyderabad-1` · **Object Storage namespace:** set at apply time (CLI: `oci os ns get`)
+**Region:** `ap-hyderabad-1` · **Object Storage namespace:** `axbak8qmhjek` (CLI: `oci os ns get`)
+
+**Current focus:** **Phase S2** — OL9 Python 3.12 + `pip install -r requirements.txt` (aarch64 compat gate).
 
 ---
 
@@ -14,26 +17,39 @@
 | Fleet spec in git | **DONE** | `OCI_COMPUTE_FLEET.md`, `fleet.launch.yaml` |
 | Local OCI API auth | **DONE** | `puja_platform/.oci/` + `Set-OciConfig.ps1` |
 | Staging compartment `mana-guruji-staging` | **DONE** | See [`OCI_COMPARTMENTS.md`](./OCI_COMPARTMENTS.md) |
-| Terraform staging (`stg-aio-1`) | **COMPUTE LIVE** | `terraform apply` **2026-10-16** — instance `RUNNING` (see inventory) |
-| Terraform production (5-node) | **NOT STARTED** | After staging validated |
-| Ansible (PG/Redis/app) | **NOT STARTED** | Post-compute |
-| GitHub `infra-terraform.yml` | **NOT STARTED** | Plan on PR after staging apply works locally |
+| Terraform staging (`stg-aio-1`) | **COMPUTE DONE** | VCN + subnet + instance **2026-10-16** — see inventory |
+| Staging app stack (PG/Redis/API) | **IN PROGRESS** | S1 done; **S2–S6** pending on VM |
+| GitHub **ci.yml** | **IN REPO** | Push to `dev`/`main` to run arm64 gate |
+| GitHub **deploy-staging.yml** | **IN REPO** | Push **`dev`** → SSH CD — [`STAGING_DEPLOY_PIPELINE.md`](./STAGING_DEPLOY_PIPELINE.md) |
+| GitHub **infra-terraform-staging.yml** | **IN REPO** | Optional plan on PR; **apply stays local** |
+| Terraform production (5-node) | **NOT STARTED** | After STG-S6 |
+| Ansible (PG/Redis/app) | **NOT STARTED** | Post-S3 scripts / playbooks |
 
 ---
 
 ## Staging — `stg-aio-1`
 
-| Step | Status | Owner / date |
+### IaC / compute (complete)
+
+| Step | Status | Date / notes |
 |------|--------|----------------|
-| Staging compartment `mana-guruji-staging` | ☑ | 2026-10-10 — CLI `oci iam compartment create` |
-| `terraform.tfvars` — `compartment_id` from compartment list | ☐ | |
-| `terraform init` / `plan` / `apply` | ☑ | 2026-10-16 — `stg-aio-1` created |
-| Record OCID + public IP in inventory below | ☑ | from `terraform output` / state |
-| SSH `opc@<public_ip>` | ☐ | from operator home IP (`ssh_allowed_cidrs`) |
-| OL9: Python 3.12 + `pip install -r requirements.txt` (aarch64) | ☐ | |
-| PG16 + PostGIS + Redis on box | ☐ | |
-| `bootstrap.sh` + migrations on staging DB | ☐ | |
-| `/health` smoke | ☐ | |
+| Compartment `mana-guruji-staging` | ☑ | 2026-10-10 — [`OCI_COMPARTMENTS.md`](./OCI_COMPARTMENTS.md) |
+| `terraform.tfvars` (compartment + SSH key + CIDRs) | ☑ | 2026-10-16 |
+| `terraform init` / `plan` / `apply` | ☑ | 2026-10-16 — VCN `10.60.0.0/16`, `stg-aio-1` **RUNNING** |
+| Inventory recorded below | ☑ | 2026-10-16 |
+
+### Staging phases (post-Terraform)
+
+| Phase | Step | Status | Date |
+|-------|------|--------|------|
+| **S1** | SSH `opc@140.245.245.201` | ☑ | 2026-10-16 — from laptop |
+| **S2** | OL9 Python runtime pipeline (`scripts/linux/bootstrap_python_runtime.sh`) | ☐ | **next** — see [`LINUX_RUNTIME_PIPELINE.md`](./LINUX_RUNTIME_PIPELINE.md) |
+| **S3** | PG16 + PostGIS + Redis 7 on host | ☐ | |
+| **S4** | Extensions → `bootstrap.sh` → migrations → `apply_grants.py` | ☐ | |
+| **S5** | API + Celery worker + beat + staging `.env` | ☐ | |
+| **S6** | `GET /health` OK; MVP checklist A–F on staging (smoke) | ☐ | |
+
+Runbook detail: [`OCI_PROD_MANUAL_RUNBOOK.md`](./OCI_PROD_MANUAL_RUNBOOK.md) (single-host). Sign-off template: [`MVP_GO_NO_GO_CHECKLIST.md`](./MVP_GO_NO_GO_CHECKLIST.md).
 
 ### Staging inventory (fill after `terraform apply`)
 
@@ -140,5 +156,7 @@ Remove scheduled task: `Unregister-ScheduledTask -TaskName ManaGuruji-StagingTer
 
 | Date | Change |
 |------|--------|
+| 2026-10-16 | **S1** SSH from laptop complete; **S2** OL9/pip gate next |
+| 2026-10-16 | Staging `terraform apply` complete; inventory filled |
 | 2026-10-10 | Staging compartment `mana-guruji-staging` created |
 | 2026-10-10 | Staging Terraform module `staging_stack` + env; status doc created |

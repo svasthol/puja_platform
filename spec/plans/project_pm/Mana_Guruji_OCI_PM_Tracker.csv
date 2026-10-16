@@ -1,0 +1,35 @@
+﻿Workstream,Task_ID,Phase,Task_Name,Environment,Priority,Status,Owner,Planned_Start,Completed_Date,Depends_On,Mode,Spec_Reference,Notes
+Foundation,OCI-001,,Tenancy home region ap-hyderabad-1,Shared,P0,Completed,,,2026-10-10,,Manual,OCI_PROD_APPLY_SHEET.md §0.1,
+Foundation,OCI-002,,Local OCI API config (.oci + Set-OciConfig.ps1),Shared,P0,Completed,,,2026-10-10,,Manual,LOCAL_OCI_SETUP.md,
+Foundation,OCI-003,,Fleet SSOT in git (OCI_COMPUTE_FLEET + fleet.launch.yaml),Shared,P0,Completed,,,2026-10-10,,Docs,OCI_COMPUTE_FLEET.md,
+Foundation,OCI-004,,Create compartment mana-guruji-staging,Staging,P0,Completed,,,2026-10-10,,CLI,OCI_COMPARTMENTS.md,
+Foundation,OCI-005,,Create compartment mana-guruji-production,Production,P0,Not Started,,,,OCI-004,CLI,OCI_COMPARTMENTS.md,Before prod Terraform
+Staging-IaC,STG-IAC-001,,terraform.tfvars (compartment SSH CIDRs),Staging,P0,Completed,,,2026-10-16,OCI-004,Manual,infra/oci/terraform/environments/staging,
+Staging-IaC,STG-IAC-002,,terraform init plan apply (VCN + stg-aio-1),Staging,P0,Completed,,,2026-10-16,STG-IAC-001,Terraform,OCI_INFRA_STATUS.md,Public IP 140.245.245.201
+Staging-IaC,STG-IAC-003,,Record inventory OCIDs in OCI_INFRA_STATUS,Staging,P1,Completed,,,2026-10-16,STG-IAC-002,Manual,OCI_INFRA_STATUS.md,
+Staging-Configure,STG-S1,,SSH opc@stg-aio-1 (140.245.245.201),Staging,P0,In Progress,,,,STG-IAC-002,Manual,OCI_INFRA_STATUS.md §S1,Current focus
+Staging-Configure,STG-S2,,OL9 Python 3.12 + pip install -r requirements.txt aarch64,Staging,P0,Not Started,,,,STG-S1,Manual,OCI_INFRA_STATUS.md §S2,Compat gate
+Staging-Configure,STG-S3,,Install PG16 PostGIS + Redis 7 on stg-aio-1,Staging,P0,Not Started,,,,STG-S2,Manual,OCI_INFRA_STATUS.md §S3,All-in-one host
+Staging-Configure,STG-S4,,Extensions bootstrap.sh migrations apply_grants,Staging,P0,Not Started,,,,STG-S3,Manual,MVP_GO_NO_GO_CHECKLIST.md §C,Staging DB only
+Staging-Configure,STG-S5,,API + Celery worker + beat + staging api.env,Staging,P0,Not Started,,,,STG-S4,Manual,MVP_GO_NO_GO_CHECKLIST.md §B,
+Staging-Configure,STG-S6,,GET /health OK + MVP checklist A-F smoke on staging,Staging,P0,Not Started,,,,STG-S5,Manual,MVP_GO_NO_GO_CHECKLIST.md,Before prod fleet
+Staging-Configure,STG-S7,,Object Storage buckets for staging (kyc catalog),Staging,P1,Not Started,,,,STG-S5,Manual,MVP_GO_NO_GO_CHECKLIST.md B10,S3-compatible API
+Production-IaC,PRD-IAC-001,,Prod VCN 10.50.0.0/16 + 5-node fleet,Production,P0,Not Started,,,,STG-S6,Terraform/Manual,OCI_COMPUTE_FLEET.md,Option B corrected
+Production-IaC,PRD-IAC-002,,NLB + DNS api/admin domains,Production,P0,Not Started,,,,PRD-IAC-001,Manual,OCI_PROD_APPLY_SHEET.md §0.4-0.6,
+Production-IaC,PRD-IAC-003,,Terraform environments/production scaffold,Production,P1,Not Started,,,,PRD-IAC-001,Terraform,infra/oci/terraform,Not started in repo
+Production-Configure,PRD-P1-001,,Patroni PG16 PostGIS db-1 db-2,Production,P0,Not Started,,,,PRD-IAC-001,Ansible/Manual,OCI_PROD_APPLY_SHEET.md §1.1,
+Production-Configure,PRD-P1-002,,Redis Sentinel cache-1 + replica app-2,Production,P0,Not Started,,,,PRD-IAC-001,Ansible/Manual,OCI_PROD_APPLY_SHEET.md §1.2,
+Production-Configure,PRD-P1-003,,PgBouncer HAProxy on app-1 app-2,Production,P0,Not Started,,,,PRD-P1-001,Ansible/Manual,OCI_PROD_APPLY_SHEET.md §1.3,
+Production-Configure,PRD-P2-001,,Prod DB bootstrap.sh once + Vault passwords,Production,P0,Not Started,,,,PRD-P1-001,Manual,OCI_PROD_APPLY_SHEET.md §2,
+Production-Configure,PRD-P3-001,,Prod migrations 001-032 + apply_grants + TDS strict,Production,P0,Not Started,,,,PRD-P2-001,Manual,MVP_GO_NO_GO_CHECKLIST.md §C,
+Production-Configure,PRD-P4-001,,Prod API workers beat nginx TLS,Production,P0,Not Started,,,,PRD-P3-001,CI/Manual,OCI_PROD_APPLY_SHEET.md §4,
+Production-Configure,PRD-P4-002,,Razorpay Setu webhooks + prod /health,Production,P0,Not Started,,,,PRD-P4-001,Manual,OCI_PROD_APPLY_SHEET.md §4.5-4.6,
+CI-CD,CI-001,,ci.yml pytest migrate chain,Shared,P0,Not Started,,,,STG-S2,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-002,,build-push.yml OCIR linux/arm64,Shared,P1,Not Started,,,,CI-001,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-003,,deploy-staging.yml,Staging,P1,Not Started,,,,STG-S6,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-004,,deploy-prod.yml full rollout (beyond preflight),Production,P0,Not Started,,,,PRD-P4-001,GitHub,deploy-prod.yml,Preflight exists today
+CI-CD,CI-005,,infra-terraform.yml plan/apply,Shared,P2,Not Started,,,,STG-IAC-002,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-006,,Ansible roles PG Redis app node,Shared,P1,Not Started,,,,STG-S6,Ansible,infra/oci/README.md,
+Mobile-Admin,MOB-001,,Flutter OpenAPI sync + staging API_BASE_URL,Staging,P1,Not Started,,,,STG-S6,Manual,PujaPlatformFlutter,
+Mobile-Admin,MOB-002,,Admin UI staging ALLOWED_ORIGINS,Staging,P1,Not Started,,,,STG-S5,Manual,OCI_PROD_APPLY_SHEET.md §6.2,
+Mobile-Admin,MOB-003,,Device smoke staging then prod F5 F6,Production,P0,Not Started,,,,PRD-P4-002,Manual,MVP_GO_NO_GO_CHECKLIST.md,

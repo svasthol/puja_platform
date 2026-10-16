@@ -5,7 +5,7 @@
 
 **Repos:** Backend only — `puja_platform` ([Guruji](https://github.com/svasthol/Guruji.git)). Flutter is separate ([PujaPlatformFlutter](https://github.com/svasthol/PujaPlatformFlutter.git)).
 
-**Related:** [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md) · [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md) (**IaC apply tracker**) · [`infra/oci/terraform/environments/staging`](../../infra/oci/terraform/environments/staging) · [`OCI_PROD_MANUAL_RUNBOOK.md`](./OCI_PROD_MANUAL_RUNBOOK.md) · [`.github/OCI_CI_CD.md`](../../.github/OCI_CI_CD.md).
+**Related:** [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md) · [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md) · [PM Staging](./project_pm/Mana_Guruji_OCI_PM_Tracker_Staging.csv) · [PM Production](./project_pm/Mana_Guruji_OCI_PM_Tracker_Production.csv) · [`infra/oci/terraform/environments/staging`](../../infra/oci/terraform/environments/staging) · [`OCI_PROD_MANUAL_RUNBOOK.md`](./OCI_PROD_MANUAL_RUNBOOK.md).
 
 ---
 

@@ -1,0 +1,111 @@
+# Staging CD: laptop pushes to `dev` → CI gates → SSH deploy on stg-aio-1.
+# Docs: spec/plans/STAGING_DEPLOY_PIPELINE.md
+name: Deploy staging
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - "migrations/**"
+      - "deploy/**"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - ".github/workflows/deploy-staging.yml"
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Git ref to deploy (branch or tag)
+        default: dev
+      run_data_services:
+        description: Install PG16+PostGIS+Redis (first boot only)
+        type: boolean
+        default: false
+      run_db_bootstrap:
+        description: Run bootstrap.sh once (roles)
+        type: boolean
+        default: false
+      run_migrate:
+        description: Run migrate.sh
+        type: boolean
+        default: true
+      run_python_bootstrap:
+        description: pip install / verify runtime
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Repo gates (G1 G2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b16344ce8d6857134bdbd007df # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea731ca69bcb57a0580097d81b246 # v5.3.0
+        with:
+          python-version: "3.12"
+      - run: python scripts/deploy_preflight_repo.py
+
+  deploy:
+    name: SSH deploy stg-aio-1
+    needs: [preflight]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Require SSH secrets
+        run: |
+          test -n "${{ secrets.STAGING_HOST }}" || (echo "Missing STAGING_HOST" && exit 1)
+          test -n "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" || (echo "Missing STAGING_SSH_PRIVATE_KEY" && exit 1)
+
+      - name: Remote deploy
+        env:
+          SSH_USER: ${{ secrets.STAGING_SSH_USER || 'opc' }}
+          SSH_HOST: ${{ secrets.STAGING_HOST }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          REPO_DIR: ${{ vars.STAGING_REPO_DIR || '/opt/mana-guruji/src/puja_platform' }}
+        run: |
+          GIT_REF="${{ github.event_name == 'workflow_dispatch' && inputs.git_ref || 'dev' }}"
+          RUN_DATA_SERVICES=0
+          RUN_DB_BOOTSTRAP=0
+          RUN_MIGRATE=1
+          RUN_PYTHON_BOOTSTRAP=1
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ inputs.run_data_services }}" == "true" ]] && RUN_DATA_SERVICES=1
+            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && RUN_DB_BOOTSTRAP=1
+            [[ "${{ inputs.run_migrate }}" == "false" ]] && RUN_MIGRATE=0
+            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && RUN_PYTHON_BOOTSTRAP=0
+          fi
+          install -m 700 -d ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
+            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} bash -s" <<'REMOTE'
+          set -euo pipefail
+          if [[ ! -d "${REPO_ROOT}/.git" ]]; then
+            echo "First-time: sudo mkdir -p /opt/mana-guruji && sudo chown opc:opc /opt/mana-guruji"
+            echo "git clone https://github.com/svasthol/Guruji.git /opt/mana-guruji/src && cd ${REPO_ROOT}"
+            exit 1
+          fi
+          cd "${REPO_ROOT}"
+          export GIT_REF RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1
+          chmod +x scripts/linux/remote_staging_deploy.sh
+          ./scripts/linux/remote_staging_deploy.sh
+          REMOTE
+
+      - name: Health check (on VM localhost)
+        continue-on-error: true
+        env:
+          SSH_USER: ${{ secrets.STAGING_SSH_USER || 'opc' }}
+          SSH_HOST: ${{ secrets.STAGING_HOST }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
+            'curl -fsS http://127.0.0.1:8000/health/live && echo "health/live OK" || echo "WARN: API not up yet — finish first-boot (STAGING_DEPLOY_PIPELINE.md § First-time)"'

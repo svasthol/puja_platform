@@ -1,0 +1,17 @@
+[Unit]
+Description=Mana Guruji API (FastAPI)
+After=network.target postgresql-16.service redis.service
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+WorkingDirectory=/opt/mana-guruji/src/puja_platform
+EnvironmentFile=/etc/mana-guruji/api.env
+Environment=PATH=/opt/mana-guruji/venv/bin:/usr/local/bin:/usr/bin
+ExecStart=/opt/mana-guruji/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
