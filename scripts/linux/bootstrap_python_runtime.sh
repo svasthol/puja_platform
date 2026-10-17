@@ -19,9 +19,13 @@ fi
 
 if [[ "${INSTALL_SYSTEM}" == "1" ]]; then
   if [[ -f /etc/oracle-release ]] || grep -qi 'oracle linux' /etc/os-release 2>/dev/null; then
+    # shellcheck source=pgdg_ol9_fixup.sh
+    source "$(dirname "${BASH_SOURCE[0]}")/pgdg_ol9_fixup.sh"
+    pgdg_fixup_ol9_aarch64
     log "Installing OS packages from ${OS_PACKAGES}"
+    PGDG_EXCLUDE="$(pgdg_disable_for_dnf_extras)"
     # shellcheck disable=SC2046
-    sudo dnf -y install $(grep -v '^#' "${OS_PACKAGES}" | grep -v '^[[:space:]]*$' | tr '\n' ' ')
+    sudo dnf -y install ${PGDG_EXCLUDE} $(grep -v '^#' "${OS_PACKAGES}" | grep -v '^[[:space:]]*$' | tr '\n' ' ')
   else
     log "Non-OL9 host — skip dnf (set INSTALL_SYSTEM=0 to silence)"
   fi

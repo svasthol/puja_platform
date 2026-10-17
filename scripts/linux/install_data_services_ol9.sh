@@ -18,12 +18,20 @@ fi
 
 echo "[install_data_services] PGDG + PostgreSQL 16 + PostGIS + Redis"
 ARCH="$(uname -m)"
-sudo dnf install -y "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-${ARCH}/pgdg-redhat-repo-latest.noarch.rpm"
+# shellcheck source=pgdg_ol9_fixup.sh
+source "$(dirname "${BASH_SOURCE[0]}")/pgdg_ol9_fixup.sh"
+if ! ls /etc/yum.repos.d/pgdg*.repo >/dev/null 2>&1; then
+  sudo dnf install -y "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-${ARCH}/pgdg-redhat-repo-latest.noarch.rpm"
+fi
+pgdg_fixup_ol9_aarch64
 sudo dnf -qy module disable postgresql || true
 if [[ "$SKIP_REDIS" == "1" ]]; then
-  sudo dnf install -y postgresql16-server postgresql16-contrib postgis34_16
+  sudo dnf install -y --disablerepo='pgdg*' --enablerepo=pgdg16-ol9-aarch64 \
+    postgresql16-server postgresql16-contrib postgis34_16
 else
-  sudo dnf install -y postgresql16-server postgresql16-contrib postgis34_16 redis
+  sudo dnf install -y --disablerepo='pgdg*' --enablerepo=pgdg16-ol9-aarch64 \
+    postgresql16-server postgresql16-contrib postgis34_16
+  sudo dnf install -y redis
 fi
 
 if [[ ! -d /var/lib/pgsql/16/data/base ]]; then
