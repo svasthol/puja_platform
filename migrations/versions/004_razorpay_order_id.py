@@ -17,7 +17,7 @@ DB_DIR = Path(__file__).parent.parent.parent / "spec" / "db"
 
 
 def upgrade() -> None:
-    sql = (DB_DIR / "migration_004.sql").read_text()
+    sql = (DB_DIR / "migration_004.sql").read_text(encoding="utf-8-sig")
     op.execute(sql)  # type: ignore[arg-type]
 
 
