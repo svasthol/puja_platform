@@ -1,0 +1,12 @@
+# Oracle Linux 9 — RPMs for building/installing Python runtime deps (aarch64/x86_64).
+# Used by scripts/linux/bootstrap_python_runtime.sh
+# App uses psycopg[binary] — no postgresql-devel required for the API venv.
+git
+gcc
+gcc-c++
+make
+openssl-devel
+libffi-devel
+python3.12
+python3.12-devel
+python3.12-pip

@@ -1,0 +1,22 @@
+﻿Workstream,Task_ID,Phase,Task_Name,Environment,Priority,Status,Owner,Planned_Start,Completed_Date,Depends_On,Mode,Spec_Reference,Notes
+Foundation,OCI-001,,Tenancy home region ap-hyderabad-1,Shared,P0,Completed,,,2026-10-10,,Manual,OCI_PROD_APPLY_SHEET.md §0.1,
+Foundation,OCI-002,,Local OCI API config (.oci + Set-OciConfig.ps1),Shared,P0,Completed,,,2026-10-10,,Manual,LOCAL_OCI_SETUP.md,
+Foundation,OCI-003,,Fleet SSOT in git (OCI_COMPUTE_FLEET + fleet.launch.yaml),Shared,P0,Completed,,,2026-10-10,,Docs,OCI_COMPUTE_FLEET.md,
+Foundation,OCI-004,,Create compartment mana-guruji-staging,Staging,P0,Completed,,,2026-10-10,,CLI,OCI_COMPARTMENTS.md,
+Staging-IaC,STG-IAC-001,,terraform.tfvars (compartment SSH CIDRs),Staging,P0,Completed,,,2026-10-16,OCI-004,Manual,infra/oci/terraform/environments/staging,
+Staging-IaC,STG-IAC-002,,terraform init plan apply (VCN + stg-aio-1),Staging,P0,Completed,,,2026-10-16,STG-IAC-001,Terraform,OCI_INFRA_STATUS.md,Public IP 140.245.245.201
+Staging-IaC,STG-IAC-003,,Record inventory OCIDs in OCI_INFRA_STATUS,Staging,P1,Completed,,,2026-10-16,STG-IAC-002,Manual,OCI_INFRA_STATUS.md,
+Staging-Configure,STG-S1,,SSH opc@stg-aio-1 (140.245.245.201),Staging,P0,In Progress,,,,STG-IAC-002,Manual,OCI_INFRA_STATUS.md §S1,Current focus
+Staging-Configure,STG-S2,,OL9 Python 3.12 + pip install -r requirements.txt aarch64,Staging,P0,Not Started,,,,STG-S1,Manual,OCI_INFRA_STATUS.md §S2,Compat gate
+Staging-Configure,STG-S3,,Install PG16 PostGIS + Redis 7 on stg-aio-1,Staging,P0,Not Started,,,,STG-S2,Manual,OCI_INFRA_STATUS.md §S3,All-in-one host
+Staging-Configure,STG-S4,,Extensions bootstrap.sh migrations apply_grants,Staging,P0,Not Started,,,,STG-S3,Manual,MVP_GO_NO_GO_CHECKLIST.md §C,Staging DB only
+Staging-Configure,STG-S5,,API + Celery worker + beat + staging api.env,Staging,P0,Not Started,,,,STG-S4,Manual,MVP_GO_NO_GO_CHECKLIST.md §B,
+Staging-Configure,STG-S6,,GET /health OK + MVP checklist A-F smoke on staging,Staging,P0,Not Started,,,,STG-S5,Manual,MVP_GO_NO_GO_CHECKLIST.md,Gate before production cut
+Staging-Configure,STG-S7,,Object Storage buckets for staging (kyc catalog),Staging,P1,Not Started,,,,STG-S5,Manual,MVP_GO_NO_GO_CHECKLIST.md B10,S3-compatible API
+CI-CD,CI-001,,ci.yml pytest migrate chain,Shared,P0,Not Started,,,,STG-S2,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-002,,build-push.yml OCIR linux/arm64,Shared,P1,Not Started,,,,CI-001,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-003,,deploy-staging.yml,Staging,P1,Not Started,,,,STG-S6,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-005,,infra-terraform.yml plan/apply,Shared,P2,Not Started,,,,STG-IAC-002,GitHub,.github/OCI_CI_CD.md,
+CI-CD,CI-006,,Ansible roles PG Redis app node,Shared,P1,Not Started,,,,STG-S6,Ansible,infra/oci/README.md,Prototype on staging first
+Mobile-Admin,MOB-001,,Flutter OpenAPI sync + staging API_BASE_URL,Staging,P1,Not Started,,,,STG-S6,Manual,PujaPlatformFlutter,
+Mobile-Admin,MOB-002,,Admin UI staging ALLOWED_ORIGINS,Staging,P1,Not Started,,,,STG-S5,Manual,OCI_PROD_APPLY_SHEET.md §6.2,

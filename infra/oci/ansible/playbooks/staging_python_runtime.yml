@@ -1,0 +1,18 @@
+---
+# Run on stg-aio-1 after repo is cloned to /opt/mana-guruji/src/puja_platform
+# ansible-playbook -i inventory/staging.ini playbooks/staging_python_runtime.yml
+- name: Bootstrap Python runtime (OL9 aarch64)
+  hosts: stg_aio
+  become: false
+  vars:
+    repo_root: /opt/mana-guruji/src/puja_platform
+    venv_dir: /opt/mana-guruji/venv
+  tasks:
+    - name: Run bootstrap_python_runtime.sh
+      ansible.builtin.command:
+        cmd: ./scripts/linux/bootstrap_python_runtime.sh
+        chdir: "{{ repo_root }}"
+      environment:
+        VENV_DIR: "{{ venv_dir }}"
+        INSTALL_SYSTEM: "1"
+      changed_when: true

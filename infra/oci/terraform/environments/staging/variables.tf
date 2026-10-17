@@ -64,3 +64,9 @@ variable "availability_domain_name" {
   default     = null
   description = "Optional AD pin (multi-AD regions only). ap-hyderabad-1 has a single AD; null uses aeXz:AP-HYDERABAD-1-AD-1."
 }
+
+variable "enable_staging_redis_micro" {
+  type        = bool
+  default     = false
+  description = "If true, provision Always Free VM.Standard.E2.1.Micro (stg-redis-1) with Docker Redis 7 in the staging VCN."
+}

@@ -8,9 +8,10 @@
 | Workflow | Purpose | Fleet coupling |
 |----------|---------|----------------|
 | [`workflows/deploy-prod.yml`](./workflows/deploy-prod.yml) | Prod preflight (G1/G2); deploy placeholder | Targets **`app-1` / `app-2`** when SSH/OCIR rollout is wired; images **`linux/arm64`** |
-| `workflows/ci.yml` | *Planned* — pytest, migrate chain | Runners `ubuntu-latest`; optional **`ubuntu-24.04-arm`** or OL9 A1 job for arm64 wheel check |
-| `workflows/build-push.yml` | *Planned* — OCIR `hyd.ocir.io` | **`platforms: linux/arm64`** per fleet SSOT |
-| `workflows/deploy-staging.yml` | *Planned* | Single host **`stg-aio-1`** |
+| [`workflows/ci.yml`](./workflows/ci.yml) | **linux-arm64-runtime** + G1/G2 preflight | `ubuntu-24.04-arm` |
+| [`workflows/deploy-staging.yml`](./workflows/deploy-staging.yml) | Manual SSH bootstrap | Secrets: [`STAGING_GITHUB_SETUP.md`](../spec/plans/STAGING_GITHUB_SETUP.md) |
+| [`workflows/infra-terraform-staging.yml`](./workflows/infra-terraform-staging.yml) | PR plan (optional) | Staging compute already applied locally |
+| `workflows/build-push.yml` | *Planned* — OCIR `hyd.ocir.io` | **`platforms: linux/arm64`** |
 
 ## Secrets / environments
 
@@ -21,8 +22,10 @@
 
 ## IaC migration checklist
 
-- [x] Staging Terraform: `infra/oci/terraform/environments/staging` (`stg-aio-1`) — tracker [`OCI_INFRA_STATUS.md`](../spec/plans/OCI_INFRA_STATUS.md)
-- [ ] `terraform apply` staging + inventory filled
+- [x] Staging Terraform apply + inventory (**2026-10-16**)
+- [x] `ci.yml` + `deploy-staging.yml` + `infra-terraform-staging.yml` in repo
+- [ ] GitHub Environment `staging` secrets configured
+- [ ] Staging S2–S6 on VM + `/health` — [`OCI_INFRA_STATUS.md`](../spec/plans/OCI_INFRA_STATUS.md)
 - [ ] Terraform module variables default from `fleet.launch.yaml` (`region`, `shape`, per-host `ocpu`, `memory_gb`) for **production**
 - [ ] Ansible inventory generated from `environments.production.hosts`
 - [ ] NLB health path = `load_balancer.health_check.path` in YAML
