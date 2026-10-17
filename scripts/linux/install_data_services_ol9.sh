@@ -29,12 +29,21 @@ sudo dnf -qy module disable postgresql || true
 # CodeReady Builder often required for GDAL/GEOS build deps on OL9.
 sudo dnf install -y oraclelinux-developer-release-el9 2>/dev/null || true
 sudo dnf config-manager --enable ol9_codeready_builder 2>/dev/null || true
-if [[ "$SKIP_REDIS" == "1" ]]; then
-  sudo dnf install -y --disablerepo='pgdg*' ${PGDG_ENABLE} \
-    postgresql16-server postgresql16-contrib postgis34_16
-else
-  sudo dnf install -y --disablerepo='pgdg*' ${PGDG_ENABLE} \
-    postgresql16-server postgresql16-contrib postgis34_16
+sudo dnf install -y oracle-epel-release-el9 2>/dev/null || true
+
+echo "[install_data_services] PostgreSQL 16 server"
+sudo dnf install -y --disablerepo='pgdg*' ${PGDG_ENABLE} \
+  postgresql16-server postgresql16-contrib
+
+echo "[install_data_services] PostGIS deps (OL9 / EPEL / CRB — not always in PGDG extras on aarch64)"
+sudo dnf install -y hdf5 xerces-c 2>/dev/null \
+  || sudo dnf install -y hdf5-aarch64 libxerces-c 2>/dev/null \
+  || true
+
+echo "[install_data_services] PostGIS 3.4 for PG16"
+sudo dnf install -y --disablerepo='pgdg*' ${PGDG_ENABLE} postgis34_16
+
+if [[ "$SKIP_REDIS" != "1" ]]; then
   sudo dnf install -y redis
 fi
 

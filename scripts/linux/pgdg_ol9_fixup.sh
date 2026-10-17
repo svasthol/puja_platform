@@ -8,6 +8,9 @@ pgdg_fixup_ol9_aarch64() {
   [[ "$(uname -m)" == "aarch64" ]] || return 0
   [[ -f /etc/oracle-release ]] || grep -qi 'oracle linux' /etc/os-release 2>/dev/null || return 0
 
+  # Remove stock + duplicate pinned files (avoids "listed more than once").
+  sudo rm -f /etc/yum.repos.d/pgdg-redhat-all.repo /etc/yum.repos.d/pgdg-redhat.repo
+  sudo rm -f /etc/yum.repos.d/pgdg16-ol9-aarch64.repo
   if ls /etc/yum.repos.d/pgdg*.repo >/dev/null 2>&1; then
     while IFS= read -r repo; do
       [[ -n "$repo" ]] && sudo dnf -qy config-manager --disable "$repo" 2>/dev/null || true

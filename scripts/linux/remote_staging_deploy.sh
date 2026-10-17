@@ -19,6 +19,7 @@ log "git fetch + checkout ${GIT_REF}"
 git fetch origin
 if git show-ref --verify --quiet "refs/remotes/${GIT_REF}"; then
   git checkout -B deploy-staging "${GIT_REF}"
+  git reset --hard "${GIT_REF}"
 else
   git pull --ff-only origin "$(echo "$GIT_REF" | sed 's|origin/||')"
 fi
@@ -49,8 +50,12 @@ if [[ "$RUN_DB_BOOTSTRAP" == "1" ]]; then
 fi
 
 if [[ "$RUN_MIGRATE" == "1" ]]; then
-  export VENV_DIR
-  ./scripts/migrate.sh
+  if [[ ! -f /etc/mana-guruji/api.env ]]; then
+    log "SKIP migrate: /etc/mana-guruji/api.env missing — copy deploy/env/staging.api.env.example, then re-run with run_migrate"
+  else
+    export VENV_DIR
+    ./scripts/migrate.sh
+  fi
 fi
 
 if [[ "$RESTART_SERVICES" == "1" ]]; then

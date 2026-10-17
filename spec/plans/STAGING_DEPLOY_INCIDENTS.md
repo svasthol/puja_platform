@@ -22,6 +22,9 @@
 | 10 | `bash\r: No such file` on scripts | CRLF from Windows edit | `.gitattributes` `scripts/linux/** eol=lf` |
 | 11 | Wrong clone path | Docs said `Guruji.git`; remote is `puja_platform` | Clone to `/opt/mana-guruji/src/puja_platform` |
 | 12 | No venv at `/opt/mana-guruji/venv` | Bootstrap never completed | Fix PGDG first; `VENV_DIR=/opt/mana-guruji/venv` |
+| 13 | Deploy fails at `migrate.sh` | No `/etc/mana-guruji/api.env` yet | Create `api.env` first; deploy skips migrate until file exists |
+| 14 | PostGIS missing `hdf5`, `xerces-c` | PGDG extras incomplete on OL9 aarch64 | Install from OL9/EPEL/CRB before `postgis34_16`; see `install_data_services_ol9.sh` |
+| 15 | `pgdg16 listed more than once` | Old + pinned repo files | `pgdg_ol9_fixup.sh` removes duplicates |
 
 ---
 
