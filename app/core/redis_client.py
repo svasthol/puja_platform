@@ -58,7 +58,7 @@ def _is_transient_redis_error(exc: BaseException) -> bool:
 
 def _create_pool() -> aioredis.Redis:
     return aioredis.from_url(
-        str(settings.REDIS_URL),
+        settings.redis_cache_url,
         encoding="utf-8",
         decode_responses=True,
         health_check_interval=30,

@@ -28,10 +28,9 @@ jobs:
           ref: ${{ inputs.git_ref }}
 
       - name: Schema verify (spec/db vs live)
-        env:
-          REPO_ROOT: ${{ vars.STAGING_REPO_DIR || '/opt/mana-guruji/src/puja_platform' }}
         run: |
           set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
           ENV_FILE=/etc/mana-guruji/api.env
           test -f "$ENV_FILE" || { echo "Missing $ENV_FILE"; exit 1; }
           set -a && source "$ENV_FILE" && set +a
@@ -44,6 +43,7 @@ jobs:
           DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
         run: |
           set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
           if [[ -z "${DEV_DATABASE_URL:-}" ]]; then
             echo "Set Environment secret DEV_DATABASE_URL to compare (read-only URL is fine)."
             exit 1

@@ -87,9 +87,16 @@ jobs:
           TF_VAR_enable_staging_redis_micro: ${{ inputs.enable_redis_micro }}
         run: terraform apply -input=false -auto-approve -no-color
 
-      - name: Redis URL hint
+      - name: Redis endpoints (apply)
         if: inputs.terraform_action == 'apply'
         run: |
-          echo "Set on stg-aio-1 /etc/mana-guruji/api.env:"
+          echo "=== stg-redis-1 (VM.Standard.E2.1.Micro) ==="
+          terraform output stg_redis_public_ip || true
+          terraform output stg_redis_private_ip || true
+          echo "REDIS_URL (cache DB 0):"
           terraform output -raw stg_redis_url || true
-          echo "Set repo variable STAGING_SKIP_HOST_REDIS=true and restart API."
+          echo "Celery DB 1 (phase 2):"
+          terraform output -raw stg_redis_url_celery || true
+          echo "Public URL (only if redis_extra_client_cidrs set):"
+          terraform output -raw stg_redis_url_public || true
+          echo "On stg-aio-1: set api.env, STAGING_SKIP_HOST_REDIS=true, restart API/worker/beat."

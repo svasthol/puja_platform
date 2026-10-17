@@ -136,8 +136,9 @@ jobs:
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          SKIP_REDIS_FLAG="${{ vars.STAGING_SKIP_HOST_REDIS == 'true' && '1' || '0' }}"
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
-            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} DEPLOY_COMPONENT=${DEPLOY_COMPONENT} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} bash -s" <<'REMOTE'
+            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} DEPLOY_COMPONENT=${DEPLOY_COMPONENT} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} SKIP_REDIS=${SKIP_REDIS_FLAG} bash -s" <<'REMOTE'
           set -euo pipefail
           if [[ ! -d "${REPO_ROOT}/.git" ]]; then
             echo "First-time: sudo mkdir -p /opt/mana-guruji && sudo chown opc:opc /opt/mana-guruji"
@@ -146,6 +147,7 @@ jobs:
           fi
           cd "${REPO_ROOT}"
           export GIT_REF RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1
+          export VENV_DIR=/opt/mana-guruji/venv SKIP_REDIS="${SKIP_REDIS:-0}"
           chmod +x scripts/linux/remote_staging_deploy.sh
           ./scripts/linux/remote_staging_deploy.sh
           REMOTE

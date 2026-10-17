@@ -12,4 +12,5 @@ for u in mana-guruji-api mana-guruji-celery-worker mana-guruji-celery-beat; do
 done
 sudo systemctl daemon-reload
 sudo systemctl enable mana-guruji-api mana-guruji-celery-worker mana-guruji-celery-beat
-echo "install_systemd: OK — edit /etc/mana-guruji/api.env then start services"
+echo "install_systemd: OK — does NOT create OCI VMs, Docker, or Redis (use Deploy Redis staging + api.env REDIS_URL)."
+echo "install_systemd: installs 3 units — API, one Celery worker (4 queues), Celery beat. Then: sudo systemctl start ..."

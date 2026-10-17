@@ -88,6 +88,17 @@ if [[ "$RUN_SYSTEMD_INSTALL" == "1" ]]; then
   ./deploy/staging/install_systemd.sh
 fi
 
+if [[ "${RUN_REDIS_ENSURE:-0}" == "1" ]]; then
+  if [[ -f /etc/mana-guruji/api.env ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source /etc/mana-guruji/api.env
+    set +a
+    export VENV_DIR
+    "${VENV_DIR}/bin/python" scripts/ensure_redis_logical_dbs.py --strict || log "WARN: redis ensure failed"
+  fi
+fi
+
 if [[ "$RESTART_SERVICES" == "1" ]]; then
   if systemctl list-unit-files | grep -q mana-guruji-api.service; then
     sudo systemctl restart mana-guruji-api mana-guruji-celery-worker mana-guruji-celery-beat

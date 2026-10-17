@@ -24,4 +24,5 @@ module "staging_redis_micro" {
   ssh_allowed_cidrs          = var.ssh_allowed_cidrs
   availability_domain_name   = var.availability_domain_name
   redis_client_cidr          = "10.60.1.0/24"
+  redis_extra_client_cidrs   = var.redis_extra_client_cidrs
 }

@@ -37,7 +37,13 @@ variable "ssh_allowed_cidrs" {
 variable "redis_client_cidr" {
   type        = string
   default     = "10.60.1.0/24"
-  description = "CIDR allowed to connect to Redis TCP/6379 (staging app subnet)."
+  description = "CIDR allowed to connect to Redis TCP/6379 (staging app subnet, stg-aio-1)."
+}
+
+variable "redis_extra_client_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Optional extra ingress to TCP/6379 (e.g. laptop /32 for debugging). Prefer private IP from stg-aio-1 only."
 }
 
 variable "redis_image" {

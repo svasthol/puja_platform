@@ -70,3 +70,9 @@ variable "enable_staging_redis_micro" {
   default     = false
   description = "If true, provision Always Free VM.Standard.E2.1.Micro (stg-redis-1) with Docker Redis 7 in the staging VCN."
 }
+
+variable "redis_extra_client_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Optional: allow TCP/6379 from these CIDRs (e.g. laptop /32). Empty = only staging app subnet."
+}

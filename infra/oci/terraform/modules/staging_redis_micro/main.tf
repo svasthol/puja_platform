@@ -40,11 +40,26 @@ resource "oci_core_network_security_group_security_rule" "redis_ssh" {
   }
 }
 
-resource "oci_core_network_security_group_security_rule" "redis_port" {
+resource "oci_core_network_security_group_security_rule" "redis_port_app_subnet" {
   network_security_group_id = oci_core_network_security_group.redis.id
   direction                 = "INGRESS"
   protocol                  = "6"
   source                    = var.redis_client_cidr
+  source_type               = "CIDR_BLOCK"
+  tcp_options {
+    destination_port_range {
+      min = 6379
+      max = 6379
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "redis_port_extra" {
+  for_each                  = toset(var.redis_extra_client_cidrs)
+  network_security_group_id = oci_core_network_security_group.redis.id
+  direction                 = "INGRESS"
+  protocol                  = "6"
+  source                    = each.value
   source_type               = "CIDR_BLOCK"
   tcp_options {
     destination_port_range {

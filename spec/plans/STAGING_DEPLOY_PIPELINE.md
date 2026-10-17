@@ -33,6 +33,7 @@
 | [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml) | manual | Prod preflight (rollout TBD) |
 | [`db-verify.yml`](../../.github/workflows/db-verify.yml) | manual | Strict `spec/db` vs live DB on staging; optional dev compare |
 | [`deploy-redis-staging.yml`](../../.github/workflows/deploy-redis-staging.yml) | manual | Terraform E2 Micro + Redis Docker |
+| [`redis-ensure-staging.yml`](../../.github/workflows/redis-ensure-staging.yml) | manual | PING/bootstrap logical Redis DB 0,1,2 from `api.env` |
 
 ---
 
