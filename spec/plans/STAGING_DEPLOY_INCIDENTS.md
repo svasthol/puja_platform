@@ -25,6 +25,8 @@
 | 13 | Deploy fails at `migrate.sh` | No `/etc/mana-guruji/api.env` yet | Create `api.env` first; deploy skips migrate until file exists |
 | 14 | PostGIS missing `hdf5`, `xerces-c` | PGDG extras incomplete on OL9 aarch64 | Install from OL9/EPEL/CRB before `postgis34_16`; see `install_data_services_ol9.sh` |
 | 15 | `pgdg16 listed more than once` | Old + pinned repo files | `pgdg_ol9_fixup.sh` removes duplicates |
+| 16 | `ALLOWED_ORIGINS` JSONDecodeError on migrate | `api.env` value not valid JSON array | Use `ALLOWED_ORIGINS=["http://localhost:3000"]` (double quotes); see `deploy/env/staging.api.env.example` |
+| 17 | `invalid interpolation syntax` at `%40` in DB URL | Alembic `set_main_option` + ConfigParser vs URL-encoded `@` in password | Fixed in `migrations/env.py` — pass URL from settings, not ini interpolation; keep `%40` in connection strings |
 
 ---
 
@@ -41,6 +43,7 @@
 | **CI vs CD** | CI does not install on hosts | Prod: build once (arm64), promote digest; migrate on DB role |
 | **Redis** | Optional E2 Micro + Docker | Prod: `cache-1` per `fleet.launch.yaml`; not on app A1 |
 | **Paths** | `/opt/mana-guruji/venv`, `api.env` | Same conventions in systemd + `fleet.launch.yaml` |
+| **api.env** | JSON `ALLOWED_ORIGINS`; `%40` in DB URLs | Ship `staging.api.env.example`; Alembic must not use ConfigParser for migrate URL |
 
 ---
 
