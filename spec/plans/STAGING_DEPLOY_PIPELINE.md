@@ -31,6 +31,35 @@
 | [`ci.yml`](../../.github/workflows/ci.yml) | push/PR `main`, `dev` | Compile-time: arm64 wheels + import verify |
 | [`deploy-staging.yml`](../../.github/workflows/deploy-staging.yml) | push `dev` (app paths) or **manual** | Runtime deploy on VM |
 | [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml) | manual | Prod preflight (rollout TBD) |
+| [`db-verify.yml`](../../.github/workflows/db-verify.yml) | manual | Strict `spec/db` vs live DB on staging; optional dev compare |
+| [`deploy-redis-staging.yml`](../../.github/workflows/deploy-redis-staging.yml) | manual | Terraform E2 Micro + Redis Docker |
+
+---
+
+## Manual deploy — pick branch + component
+
+**Actions → Deploy staging → Run workflow**
+
+| `component` | Does |
+|-------------|------|
+| `full` | git pull, pip, migrate, restart API/worker/beat (default push) |
+| `backend_only` | pip + restart (no DB) |
+| `db_migrate_only` | `migrate.sh` only |
+| `db_bootstrap_only` | `bootstrap.sh` once |
+| `data_services_only` | PG/PostGIS/Redis install script |
+| `install_systemd` | `deploy/staging/install_systemd.sh` + restart |
+
+Set **git_ref** to any branch (e.g. `dev`). Prod uses the same pattern in **Deploy production** when rollout is wired.
+
+**Redis micro:** **Deploy Redis staging** → `terraform_action=apply`, then set `REDIS_URL` from terraform output on `stg-aio-1` and `STAGING_SKIP_HOST_REDIS=true`.
+
+**DB audit:** **DB verify** on staging; optional **compare_dev** if GitHub Environment secret `DEV_DATABASE_URL` is set (laptop/dev read-only URL).
+
+```bash
+# On VM or laptop with URLs:
+python scripts/verify_database_schema.py --strict --label staging
+python scripts/compare_database_schemas.py --left-url "$DEV_DATABASE_URL" --right-url "$DATABASE_MIGRATE_URL" --strict
+```
 
 ---
 

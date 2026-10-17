@@ -16,22 +16,33 @@ on:
   workflow_dispatch:
     inputs:
       git_ref:
-        description: Git ref to deploy (branch or tag)
+        description: Git branch to deploy (e.g. dev)
         default: dev
+      component:
+        description: What to deploy (staging VM)
+        type: choice
+        options:
+          - full
+          - backend_only
+          - db_migrate_only
+          - db_bootstrap_only
+          - data_services_only
+          - install_systemd
+        default: full
       run_data_services:
-        description: Install PG16+PostGIS+Redis (first boot only)
+        description: "(legacy) Install PG16+PostGIS+Redis — use component=data_services_only"
         type: boolean
         default: false
       run_db_bootstrap:
-        description: Run bootstrap.sh once (roles)
+        description: "(legacy) bootstrap.sh — use component=db_bootstrap_only"
         type: boolean
         default: false
       run_migrate:
-        description: Run migrate.sh
+        description: "(legacy) migrate.sh — use component=db_migrate_only"
         type: boolean
         default: true
       run_python_bootstrap:
-        description: pip install / verify runtime
+        description: "(legacy) pip — use component=backend_only"
         type: boolean
         default: true
 
@@ -63,22 +74,23 @@ jobs:
           REPO_ROOT: ${{ vars.STAGING_REPO_DIR || '/opt/mana-guruji/src/puja_platform' }}
         run: |
           GIT_REF="${{ github.event_name == 'workflow_dispatch' && inputs.git_ref || 'dev' }}"
+          DEPLOY_COMPONENT="${{ github.event_name == 'workflow_dispatch' && inputs.component || 'full' }}"
           RUN_DATA_SERVICES=0
           RUN_DB_BOOTSTRAP=0
           RUN_MIGRATE=1
           RUN_PYTHON_BOOTSTRAP=1
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            [[ "${{ inputs.run_data_services }}" == "true" ]] && RUN_DATA_SERVICES=1
-            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && RUN_DB_BOOTSTRAP=1
-            [[ "${{ inputs.run_migrate }}" == "false" ]] && RUN_MIGRATE=0
-            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && RUN_PYTHON_BOOTSTRAP=0
+            [[ "${{ inputs.run_data_services }}" == "true" ]] && DEPLOY_COMPONENT=data_services_only
+            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && DEPLOY_COMPONENT=db_bootstrap_only
+            [[ "${{ inputs.run_migrate }}" == "false" ]] && DEPLOY_COMPONENT=backend_only
+            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && DEPLOY_COMPONENT=db_migrate_only
           fi
           if [[ ! -d "${REPO_ROOT}/.git" ]]; then
             echo "Clone first: git clone -b dev https://github.com/svasthol/puja_platform.git ${REPO_ROOT}"
             exit 1
           fi
           cd "${REPO_ROOT}"
-          export GIT_REF="origin/${GIT_REF}" RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1 VENV_DIR=/opt/mana-guruji/venv
+          export GIT_REF="origin/${GIT_REF}" DEPLOY_COMPONENT RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1 VENV_DIR=/opt/mana-guruji/venv
           export SKIP_REDIS="${{ vars.STAGING_SKIP_HOST_REDIS == 'true' && '1' || '0' }}"
           chmod +x scripts/linux/remote_staging_deploy.sh
           ./scripts/linux/remote_staging_deploy.sh
@@ -109,22 +121,23 @@ jobs:
           REPO_DIR: ${{ vars.STAGING_REPO_DIR || '/opt/mana-guruji/src/puja_platform' }}
         run: |
           GIT_REF="${{ github.event_name == 'workflow_dispatch' && inputs.git_ref || 'dev' }}"
+          DEPLOY_COMPONENT="${{ github.event_name == 'workflow_dispatch' && inputs.component || 'full' }}"
           RUN_DATA_SERVICES=0
           RUN_DB_BOOTSTRAP=0
           RUN_MIGRATE=1
           RUN_PYTHON_BOOTSTRAP=1
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            [[ "${{ inputs.run_data_services }}" == "true" ]] && RUN_DATA_SERVICES=1
-            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && RUN_DB_BOOTSTRAP=1
-            [[ "${{ inputs.run_migrate }}" == "false" ]] && RUN_MIGRATE=0
-            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && RUN_PYTHON_BOOTSTRAP=0
+            [[ "${{ inputs.run_data_services }}" == "true" ]] && DEPLOY_COMPONENT=data_services_only
+            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && DEPLOY_COMPONENT=db_bootstrap_only
+            [[ "${{ inputs.run_migrate }}" == "false" ]] && DEPLOY_COMPONENT=backend_only
+            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && DEPLOY_COMPONENT=db_migrate_only
           fi
           install -m 700 -d ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
-            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} bash -s" <<'REMOTE'
+            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} DEPLOY_COMPONENT=${DEPLOY_COMPONENT} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} bash -s" <<'REMOTE'
           set -euo pipefail
           if [[ ! -d "${REPO_ROOT}/.git" ]]; then
             echo "First-time: sudo mkdir -p /opt/mana-guruji && sudo chown opc:opc /opt/mana-guruji"

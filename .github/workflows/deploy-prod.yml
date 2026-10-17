@@ -6,6 +6,19 @@ name: Deploy production
 
 on:
   workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Git branch or tag to deploy (when rollout is wired)
+        default: main
+      component:
+        description: Prod component (placeholder until fleet rollout)
+        type: choice
+        options:
+          - preflight_only
+          - db_migrate_only
+          - backend_only
+          - full
+        default: preflight_only
 
 concurrency:
   group: deploy-prod
@@ -55,4 +68,6 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - run: echo "OCI rolling deploy not wired yet — preflight passed."
+      - run: |
+          echo "OCI rolling deploy not wired yet — preflight passed."
+          echo "Selected component=${{ inputs.component }} ref=${{ inputs.git_ref }}"
