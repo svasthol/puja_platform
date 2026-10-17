@@ -24,12 +24,16 @@ if ! ls /etc/yum.repos.d/pgdg*.repo >/dev/null 2>&1; then
   sudo dnf install -y "https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-${ARCH}/pgdg-redhat-repo-latest.noarch.rpm"
 fi
 pgdg_fixup_ol9_aarch64
+PGDG_ENABLE="$(pgdg_enable_flags)"
 sudo dnf -qy module disable postgresql || true
+# CodeReady Builder often required for GDAL/GEOS build deps on OL9.
+sudo dnf install -y oraclelinux-developer-release-el9 2>/dev/null || true
+sudo dnf config-manager --enable ol9_codeready_builder 2>/dev/null || true
 if [[ "$SKIP_REDIS" == "1" ]]; then
-  sudo dnf install -y --disablerepo='pgdg*' --enablerepo=pgdg16-ol9-aarch64 \
+  sudo dnf install -y --disablerepo='pgdg*' ${PGDG_ENABLE} \
     postgresql16-server postgresql16-contrib postgis34_16
 else
-  sudo dnf install -y --disablerepo='pgdg*' --enablerepo=pgdg16-ol9-aarch64 \
+  sudo dnf install -y --disablerepo='pgdg*' ${PGDG_ENABLE} \
     postgresql16-server postgresql16-contrib postgis34_16
   sudo dnf install -y redis
 fi

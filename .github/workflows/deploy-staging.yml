@@ -54,7 +54,8 @@ jobs:
     name: Deploy on VM (self-hosted)
     needs: [preflight]
     if: vars.STAGING_DEPLOY_MODE == 'self-hosted'
-    runs-on: [self-hosted, Linux, ARM64, staging]
+    # Match runner labels from GitHub UI (self-hosted, Linux, ARM64). Optional label "staging" is not required.
+    runs-on: [self-hosted, Linux, ARM64]
     environment: staging
     steps:
       - name: Run staging deploy script on this host

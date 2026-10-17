@@ -20,7 +20,7 @@
 | Terraform staging (`stg-aio-1`) | **COMPUTE DONE** | VCN + subnet + instance **2026-10-16** — see inventory |
 | Staging app stack (PG/Redis/API) | **IN PROGRESS** | S1 done; **S2–S6** pending on VM |
 | GitHub **ci.yml** | **IN REPO** | Push to `dev`/`main` to run arm64 gate |
-| GitHub **deploy-staging.yml** | **IN REPO** | Push **`dev`** → SSH CD — [`STAGING_DEPLOY_PIPELINE.md`](./STAGING_DEPLOY_PIPELINE.md) |
+| GitHub **deploy-staging.yml** | **IN REPO** | Self-hosted runner on VM — [`STAGING_DEPLOY_PIPELINE.md`](./STAGING_DEPLOY_PIPELINE.md) · incidents [`STAGING_DEPLOY_INCIDENTS.md`](./STAGING_DEPLOY_INCIDENTS.md) |
 | GitHub **infra-terraform-staging.yml** | **IN REPO** | Optional plan on PR; **apply stays local** |
 | Terraform production (5-node) | **NOT STARTED** | After STG-S6 |
 | Ansible (PG/Redis/app) | **NOT STARTED** | Post-S3 scripts / playbooks |
@@ -43,7 +43,7 @@
 | Phase | Step | Status | Date |
 |-------|------|--------|------|
 | **S1** | SSH `opc@140.245.245.201` | ☑ | 2026-10-16 — `hostnamectl`: **OL 9.8**, **aarch64**, static hostname **`stg-aio-1`** |
-| **S2** | OL9 Python runtime pipeline (`scripts/linux/bootstrap_python_runtime.sh`) | ☐ | **next** — see [`LINUX_RUNTIME_PIPELINE.md`](./LINUX_RUNTIME_PIPELINE.md) |
+| **S2** | OL9 Python runtime pipeline (`scripts/linux/bootstrap_python_runtime.sh`) | ☑ / ☐ | venv at `/opt/mana-guruji/venv` — see [`LINUX_RUNTIME_PIPELINE.md`](./LINUX_RUNTIME_PIPELINE.md) |
 | **S3** | PG16 + PostGIS + Redis 7 on host | ☐ | |
 | **S4** | Extensions → `bootstrap.sh` → migrations → `apply_grants.py` | ☐ | |
 | **S5** | API + Celery worker + beat + staging `.env` | ☐ | |

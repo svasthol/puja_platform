@@ -23,7 +23,7 @@ Everything else (pip venv, PG/Redis, migrate) can be driven by **Deploy staging*
 
 1. GitHub → **svasthol/puja_platform** → **Settings** → **Actions** → **Runners** → **New self-hosted runner**.
 2. OS: **Linux**, Arch: **ARM64**.
-3. On VM as `opc`, follow GitHub’s commands. When `./config.sh` asks for labels, include **`staging`** (defaults already add `self-hosted`, `Linux`, `ARM64`), e.g. `--labels staging` or accept defaults then add `staging` in the prompt.
+3. On VM as `opc`, follow GitHub’s commands. Default labels **`self-hosted`, `Linux`, `ARM64`** are enough (workflow does not require a `staging` label).
 4. Install as a **service** so it survives reboot (`sudo ./svc.sh install` per GitHub instructions).
 5. Repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → New repository variable:
    - Name: `STAGING_DEPLOY_MODE`
@@ -79,7 +79,18 @@ journalctl -u 'actions.runner.*' -n 30 --no-pager
 
 Runner **Idle** in GitHub before re-running **Deploy staging**.
 
-### Permission denied on `runsvc.sh` (journal shows `203/EXEC`)
+### SELinux blocks runner (`203/EXEC` / Permission denied)
+
+On OL9 with **Enforcing** SELinux:
+
+```bash
+sudo dnf install -y policycoreutils-python-utils
+sudo semanage fcontext -a -t bin_t "/home/opc/actions-runner(/.*)?"
+sudo restorecon -Rv /home/opc/actions-runner
+sudo ./svc.sh start
+```
+
+### Permission denied on `runsvc.sh` (other causes)
 
 OL9 **SELinux** or **home directory permissions** often block systemd from executing `~/actions-runner/runsvc.sh`.
 
