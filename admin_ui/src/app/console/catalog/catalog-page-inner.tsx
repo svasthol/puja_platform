@@ -239,7 +239,7 @@ export default function CatalogPageInner() {
       />
       <PageContent>
         <CatalogReadOnlyBanner me={me} />
-        <Alert tone="info" className="mb-4">
+        <Alert tone="default" className="mb-4">
           <strong>Catalogue policy:</strong> there is no hard delete. &quot;Off&quot; / &quot;Disable&quot; sets{" "}
           <code className="text-xs">is_active=false</code> — the row stays in Postgres for bookings and
           history. Customer app reads <code className="text-xs">GET /v1/pujas</code> (active only).
