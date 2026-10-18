@@ -27,6 +27,8 @@ terraform plan
 terraform apply
 ```
 
+**Laptop DB parity:** Postgres via `ssh -L 15432:127.0.0.1:5432` (not public 5432). App ingress: `developer_allowed_cidrs` (8000/3000/6379) — see [`spec/plans/DB_DEV_STAGING_PARITY.md`](../../../spec/plans/DB_DEV_STAGING_PARITY.md).
+
 Record outputs (`public_ip`, `instance_id`) in [`OCI_COMPUTE_FLEET.md`](../../../spec/plans/OCI_COMPUTE_FLEET.md) inventory and [`OCI_INFRA_STATUS.md`](../../../spec/plans/OCI_INFRA_STATUS.md).
 
 ## State

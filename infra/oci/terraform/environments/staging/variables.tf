@@ -48,6 +48,18 @@ variable "ssh_allowed_cidrs" {
   description = "Your public IP as /32 recommended; avoid 0.0.0.0/0 in production-like staging."
 }
 
+variable "developer_allowed_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Auto-updated by scripts/db_dev_staging_parity.py (developer.auto.tfvars.json)."
+}
+
+variable "developer_tcp_ports" {
+  type        = list(number)
+  default     = [8000, 3000, 6379]
+  description = "App ports from laptop; Postgres via ssh -L 15432:127.0.0.1:5432."
+}
+
 variable "display_name_prefix" {
   type    = string
   default = "mana-guruji-stg"

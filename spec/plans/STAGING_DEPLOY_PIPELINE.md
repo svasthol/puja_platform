@@ -16,8 +16,9 @@
             → bootstrap_python_runtime.sh (pip)
             → migrate.sh (DB)
             → systemctl restart api/worker/beat
+            → (full) install_admin.sh — Next.js :3000
     ↓
-[GitHub]  curl http://127.0.0.1:8000/health/live via SSH
+[GitHub]  curl :8000/health/live and :3000 (admin) on VM
 ```
 
 **Terraform** for staging compute is **already applied** — not part of app deploy. Optional: [`infra-terraform-staging.yml`](../../.github/workflows/infra-terraform-staging.yml) on IaC PRs.
@@ -32,6 +33,7 @@
 | [`deploy-staging.yml`](../../.github/workflows/deploy-staging.yml) | push `dev` (app paths) or **manual** | Runtime deploy on VM |
 | [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml) | manual | Prod preflight (rollout TBD) |
 | [`db-verify.yml`](../../.github/workflows/db-verify.yml) | manual | Strict `spec/db` vs live DB on staging; optional dev compare |
+| [`db-dev-staging-parity.yml`](../../.github/workflows/db-dev-staging-parity.yml) | manual | Developer `/32` ingress + deep catalog compare + safe `migrate.sh` |
 | [`deploy-redis-staging.yml`](../../.github/workflows/deploy-redis-staging.yml) | manual | Terraform E2 Micro + Redis Docker |
 | [`redis-ensure-staging.yml`](../../.github/workflows/redis-ensure-staging.yml) | manual | PING/bootstrap logical Redis DB 0,1,2 from `api.env` |
 
@@ -43,8 +45,9 @@
 
 | `component` | Does |
 |-------------|------|
-| `full` | git pull, pip, migrate, restart API/worker/beat (default push) |
-| `backend_only` | pip + restart (no DB) |
+| `full` | git pull, pip, migrate, restart API/worker/beat, **rebuild admin** (see [`STAGING_ADMIN_UI.md`](./STAGING_ADMIN_UI.md)) |
+| `admin_only` | git pull + `install_admin.sh` only |
+| `backend_only` | pip + restart (no DB, no admin) |
 | `db_migrate_only` | `migrate.sh` only |
 | `db_bootstrap_only` | `bootstrap.sh` once |
 | `data_services_only` | PG/PostGIS/Redis install script |
@@ -98,6 +101,11 @@ export DATABASE_URL="$DATABASE_ADMIN_URL"
 chmod +x deploy/staging/install_systemd.sh
 ./deploy/staging/install_systemd.sh
 sudo systemctl start mana-guruji-api mana-guruji-celery-worker mana-guruji-celery-beat
+
+# Admin UI (Model 2)
+chmod +x deploy/staging/install_admin.sh
+./deploy/staging/install_admin.sh
+# Add http://140.245.245.201:3000 to ALLOWED_ORIGINS in api.env if not already, then restart API
 ```
 
 Or use **Actions → Deploy staging → Run workflow** with:
@@ -116,6 +124,7 @@ Or use **Actions → Deploy staging → Run workflow** with:
 | [`bootstrap.sh`](../../scripts/bootstrap.sh) | Once per DB (roles) |
 | [`migrate.sh`](../../scripts/migrate.sh) | Every deploy |
 | [`remote_staging_deploy.sh`](../../scripts/linux/remote_staging_deploy.sh) | Called by GitHub SSH |
+| [`install_admin.sh`](../../deploy/staging/install_admin.sh) | Admin UI build + `mana-guruji-admin` — [`STAGING_ADMIN_UI.md`](./STAGING_ADMIN_UI.md) |
 
 ---
 

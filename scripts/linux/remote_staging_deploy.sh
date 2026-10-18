@@ -10,13 +10,20 @@ RUN_DATA_SERVICES="${RUN_DATA_SERVICES:-0}"
 RUN_DB_BOOTSTRAP="${RUN_DB_BOOTSTRAP:-0}"
 RUN_MIGRATE="${RUN_MIGRATE:-1}"
 RUN_SYSTEMD_INSTALL="${RUN_SYSTEMD_INSTALL:-0}"
+RUN_ADMIN_DEPLOY="${RUN_ADMIN_DEPLOY:-0}"
 RESTART_SERVICES="${RESTART_SERVICES:-1}"
 DEPLOY_COMPONENT="${DEPLOY_COMPONENT:-full}"
 
 log() { echo "[remote_staging_deploy] $*"; }
 
 case "$DEPLOY_COMPONENT" in
-  full) ;;
+  full)
+    RUN_ADMIN_DEPLOY=1
+    ;;
+  admin_only)
+    RUN_DATA_SERVICES=0 RUN_DB_BOOTSTRAP=0 RUN_MIGRATE=0 RUN_PYTHON_BOOTSTRAP=0 RUN_SYSTEMD_INSTALL=0
+    RESTART_SERVICES=0 RUN_ADMIN_DEPLOY=1 ADMIN_FORCE_INSTALL=1
+    ;;
   backend_only)
     RUN_DATA_SERVICES=0 RUN_DB_BOOTSTRAP=0 RUN_MIGRATE=0 RUN_PYTHON_BOOTSTRAP=1 RUN_SYSTEMD_INSTALL=0
     ;;
@@ -86,6 +93,17 @@ fi
 if [[ "$RUN_SYSTEMD_INSTALL" == "1" ]]; then
   chmod +x deploy/staging/install_systemd.sh 2>/dev/null || true
   ./deploy/staging/install_systemd.sh
+  chmod +x deploy/staging/install_admin.sh 2>/dev/null || true
+  UNITS_ONLY=1 ./deploy/staging/install_admin.sh || true
+fi
+
+if [[ "$RUN_ADMIN_DEPLOY" == "1" ]]; then
+  chmod +x deploy/staging/install_admin.sh scripts/linux/ensure_node_ol9.sh 2>/dev/null || true
+  if [[ -f /etc/mana-guruji/admin.env ]] || [[ "${ADMIN_FORCE_INSTALL:-0}" == "1" ]]; then
+    ./deploy/staging/install_admin.sh
+  else
+    log "SKIP admin: no /etc/mana-guruji/admin.env — one-time: ./deploy/staging/install_admin.sh (STAGING_ADMIN_UI.md)"
+  fi
 fi
 
 if [[ "${RUN_REDIS_ENSURE:-0}" == "1" ]]; then

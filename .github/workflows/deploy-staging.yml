@@ -10,6 +10,7 @@ on:
       - "scripts/**"
       - "migrations/**"
       - "deploy/**"
+      - "admin_ui/**"
       - "requirements.txt"
       - "pyproject.toml"
       - ".github/workflows/deploy-staging.yml"
@@ -28,6 +29,7 @@ on:
           - db_bootstrap_only
           - data_services_only
           - install_systemd
+          - admin_only
         default: full
       run_data_services:
         description: "(legacy) Install PG16+PostGIS+Redis — use component=data_services_only"
@@ -100,6 +102,9 @@ jobs:
         run: |
           curl -fsS http://127.0.0.1:8000/health/live && echo "health/live OK" \
             || echo "WARN: API not up — finish api.env + systemd (STAGING_DEPLOY_PIPELINE.md)"
+          curl -fsS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ | grep -qE '^(200|307|308)' \
+            && echo "admin :3000 OK" \
+            || echo "WARN: Admin not up — run deploy/staging/install_admin.sh once (STAGING_ADMIN_UI.md)"
 
   deploy:
     name: SSH deploy stg-aio-1
@@ -163,4 +168,5 @@ jobs:
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
-            'curl -fsS http://127.0.0.1:8000/health/live && echo "health/live OK" || echo "WARN: API not up yet — finish first-boot (STAGING_DEPLOY_PIPELINE.md § First-time)"'
+            'curl -fsS http://127.0.0.1:8000/health/live && echo "health/live OK" || echo "WARN: API not up yet — finish first-boot (STAGING_DEPLOY_PIPELINE.md § First-time)"; \
+            curl -fsS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ | grep -qE "^(200|307|308)" && echo "admin :3000 OK" || echo "WARN: Admin not up (STAGING_ADMIN_UI.md)"'

@@ -19,6 +19,7 @@ firebase-service-account.json
 
 # Terraform (local secrets + state)
 **/terraform.tfvars
+**/developer.auto.tfvars.json
 **/.terraform/
 **/*.tfstate
 **/*.tfstate.*

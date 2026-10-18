@@ -8,6 +8,8 @@ module "staging_stack" {
   hostname                 = "stg-aio-1"
   ssh_public_key           = var.ssh_public_key
   ssh_allowed_cidrs        = var.ssh_allowed_cidrs
+  developer_allowed_cidrs  = var.developer_allowed_cidrs
+  developer_tcp_ports      = var.developer_tcp_ports
   boot_volume_gb           = var.boot_volume_gb
   availability_domain_name = var.availability_domain_name
 }

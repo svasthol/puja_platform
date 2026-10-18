@@ -1,0 +1,19 @@
+[Unit]
+Description=Mana Guruji Admin UI (Next.js)
+After=network.target mana-guruji-api.service
+Wants=mana-guruji-api.service
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+WorkingDirectory=/opt/mana-guruji/src/puja_platform/admin_ui
+EnvironmentFile=/etc/mana-guruji/admin.env
+Environment=PATH=/usr/bin:/usr/local/bin
+# Bind all interfaces so OCI ingress / firewalld :3000 works (next defaults to localhost).
+ExecStart=/opt/mana-guruji/src/puja_platform/admin_ui/node_modules/.bin/next start --hostname 0.0.0.0 --port 3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

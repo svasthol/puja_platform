@@ -6,7 +6,7 @@
 
 **Region:** `ap-hyderabad-1` · **Object Storage namespace:** `axbak8qmhjek` (CLI: `oci os ns get`)
 
-**Current focus:** **Phase S2** — OL9 Python 3.12 + `pip install -r requirements.txt` (aarch64 compat gate).
+**Current focus:** **S5–S6** — Celery smoke, admin/Flutter against staging API, MVP checklist. PM: [`STAGING_PENDING_CHECKLIST.md`](./project_pm/STAGING_PENDING_CHECKLIST.md).
 
 ---
 
@@ -18,9 +18,9 @@
 | Local OCI API auth | **DONE** | `puja_platform/.oci/` + `Set-OciConfig.ps1` |
 | Staging compartment `mana-guruji-staging` | **DONE** | See [`OCI_COMPARTMENTS.md`](./OCI_COMPARTMENTS.md) |
 | Terraform staging (`stg-aio-1`) | **COMPUTE DONE** | VCN + subnet + instance **2026-10-16** — see inventory |
-| Staging app stack (PG/Redis/API) | **IN PROGRESS** | S1 done; **S2–S6** pending on VM |
-| GitHub **ci.yml** | **IN REPO** | Push to `dev`/`main` to run arm64 gate |
-| GitHub **deploy-staging.yml** | **IN REPO** | Self-hosted runner on VM — [`STAGING_DEPLOY_PIPELINE.md`](./STAGING_DEPLOY_PIPELINE.md) · incidents [`STAGING_DEPLOY_INCIDENTS.md`](./STAGING_DEPLOY_INCIDENTS.md) |
+| Staging app stack (PG/Redis/API) | **IN PROGRESS** | S1–S5 largely done; **S6** MVP + frontend validation pending |
+| GitHub **ci.yml** | **IN REPO** | arm64 gate; full pytest migrate TBD |
+| GitHub **deploy-staging.yml** | **DONE (operational)** | Self-hosted migrate on `dev` — [`STAGING_DEPLOY_PIPELINE.md`](./STAGING_DEPLOY_PIPELINE.md) |
 | GitHub **infra-terraform-staging.yml** | **IN REPO** | Optional plan on PR; **apply stays local** |
 | Terraform production (5-node) | **NOT STARTED** | After STG-S6 |
 | Ansible (PG/Redis/app) | **NOT STARTED** | Post-S3 scripts / playbooks |
@@ -42,12 +42,12 @@
 
 | Phase | Step | Status | Date |
 |-------|------|--------|------|
-| **S1** | SSH `opc@140.245.245.201` | ☑ | 2026-10-16 — `hostnamectl`: **OL 9.8**, **aarch64**, static hostname **`stg-aio-1`** |
-| **S2** | OL9 Python runtime pipeline (`scripts/linux/bootstrap_python_runtime.sh`) | ☑ / ☐ | venv at `/opt/mana-guruji/venv` — see [`LINUX_RUNTIME_PIPELINE.md`](./LINUX_RUNTIME_PIPELINE.md) |
-| **S3** | PG16 + PostGIS + Redis 7 on host | ☐ | |
-| **S4** | Extensions → `bootstrap.sh` → migrations → `apply_grants.py` | ☐ | |
-| **S5** | API + Celery worker + beat + staging `.env` | ☐ | |
-| **S6** | `GET /health` OK; MVP checklist A–F on staging (smoke) | ☐ | |
+| **S1** | SSH `opc@140.245.245.201` | ☑ | 2026-10-16 |
+| **S2** | Python venv `/opt/mana-guruji/venv` | ☑ | 2026-10-17 |
+| **S3** | PG16 + PostGIS; Redis external `18.60.87.153` | ☑ | 2026-10-17 |
+| **S4** | bootstrap + migrate + grants | ☑ | 2026-10-17 |
+| **S5** | API :8000 + systemd; Celery verify pending | ☑ / ☐ | 2026-10-17 |
+| **S6** | `/health/live` from laptop; MVP A–F | ☐ / ☑ partial | live OK 2026-10-17 |
 
 Runbook detail: [`OCI_PROD_MANUAL_RUNBOOK.md`](./OCI_PROD_MANUAL_RUNBOOK.md) (single-host). Sign-off template: [`MVP_GO_NO_GO_CHECKLIST.md`](./MVP_GO_NO_GO_CHECKLIST.md).
 
