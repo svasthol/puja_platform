@@ -28,6 +28,7 @@
 | 16 | `ALLOWED_ORIGINS` JSONDecodeError on migrate | `api.env` value not valid JSON array | Use `ALLOWED_ORIGINS=["http://localhost:3000"]` (double quotes); see `deploy/env/staging.api.env.example` |
 | 17 | `invalid interpolation syntax` at `%40` in DB URL | Alembic `set_main_option` + ConfigParser vs URL-encoded `@` in password | Fixed in `migrations/env.py` — pass URL from settings, not ini interpolation; keep `%40` in connection strings |
 | 18 | Alembic 001 fails on `triggers.sql` (`syntax error at or near ""`) | UTF-8 **BOM** at start of `spec/db/triggers.sql`; `read_text()` without `utf-8-sig` | Strip BOM from SQL files; `001_initial_schema.py` reads with `encoding="utf-8-sig"` |
+| 19 | Deploy `local changes would be overwritten by checkout` | Self-hosted clone has **uncommitted edits** (manual hotfix on VM) | On VM once: `git reset --hard origin/dev`; repo uses `git checkout -f` in `remote_staging_deploy.sh` |
 
 ---
 

@@ -47,10 +47,11 @@ esac
 
 cd "$REPO_ROOT"
 
-log "git fetch + checkout ${GIT_REF}"
+log "git fetch + sync ${GIT_REF} (staging VM must match origin; local edits discarded)"
 git fetch origin
 if git show-ref --verify --quiet "refs/remotes/${GIT_REF}"; then
-  git checkout -B deploy-staging "${GIT_REF}"
+  # -f: do not fail when opc left hotfix edits on the clone (common on self-hosted runner).
+  git checkout -f -B deploy-staging "${GIT_REF}"
   git reset --hard "${GIT_REF}"
 else
   git pull --ff-only origin "$(echo "$GIT_REF" | sed 's|origin/||')"
