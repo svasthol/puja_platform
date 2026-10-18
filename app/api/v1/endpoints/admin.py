@@ -191,7 +191,7 @@ async def set_booking_fee(
                 jsonb_build_object(
                     'amount', CAST(:amt AS numeric),
                     'currency', 'INR',
-                    'label', :label
+                    'label', CAST(:label AS text)
                 ),
                 now()
             )
@@ -199,7 +199,7 @@ async def set_booking_fee(
                 value_json = jsonb_build_object(
                     'amount', CAST(:amt AS numeric),
                     'currency', 'INR',
-                    'label', :label
+                    'label', CAST(:label AS text)
                 ),
                 updated_at = now()
             """
