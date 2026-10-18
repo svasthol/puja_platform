@@ -29,6 +29,7 @@
 | 17 | `invalid interpolation syntax` at `%40` in DB URL | Alembic `set_main_option` + ConfigParser vs URL-encoded `@` in password | Fixed in `migrations/env.py` — pass URL from settings, not ini interpolation; keep `%40` in connection strings |
 | 18 | Alembic 001 fails on `triggers.sql` (`syntax error at or near ""`) | UTF-8 **BOM** at start of `spec/db/triggers.sql`; `read_text()` without `utf-8-sig` | Strip BOM from SQL files; `001_initial_schema.py` reads with `encoding="utf-8-sig"` |
 | 19 | Deploy `local changes would be overwritten by checkout` | Self-hosted clone has **uncommitted edits** (manual hotfix on VM) | On VM once: `git reset --hard origin/dev`; repo uses `git checkout -f` in `remote_staging_deploy.sh` |
+| 20 | Admin `next build` — `Cannot find module 'tailwindcss'` | `NODE_ENV=production` in `admin.env` before `npm ci` → devDeps skipped (~39 packages) | `install_admin.sh` exports only `NEXT_PUBLIC_*`; runtime `NODE_ENV` in systemd unit |
 
 ---
 

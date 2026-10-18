@@ -41,14 +41,15 @@ fi
 
 echo "install_admin: npm ci + build (NEXT_PUBLIC_* from ${ADMIN_ENV})"
 cd "${REPO_ROOT}/admin_ui"
-set -a
-# shellcheck source=/dev/null
-source "$ADMIN_ENV"
-set +a
-if [[ -z "${NEXT_PUBLIC_API_URL:-}" ]]; then
+
+# Do not source NODE_ENV=production before npm ci — npm omits devDependencies (tailwind, postcss, tsc).
+NEXT_PUBLIC_API_URL="$(grep -E '^[[:space:]]*NEXT_PUBLIC_API_URL=' "$ADMIN_ENV" | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+if [[ -z "${NEXT_PUBLIC_API_URL}" ]]; then
   echo "ERROR: NEXT_PUBLIC_API_URL unset in ${ADMIN_ENV}"
   exit 1
 fi
+export NEXT_PUBLIC_API_URL
+unset NODE_ENV
 
 npm ci
 npm run build

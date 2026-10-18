@@ -375,7 +375,7 @@ export default function PujaBuilderPage() {
             <div className="mt-4 flex gap-2">
               <Button
                 type="button"
-                variant={editLocale === "en" ? "default" : "outline"}
+                variant={editLocale === "en" ? "primary" : "secondary"}
                 size="sm"
                 onClick={() => setEditLocale("en")}
               >
@@ -383,7 +383,7 @@ export default function PujaBuilderPage() {
               </Button>
               <Button
                 type="button"
-                variant={editLocale === "te" ? "default" : "outline"}
+                variant={editLocale === "te" ? "primary" : "secondary"}
                 size="sm"
                 onClick={() => setEditLocale("te")}
               >
@@ -535,7 +535,7 @@ export default function PujaBuilderPage() {
             <div className="mt-4 flex gap-2">
               <Button
                 type="button"
-                variant={editLocale === "en" ? "default" : "outline"}
+                variant={editLocale === "en" ? "primary" : "secondary"}
                 size="sm"
                 onClick={() => setEditLocale("en")}
               >
@@ -543,7 +543,7 @@ export default function PujaBuilderPage() {
               </Button>
               <Button
                 type="button"
-                variant={editLocale === "te" ? "default" : "outline"}
+                variant={editLocale === "te" ? "primary" : "secondary"}
                 size="sm"
                 onClick={() => setEditLocale("te")}
               >
