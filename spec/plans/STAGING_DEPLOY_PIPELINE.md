@@ -36,6 +36,7 @@
 | [`db-dev-staging-parity.yml`](../../.github/workflows/db-dev-staging-parity.yml) | manual | Developer `/32` ingress + deep catalog compare + safe `migrate.sh` |
 | [`deploy-redis-staging.yml`](../../.github/workflows/deploy-redis-staging.yml) | manual | Terraform E2 Micro + Redis Docker |
 | [`redis-ensure-staging.yml`](../../.github/workflows/redis-ensure-staging.yml) | manual | PING/bootstrap logical Redis DB 0,1,2 from `api.env` |
+| [`staging-storage-smoke.yml`](../../.github/workflows/staging-storage-smoke.yml) | manual | OCI/S3 catalog + KYC — [`STAGING_CONFIG_ROLLOUT.md`](./STAGING_CONFIG_ROLLOUT.md) |
 
 ---
 

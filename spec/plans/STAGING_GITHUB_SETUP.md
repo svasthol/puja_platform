@@ -8,6 +8,9 @@
 |----------|------|---------|
 | [`ci.yml`](../../.github/workflows/ci.yml) | push/PR `main`, `dev` | **linux/arm64** pip + imports; G1/G2 preflight |
 | [`deploy-staging.yml`](../../.github/workflows/deploy-staging.yml) | **Push `dev`** or manual | Full CD — [`STAGING_DEPLOY_PIPELINE.md`](./STAGING_DEPLOY_PIPELINE.md) |
+| [`staging-storage-smoke.yml`](../../.github/workflows/staging-storage-smoke.yml) | Manual | S3 catalog + KYC — [`STAGING_CONFIG_ROLLOUT.md`](./STAGING_CONFIG_ROLLOUT.md) Phase 1 |
+| [`redis-ensure-staging.yml`](../../.github/workflows/redis-ensure-staging.yml) | Manual | Redis logical DB 0/1/2 |
+| [`db-verify.yml`](../../.github/workflows/db-verify.yml) | Manual | Schema vs `spec/db` |
 | [`deploy-prod.yml`](../../.github/workflows/deploy-prod.yml) | Manual | Prod preflight (deploy TBD) |
 | [`infra-terraform-staging.yml`](../../.github/workflows/infra-terraform-staging.yml) | PR touching `infra/oci/terraform/**` | `terraform plan` (optional if secrets set) |
 

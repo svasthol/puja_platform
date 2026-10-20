@@ -74,3 +74,21 @@ Mobile-Admin,MOB-004,,Admin login TOTP smoke on staging,Staging,P0,Not Started,,
 
 Mobile-Admin,MOB-005,,ALLOWED_ORIGINS for admin + public API URL,Staging,P0,Completed,,,2026-10-17,STG-S5,Manual,api.env,no outer single quotes on JSON array
 
+Staging-Configure,STG-CFG-001,,OCI buckets mana-guruji-stg-catalog + stg-kyc,Staging,P0,Not Started,,,,STG-S4b,Manual/OCI,STAGING_CONFIG_ROLLOUT.md §1.1,Private buckets ap-hyderabad-1
+
+Staging-Configure,STG-CFG-002,,api.env S3 block single key pair no duplicates,Staging,P0,Not Started,,,,STG-CFG-001,Manual,deploy/env/staging.api.env.example,restart api+celery after edit
+
+Staging-Configure,STG-CFG-003,,verify_staging_storage.py + Actions smoke,Staging,P0,In Progress,,,,STG-CFG-002,GitHub,staging-storage-smoke.yml,script in repo; run workflow after CFG-002
+
+Staging-Configure,STG-CFG-004,,bootstrap_catalog.py Hyderabad seed on staging DB,Staging,P0,Not Started,,,,STG-CFG-003,Manual,admin_ui/README.md,not Admin CSV upload — ops script
+
+Staging-Configure,STG-CFG-005,,Admin catalogue image presign upload smoke,Staging,P0,Not Started,,,,STG-CFG-004,Manual,CATALOG_SYNC.md,JPEG PNG WebP
+
+Staging-Configure,STG-CFG-006,,KYC_REDIRECT_URL + Setu sandbox register,Staging,P1,Not Started,,,,STG-CFG-003,Manual,STAGING_CONFIG_ROLLOUT.md §3,/v1/pujari/kyc/callback public URL
+
+Staging-Configure,STG-CFG-007,,Razorpay test webhook to staging API,Staging,P1,Not Started,,,,STG-S6,Manual,STAGING_CONFIG_ROLLOUT.md §4,RAZORPAY_WEBHOOK_SECRET match dashboard
+
+Staging-IaC,STG-IAC-005,,Terraform OCI buckets catalog+kyc optional,Staging,P2,Not Started,,,,STG-CFG-001,Terraform,STAGING_CONFIG_ROLLOUT.md,until then manual console
+
+CI-CD,CI-006,,staging-storage-smoke.yml workflow,Staging,P0,In Progress,,,,STG-CFG-003,GitHub,.github/workflows/staging-storage-smoke.yml,self-hosted only
+

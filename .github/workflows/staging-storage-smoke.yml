@@ -1,0 +1,28 @@
+# Verify OCI/S3 catalogue + KYC buckets using /etc/mana-guruji/api.env on stg-aio-1.
+# Docs: spec/plans/STAGING_CONFIG_ROLLOUT.md § Phase 1
+name: Staging storage smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_roundtrip:
+        description: Only head_bucket (no put/get/delete test objects)
+        type: boolean
+        default: false
+
+jobs:
+  smoke:
+    name: S3 catalog + KYC (self-hosted)
+    runs-on: [self-hosted, Linux, ARM64]
+    environment: staging
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Verify object storage
+        run: |
+          set -euo pipefail
+          test -f /etc/mana-guruji/api.env || { echo "Missing /etc/mana-guruji/api.env"; exit 1; }
+          set -a && source /etc/mana-guruji/api.env && set +a
+          EXTRA=()
+          [[ "${{ inputs.skip_roundtrip }}" == "true" ]] && EXTRA+=(--skip-roundtrip)
+          /opt/mana-guruji/venv/bin/python scripts/verify_staging_storage.py --strict "${EXTRA[@]}"
