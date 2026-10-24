@@ -1,0 +1,173 @@
+# Staging CD: laptop pushes to `dev` → CI gates → SSH deploy on stg-aio-1.
+# Docs: spec/plans/STAGING_DEPLOY_PIPELINE.md
+name: Deploy staging
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - "migrations/**"
+      - "deploy/**"
+      - "admin_ui/**"
+      - "scripts/verify_staging_storage.py"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - ".github/workflows/deploy-staging.yml"
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Git branch to deploy (e.g. dev)
+        default: dev
+      component:
+        description: What to deploy (staging VM)
+        type: choice
+        options:
+          - full
+          - backend_only
+          - db_migrate_only
+          - db_bootstrap_only
+          - data_services_only
+          - install_systemd
+          - admin_only
+        default: full
+      run_data_services:
+        description: "(legacy) Install PG16+PostGIS+Redis — use component=data_services_only"
+        type: boolean
+        default: false
+      run_db_bootstrap:
+        description: "(legacy) bootstrap.sh — use component=db_bootstrap_only"
+        type: boolean
+        default: false
+      run_migrate:
+        description: "(legacy) migrate.sh — use component=db_migrate_only"
+        type: boolean
+        default: true
+      run_python_bootstrap:
+        description: "(legacy) pip — use component=backend_only"
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Repo gates (G1 G2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.12"
+      - run: python scripts/deploy_preflight_repo.py
+
+  deploy-self-hosted:
+    name: Deploy on VM (self-hosted)
+    needs: [preflight]
+    if: vars.STAGING_DEPLOY_MODE == 'self-hosted'
+    # Match runner labels from GitHub UI (self-hosted, Linux, ARM64). Optional label "staging" is not required.
+    runs-on: [self-hosted, Linux, ARM64]
+    environment: staging
+    steps:
+      - name: Run staging deploy script on this host
+        env:
+          REPO_ROOT: ${{ vars.STAGING_REPO_DIR || '/opt/mana-guruji/src/puja_platform' }}
+        run: |
+          GIT_REF="${{ github.event_name == 'workflow_dispatch' && inputs.git_ref || 'dev' }}"
+          DEPLOY_COMPONENT="${{ github.event_name == 'workflow_dispatch' && inputs.component || 'full' }}"
+          RUN_DATA_SERVICES=0
+          RUN_DB_BOOTSTRAP=0
+          RUN_MIGRATE=1
+          RUN_PYTHON_BOOTSTRAP=1
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ inputs.run_data_services }}" == "true" ]] && DEPLOY_COMPONENT=data_services_only
+            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && DEPLOY_COMPONENT=db_bootstrap_only
+            [[ "${{ inputs.run_migrate }}" == "false" ]] && DEPLOY_COMPONENT=backend_only
+            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && DEPLOY_COMPONENT=db_migrate_only
+          fi
+          if [[ ! -d "${REPO_ROOT}/.git" ]]; then
+            echo "Clone first: git clone -b dev https://github.com/svasthol/puja_platform.git ${REPO_ROOT}"
+            exit 1
+          fi
+          cd "${REPO_ROOT}"
+          export GIT_REF="origin/${GIT_REF}" DEPLOY_COMPONENT RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1 VENV_DIR=/opt/mana-guruji/venv
+          export SKIP_REDIS="${{ vars.STAGING_SKIP_HOST_REDIS == 'true' && '1' || '0' }}"
+          chmod +x scripts/linux/remote_staging_deploy.sh
+          ./scripts/linux/remote_staging_deploy.sh
+
+      - name: Health check (localhost)
+        continue-on-error: true
+        run: |
+          curl -fsS http://127.0.0.1:8000/health/live && echo "health/live OK" \
+            || echo "WARN: API not up — finish api.env + systemd (STAGING_DEPLOY_PIPELINE.md)"
+          curl -fsS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ | grep -qE '^(200|307|308)' \
+            && echo "admin :3000 OK" \
+            || echo "WARN: Admin not up — run deploy/staging/install_admin.sh once (STAGING_ADMIN_UI.md)"
+
+  deploy:
+    name: SSH deploy stg-aio-1
+    needs: [preflight]
+    if: vars.STAGING_DEPLOY_MODE != 'self-hosted'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Require SSH secrets
+        run: |
+          test -n "${{ secrets.STAGING_HOST }}" || (echo "Missing STAGING_HOST" && exit 1)
+          test -n "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" || (echo "Missing STAGING_SSH_PRIVATE_KEY" && exit 1)
+
+      - name: Remote deploy
+        env:
+          SSH_USER: ${{ secrets.STAGING_SSH_USER || 'opc' }}
+          SSH_HOST: ${{ secrets.STAGING_HOST }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          REPO_DIR: ${{ vars.STAGING_REPO_DIR || '/opt/mana-guruji/src/puja_platform' }}
+        run: |
+          GIT_REF="${{ github.event_name == 'workflow_dispatch' && inputs.git_ref || 'dev' }}"
+          DEPLOY_COMPONENT="${{ github.event_name == 'workflow_dispatch' && inputs.component || 'full' }}"
+          RUN_DATA_SERVICES=0
+          RUN_DB_BOOTSTRAP=0
+          RUN_MIGRATE=1
+          RUN_PYTHON_BOOTSTRAP=1
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ inputs.run_data_services }}" == "true" ]] && DEPLOY_COMPONENT=data_services_only
+            [[ "${{ inputs.run_db_bootstrap }}" == "true" ]] && DEPLOY_COMPONENT=db_bootstrap_only
+            [[ "${{ inputs.run_migrate }}" == "false" ]] && DEPLOY_COMPONENT=backend_only
+            [[ "${{ inputs.run_python_bootstrap }}" == "false" ]] && DEPLOY_COMPONENT=db_migrate_only
+          fi
+          install -m 700 -d ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          SKIP_REDIS_FLAG="${{ vars.STAGING_SKIP_HOST_REDIS == 'true' && '1' || '0' }}"
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
+            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} DEPLOY_COMPONENT=${DEPLOY_COMPONENT} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} SKIP_REDIS=${SKIP_REDIS_FLAG} bash -s" <<'REMOTE'
+          set -euo pipefail
+          if [[ ! -d "${REPO_ROOT}/.git" ]]; then
+            echo "First-time: sudo mkdir -p /opt/mana-guruji && sudo chown opc:opc /opt/mana-guruji"
+            echo "git clone -b dev https://github.com/svasthol/puja_platform.git ${REPO_ROOT} && cd ${REPO_ROOT}"
+            exit 1
+          fi
+          cd "${REPO_ROOT}"
+          export GIT_REF RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1
+          export VENV_DIR=/opt/mana-guruji/venv SKIP_REDIS="${SKIP_REDIS:-0}"
+          chmod +x scripts/linux/remote_staging_deploy.sh
+          ./scripts/linux/remote_staging_deploy.sh
+          REMOTE
+
+      - name: Health check (on VM localhost)
+        continue-on-error: true
+        env:
+          SSH_USER: ${{ secrets.STAGING_SSH_USER || 'opc' }}
+          SSH_HOST: ${{ secrets.STAGING_HOST }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
+            'curl -fsS http://127.0.0.1:8000/health/live && echo "health/live OK" || echo "WARN: API not up yet — finish first-boot (STAGING_DEPLOY_PIPELINE.md § First-time)"; \
+            curl -fsS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ | grep -qE "^(200|307|308)" && echo "admin :3000 OK" || echo "WARN: Admin not up (STAGING_ADMIN_UI.md)"'

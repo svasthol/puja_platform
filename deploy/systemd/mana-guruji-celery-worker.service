@@ -1,0 +1,17 @@
+[Unit]
+Description=Mana Guruji Celery worker
+After=network.target redis.service mana-guruji-api.service
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+WorkingDirectory=/opt/mana-guruji/src/puja_platform
+EnvironmentFile=/etc/mana-guruji/api.env
+Environment=PATH=/opt/mana-guruji/venv/bin:/usr/local/bin:/usr/bin
+ExecStart=/opt/mana-guruji/venv/bin/celery -A app.workers.celery_app worker -l info -Q sweep,dispatch,refund,notifications
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

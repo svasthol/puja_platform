@@ -117,7 +117,7 @@ Legacy cost write-up (local only, not in Guruji git): `mana_guruji/infra/OCI_COM
 | db-1 | | | data-private | |
 | db-2 | | | data-private | |
 | cache-1 | | | data-private | |
-| stg-aio-1 | | | staging | |
+| stg-aio-1 | `…vlukjq` *(full OCID in OCI_INFRA_STATUS)* | `10.60.1.98` | staging public | `mana-guruji-staging` |
 
 ---
 
@@ -129,8 +129,9 @@ Legacy cost write-up (local only, not in Guruji git): `mana_guruji/infra/OCI_COM
 | Environment | `infra/oci/terraform/environments/staging` |
 | Creates | VCN `10.60.0.0/16`, public subnet, **`stg-aio-1`** instance |
 | Vars file | Copy `terraform.tfvars.example` → `terraform.tfvars` (gitignored) |
+| Apply status | **Done 2026-10-16** — public IP `140.245.245.201` |
 
-Progress: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md).
+Progress: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md) (**S1–S6** post-apply).
 
 ---
 
@@ -138,5 +139,6 @@ Progress: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md).
 
 | Date | Change |
 |------|--------|
+| 2026-10-16 | Staging `terraform apply` — `stg-aio-1` provisioned |
 | 2026-10-10 | Staging Terraform scaffold for `stg-aio-1` |
 | 2026-10-10 | SSOT created; Option B corrected; YAML for IaC/CI |

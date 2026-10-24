@@ -19,5 +19,9 @@ display_name_prefix = "mana-guruji-stg"
 # Boot volume must be >= 50 GB for this OL9 image. If bootVolumeQuota: delete unused boot volumes in Console.
 # boot_volume_gb = 50
 
+# Optional Always Free Redis (VM.Standard.E2.1.Micro + Docker redis:7-alpine)
+# enable_staging_redis_micro = true
+# redis_extra_client_cidrs = ["203.0.113.10/32"]  # laptop — optional; stg-aio-1 uses private IP
+
 # Before terraform: . C:\...\puja_platform\infra\oci\scripts\Set-OciConfig.ps1
 # (exports TF_VAR_* for API auth from .oci/config — do not duplicate tenancy/user/key in tfvars unless needed)

@@ -15,13 +15,17 @@ Spec / Files / Acceptance / Depends-on.
 
 ## OCI infrastructure (IaC)
 
-Tracker: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md). Fleet sizes: [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md).
+Tracker: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md). PM sheets: [Staging](./project_pm/Mana_Guruji_OCI_PM_Tracker_Staging.csv) · [Production](./project_pm/Mana_Guruji_OCI_PM_Tracker_Production.csv). Fleet: [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md).
 
 | ID | Status | Notes |
 |---|---|---|
 | OCI-FLEET-SSOT | COMPLETED | `fleet.launch.yaml` + `OCI_COMPUTE_FLEET.md` |
 | OCI-LOCAL-CLI | COMPLETED | `.oci/` + `infra/oci/LOCAL_OCI_SETUP.md` |
-| OCI-TF-STG-AIO | IN_PROGRESS | `infra/oci/terraform/environments/staging` — **apply pending** |
+| OCI-TF-STG-AIO | COMPLETED | Terraform apply **2026-10-16** — `stg-aio-1` live ([`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md)) |
+| OCI-STG-CONFIGURE | IN_PROGRESS | **S1** done; **S2** [`LINUX_RUNTIME_PIPELINE.md`](./LINUX_RUNTIME_PIPELINE.md) |
+| OCI-CI-LINUX-ARM64 | COMPLETED | `.github/workflows/ci.yml` |
+| OCI-GHA-DEPLOY-STG | IN_PROGRESS | `deploy-staging.yml` + `remote_staging_deploy.sh` — first-boot VM + `staging` secrets |
+| OCI-GHA-TF-STG-PLAN | COMPLETED | `infra-terraform-staging.yml` (optional CI plan) |
 | OCI-TF-PROD-5NODE | PENDING | After staging OL9/migrate smoke |
 | OCI-ANSIBLE | PENDING | Patroni, Redis, app roles |
 | OCI-GHA-TERRAFORM | PENDING | `infra-terraform.yml` plan/apply |

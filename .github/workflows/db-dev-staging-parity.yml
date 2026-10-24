@@ -1,0 +1,134 @@
+# Dev laptop ↔ staging Postgres structure parity (read-only compare + optional ingress + safe migrate).
+# Full dev compare requires DEV_DATABASE_URL on a runner that can reach your laptop DB — use local script on Windows.
+name: DB dev staging parity
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Branch to checkout
+        default: dev
+      update_developer_ingress:
+        description: Terraform apply developer /32 from runner public IP (OCI secrets required)
+        type: boolean
+        default: false
+      compare_on_staging_runner:
+        description: Deep compare staging vs DEV_DATABASE_URL secret (staging must reach dev URL)
+        type: boolean
+        default: false
+      staging_migrate:
+        description: Run ./scripts/migrate.sh on self-hosted staging VM (safe sync)
+        type: boolean
+        default: false
+      strict:
+        description: Fail job on mismatch
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  update-ingress:
+    name: OCI developer ingress (/32)
+    if: inputs.update_developer_ingress
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Skip when OCI secrets missing
+        id: check
+        run: |
+          if [[ -z "${{ secrets.OCI_PRIVATE_KEY }}" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Set OCI_* secrets or run: python scripts/db_dev_staging_parity.py --update-ingress locally"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        if: steps.check.outputs.skip != 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Resolve runner public /32
+        if: steps.check.outputs.skip != 'true'
+        id: cidr
+        run: |
+          CIDR=$(python scripts/oci_public_cidr.py)
+          echo "cidr=$CIDR" >> "$GITHUB_OUTPUT"
+          echo "developer_allowed_cidrs=[\"$CIDR\"]" > ingress.tfvars
+          cat ingress.tfvars
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        if: steps.check.outputs.skip != 'true'
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform apply developer CIDR
+        if: steps.check.outputs.skip != 'true'
+        working-directory: infra/oci/terraform/environments/staging
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          TF_VAR_compartment_id: ${{ secrets.STAGING_COMPARTMENT_OCID }}
+          TF_VAR_ssh_public_key: ${{ secrets.TERRAFORM_SSH_PUBLIC_KEY }}
+          TF_VAR_developer_allowed_cidrs: ${{ format('["{0}"]', steps.cidr.outputs.cidr) }}
+        run: |
+          mkdir -p ~/.oci
+          echo "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${OCI_USER_OCID}
+          fingerprint=${OCI_FINGERPRINT}
+          tenancy=${OCI_TENANCY_OCID}
+          region=ap-hyderabad-1
+          key_file=${HOME}/.oci/oci_api_key.pem
+          EOF
+          terraform init -input=false
+          terraform apply -auto-approve -input=false
+
+  verify-staging:
+    name: Staging catalog + spec verify
+    runs-on: [self-hosted, Linux, ARM64]
+    environment: staging
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Spec verify (strict)
+        run: |
+          set -euo pipefail
+          set -a && source /etc/mana-guruji/api.env && set +a
+          export DATABASE_URL="${DATABASE_MIGRATE_URL:-${DATABASE_ADMIN_URL}}"
+          /opt/mana-guruji/venv/bin/python scripts/verify_database_schema.py --strict --label staging
+
+      - name: Deep compare dev vs staging
+        if: inputs.compare_on_staging_runner
+        env:
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DEV_DATABASE_URL:-}" ]]; then
+            echo "Set Environment secret DEV_DATABASE_URL"
+            exit 1
+          fi
+          set -a && source /etc/mana-guruji/api.env && set +a
+          STAGING_URL="${DATABASE_MIGRATE_URL:-${DATABASE_ADMIN_URL}}"
+          ARGS=(--left-url "$DEV_DATABASE_URL" --left-label dev --right-url "$STAGING_URL" --right-label staging)
+          if [[ "${{ inputs.strict }}" == "true" ]]; then ARGS+=(--strict); fi
+          /opt/mana-guruji/venv/bin/python scripts/compare_database_schemas.py "${ARGS[@]}"
+
+      - name: Safe migrate (repo migrations only)
+        if: inputs.staging_migrate
+        run: |
+          set -euo pipefail
+          cd /opt/mana-guruji/src/puja_platform
+          git fetch origin && git checkout "${{ inputs.git_ref }}" && git pull origin "${{ inputs.git_ref }}"
+          ./scripts/migrate.sh

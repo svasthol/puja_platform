@@ -6,10 +6,10 @@ from typing import Any
 
 import boto3
 from botocore.client import BaseClient
-from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from app.core.config import get_settings
+from app.services.s3_boto import effective_s3_endpoint, s3_boto_config
 
 EntityType = str
 MediaEntityType = str  # puja | category | gallery
@@ -58,38 +58,22 @@ def catalog_storage_configured() -> bool:
     )
 
 
-def _effective_s3_endpoint(raw: str) -> str | None:
-    """Use custom endpoint only when it is a real URL (ignore .env inline comments)."""
-    s = (raw or "").strip()
-    if not s or s.startswith("#"):
-        return None
-    if s.startswith("http://") or s.startswith("https://"):
-        return s
-    return None
-
-
 def get_s3_client() -> BaseClient:
     settings = get_settings()
     if not catalog_storage_configured():
         raise CatalogStorageNotConfigured(
             "S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET_CATALOG must be set."
         )
-    custom_endpoint = _effective_s3_endpoint(settings.S3_ENDPOINT_URL)
-    aws_endpoint = (
-        None
-        if custom_endpoint
-        else f"https://s3.{settings.S3_REGION}.amazonaws.com"
-    )
-    use_endpoint = custom_endpoint or aws_endpoint
+    custom_endpoint = effective_s3_endpoint(settings.S3_ENDPOINT_URL)
     kwargs: dict[str, Any] = {
         "service_name": "s3",
         "region_name": settings.S3_REGION,
         "aws_access_key_id": settings.S3_ACCESS_KEY,
         "aws_secret_access_key": settings.S3_SECRET_KEY,
-        "config": Config(signature_version="s3v4"),
+        "config": s3_boto_config(custom_endpoint),
     }
-    if use_endpoint:
-        kwargs["endpoint_url"] = use_endpoint
+    if custom_endpoint:
+        kwargs["endpoint_url"] = custom_endpoint
     return boto3.client(**kwargs)
 
 

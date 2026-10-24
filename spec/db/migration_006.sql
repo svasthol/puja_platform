@@ -1,4 +1,4 @@
-﻿-- Migration 006 - duration guard (P-DUR-GUARD)
+-- Migration 006 - duration guard (P-DUR-GUARD)
 -- Apply after 005. See spec/plans/SPEC_AMENDMENTS.md section 12.
 
 -- ---- trigger 5: NULLIF prevents COALESCE(0, 60) staying 0 ----------------
