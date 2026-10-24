@@ -79,7 +79,7 @@ set -a && source /etc/mana-guruji/api.env && set +a
 | Wrong endpoint / region | `head_bucket` 403/404 | Match OCI bucket region + compat URL |
 | Empty `S3_ENDPOINT_URL` on OCI | Client hits AWS default | Set compat endpoint (required for OCI) |
 | Expecting CSV upload in Admin UI | No bulk import screen | Use **Phase 2** bootstrap script for rows; images via Admin presign |
-| Smoke `head_bucket OK` but `put/get NotImplemented` | OCI S3 compat + virtual-hosted URLs | Fixed in app: `s3_boto.path` addressing — deploy latest `dev` + re-run smoke |
+| Smoke `head_bucket OK` but `put/get NotImplemented` | boto3 ≥1.36 default S3 checksums + OCI compat | `s3_boto.py`: path-style + `request_checksum_calculation=when_required` — deploy `dev` + re-run smoke |
 
 ---
 

@@ -52,8 +52,8 @@ def _roundtrip_put_delete(client, bucket: str, label: str, errors: list[str]) ->
         code = exc.response.get("Error", {}).get("Code", "")
         if code == "NotImplemented":
             errors.append(
-                f"{label}: put/get NotImplemented — pull latest code (OCI needs S3 path-style); "
-                "or IAM policy on buckets"
+                f"{label}: put/get NotImplemented — deploy latest s3_boto.py "
+                "(OCI: path-style + request_checksum_calculation=when_required); not IAM"
             )
         else:
             errors.append(f"{label}: put/get failed ({code}) — check IAM policy and endpoint")
