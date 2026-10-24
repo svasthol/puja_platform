@@ -3,6 +3,7 @@
 
 Run on stg-aio-1 after /etc/mana-guruji/api.env is configured:
 
+  cd /opt/mana-guruji/src/puja_platform
   set -a && source /etc/mana-guruji/api.env && set +a
   /opt/mana-guruji/venv/bin/python scripts/verify_staging_storage.py --strict
 
@@ -12,6 +13,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -44,7 +50,13 @@ def _roundtrip_put_delete(client, bucket: str, label: str, errors: list[str]) ->
         client.delete_object(Bucket=bucket, Key=key)
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code", "")
-        errors.append(f"{label}: put/get failed ({code}) — bucket policy must allow read/write")
+        if code == "NotImplemented":
+            errors.append(
+                f"{label}: put/get NotImplemented — pull latest code (OCI needs S3 path-style); "
+                "or IAM policy on buckets"
+            )
+        else:
+            errors.append(f"{label}: put/get failed ({code}) — check IAM policy and endpoint")
     except BotoCoreError as exc:
         errors.append(f"{label}: roundtrip error — {exc}")
 

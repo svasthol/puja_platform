@@ -11,6 +11,7 @@ on:
       - "migrations/**"
       - "deploy/**"
       - "admin_ui/**"
+      - "scripts/verify_staging_storage.py"
       - "requirements.txt"
       - "pyproject.toml"
       - ".github/workflows/deploy-staging.yml"

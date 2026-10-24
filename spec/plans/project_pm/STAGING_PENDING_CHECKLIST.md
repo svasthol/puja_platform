@@ -1,7 +1,8 @@
 # Staging pending checklist (backend · frontend · validation)
 
 **PM tracker CSV:** [`Mana_Guruji_OCI_PM_Tracker_Staging.csv`](./Mana_Guruji_OCI_PM_Tracker_Staging.csv)  
-**Last updated:** 2026-10-17  
+**Config rollout (ordered):** [`STAGING_CONFIG_ROLLOUT.md`](../STAGING_CONFIG_ROLLOUT.md) · env SSOT: [`ENV_STAGING_REFERENCE.md`](../ENV_STAGING_REFERENCE.md)  
+**Last updated:** 2026-10-21  
 **Host:** `stg-aio-1` · `140.245.245.201` · API `http://140.245.245.201:8000`
 
 ---
@@ -28,7 +29,7 @@
 | STG-S4b | Finish `api.env`: S3 buckets/keys, Razorpay test, `TOTP_ENC_KEYS`, `SECRET_KEY`, optional FCM path | P0 |
 | STG-S5 | Confirm **Celery worker + beat** active; broker on Redis **DB 1** after latest code deploy | P0 |
 | STG-S6 | `/health/ready` (or full health) not degraded — DB + Redis | P0 |
-| STG-S7 | OCI Object Storage buckets + verify presigned upload smoke | P1 |
+| STG-S7 | OCI Object Storage — **STG-CFG-001..005** in [`STAGING_CONFIG_ROLLOUT.md`](../STAGING_CONFIG_ROLLOUT.md) | P0 |
 | BE-001 | Route **presence** to Redis **DB 2** (`redis_presence_url`) | P2 |
 | BE-002 | `bootstrap_admin.py` — first admin for console | P0 |
 | BE-003 | Razorpay test webhooks pointed at staging public URL | P1 |
@@ -70,6 +71,7 @@
 2. **STG-S5** — Celery verification (**VAL-003**)  
 3. **VAL-001** + **VAL-004** — DB + MVP gate  
 4. **MOB-001/002** — Flutter device smoke  
-5. **STG-S7** + **BE-003** — storage + payments  
+5. **STG-CFG Phase 1–2** — OCI buckets + `bootstrap_catalog.py` + storage smoke workflow  
+6. **BE-003** — Razorpay webhooks  
 
 **Production:** blocked until **STG-S6** + **VAL-004** marked **Completed** in CSV.
