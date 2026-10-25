@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
+from urllib.parse import quote
 
 import boto3
 from botocore.client import BaseClient
@@ -41,12 +42,21 @@ def build_s3_key(entity_type: str, media_id: uuid.UUID, content_type: str) -> st
     return f"catalog/{entity_type}/{media_id}.{ext}"
 
 
+def _oci_native_object_base(base: str) -> bool:
+    """OCI Object Storage native URLs use a single encoded segment after ``/o``."""
+    normalized = base.rstrip("/")
+    return "/n/" in normalized and "/b/" in normalized and normalized.endswith("/o")
+
+
 def public_url(s3_key: str) -> str | None:
     settings = get_settings()
     base = (settings.S3_CATALOG_PUBLIC_URL or "").strip().rstrip("/")
     if not base:
         return None
-    return f"{base}/{s3_key.lstrip('/')}"
+    key = s3_key.lstrip("/")
+    if _oci_native_object_base(base):
+        return f"{base}/{quote(key, safe='')}"
+    return f"{base}/{key}"
 
 
 def catalog_storage_configured() -> bool:

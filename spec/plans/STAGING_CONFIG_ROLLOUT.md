@@ -6,6 +6,8 @@
 
 Execute **one phase at a time**. Mark the CSV row **Completed** only after its **Verify** step passes.
 
+**Git / deploy procedure:** [`DEVELOPER_RELEASE_FLOW.md`](./DEVELOPER_RELEASE_FLOW.md) (code via `push dev`; config via `api.env` on VM).
+
 ---
 
 ## Principles (dev + staging)
@@ -180,12 +182,12 @@ When adding a new env var to staging `api.env`:
 
 | Task_ID | Task_Name | Status |
 |---------|-----------|--------|
-| STG-CFG-001 | OCI buckets catalog + KYC | Not Started |
-| STG-CFG-002 | api.env S3 block + API restart | Not Started |
-| STG-CFG-003 | `verify_staging_storage.py` + Actions smoke | Not Started |
+| STG-CFG-001 | OCI buckets catalog + KYC | **Completed** 2026-10-24 |
+| STG-CFG-002 | api.env S3 block + API restart | **Completed** 2026-10-24 |
+| STG-CFG-003 | `verify_staging_storage.py` + Actions smoke | **Completed** (VM); run `staging-storage-smoke.yml` for CI-006 |
 | STG-CFG-004 | `bootstrap_catalog.py` on staging | Not Started |
 | STG-CFG-005 | Admin catalogue image upload smoke | Not Started |
 | STG-CFG-006 | KYC redirect + Setu sandbox | Not Started |
 | STG-CFG-007 | Razorpay webhook staging URL | Not Started |
 
-*Last updated: 2026-10-21*
+*Last updated: 2026-10-24*

@@ -1,6 +1,7 @@
 # Staging deploy pipeline (dev laptop → GitHub → OCI)
 
-**Host:** `stg-aio-1` · **Target branch:** `dev` · **Inventory:** [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md)
+**Host:** `stg-aio-1` · **Target branch:** `dev` · **Inventory:** [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md)  
+**Full developer procedure (dev → stg → main/prod readiness):** [`DEVELOPER_RELEASE_FLOW.md`](./DEVELOPER_RELEASE_FLOW.md)
 
 ## Flow
 
@@ -153,4 +154,6 @@ Watch **Actions** → **Deploy staging** → green health step.
 
 ## Production (later)
 
-Same scripts on **app-1/app-2** with Patroni + PgBouncer; `deploy-prod.yml` rollout + digest pin — not enabled yet.
+Same scripts on **app-1/app-2** with Patroni + PgBouncer; `deploy-prod.yml` rollout + digest pin — **preflight only today**.
+
+**STG → prod promotion, gates, and pipelines to build:** [`STG_TO_PROD_PIPELINE.md`](./STG_TO_PROD_PIPELINE.md) (incident log → prod guardrails: [`STAGING_DEPLOY_INCIDENTS.md`](./STAGING_DEPLOY_INCIDENTS.md)).

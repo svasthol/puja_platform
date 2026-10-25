@@ -30,6 +30,8 @@
 | 18 | Alembic 001 fails on `triggers.sql` (`syntax error at or near ""`) | UTF-8 **BOM** at start of `spec/db/triggers.sql`; `read_text()` without `utf-8-sig` | Strip BOM from SQL files; `001_initial_schema.py` reads with `encoding="utf-8-sig"` |
 | 19 | Deploy `local changes would be overwritten by checkout` | Self-hosted clone has **uncommitted edits** (manual hotfix on VM) | On VM once: `git reset --hard origin/dev`; repo uses `git checkout -f` in `remote_staging_deploy.sh` |
 | 20 | Admin `next build` — `Cannot find module 'tailwindcss'` | `NODE_ENV=production` in `admin.env` before `npm ci` → devDeps skipped (~39 packages) | `install_admin.sh` exports only `NEXT_PUBLIC_*`; runtime `NODE_ENV` in systemd unit |
+| 21 | S3 smoke: `head_bucket OK`, `put/get NotImplemented` | boto3 ≥1.36 default S3 checksums; OCI compat API rejects them (not IAM) | `app/services/s3_boto.py`: path-style + `request_checksum_calculation=when_required`; verify with `scripts/verify_staging_storage.py` |
+| 22 | `git checkout` blocked / deploy drift on VM | Uncommitted edits on `stg-aio-1` clone (scripts, celerybeat files) | `git fetch && git checkout -f dev && git reset --hard origin/dev`; routine deploy uses `git checkout -f` in `remote_staging_deploy.sh` |
 
 ---
 
@@ -47,6 +49,10 @@
 | **Redis** | Optional E2 Micro + Docker | Prod: `cache-1` per `fleet.launch.yaml`; not on app A1 |
 | **Paths** | `/opt/mana-guruji/venv`, `api.env` | Same conventions in systemd + `fleet.launch.yaml` |
 | **api.env** | JSON `ALLOWED_ORIGINS`; `%40` in DB URLs | Ship `staging.api.env.example`; Alembic must not use ConfigParser for migrate URL |
+| **Object Storage** | OCI S3 compat + boto3 checksum defaults (#21) | Prod buckets via IaC; deploy includes `s3_boto.py`; storage smoke in prod pipeline before go-live |
+| **Git on fleet** | Dirty VM clone blocked deploy (#19, #22) | Prod nodes only receive pinned ref from CD; no long-lived manual edits on `/opt/mana-guruji/src` |
+
+**Promotion model:** [`STG_TO_PROD_PIPELINE.md`](./STG_TO_PROD_PIPELINE.md) — review this table at **STG-GATE**.
 
 ---
 

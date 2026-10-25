@@ -8,6 +8,7 @@
 | [**`STAGING_PENDING_CHECKLIST.md`**](./STAGING_PENDING_CHECKLIST.md) | Human-readable **pending** backend / frontend / validation |
 | [**`Mana_Guruji_OCI_PM_Tracker_Production.csv`**](./Mana_Guruji_OCI_PM_Tracker_Production.csv) | Production only — compartment, 5-node fleet, go-live |
 | [`Mana_Guruji_OCI_PM_Tracker.csv`](./Mana_Guruji_OCI_PM_Tracker.csv) | **Index** — points to the two sheets above (not a full task list) |
+| [`STG_TO_PROD_PIPELINE.md`](../STG_TO_PROD_PIPELINE.md) | Promotion dev→STG→prod, gates, prod pipelines to build, incident feed-forward |
 
 **Engineering source of truth (keep in sync):**
 
@@ -53,4 +54,4 @@ When adding tasks, add to the correct CSV **and** the relevant spec/runbook.
 
 ---
 
-*Last update: 2026-10-17 — staging CSV + STAGING_PENDING_CHECKLIST synced to deploy progress*
+*Last update: 2026-10-24 — STG-CFG-001..003 completed; STG_TO_PROD_PIPELINE.md + incident #21–22*
