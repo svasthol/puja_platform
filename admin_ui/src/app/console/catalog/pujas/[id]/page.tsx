@@ -97,20 +97,14 @@ export default function PujaBuilderPage() {
     enabled: tab === "media" && !!puja,
   });
 
-  const heroMedia =
-    mediaData?.items.find(
-      (m) =>
-        m.upload_status === "ready" &&
-        m.is_active &&
-        m.id === puja?.hero_media_id,
-    ) ??
-    mediaData?.items.find(
-      (m) =>
-        m.upload_status === "ready" &&
-        m.is_active &&
-        m.entity_type === "puja",
-    ) ??
-    null;
+  const heroMedia = puja?.hero_media_id
+    ? (mediaData?.items.find(
+        (m) =>
+          m.upload_status === "ready" &&
+          m.is_active &&
+          m.id === puja.hero_media_id,
+      ) ?? null)
+    : null;
 
   const heroUrl = heroMedia?.public_url ?? null;
 
@@ -871,8 +865,11 @@ export default function PujaBuilderPage() {
                   {heroMedia && (
                     <RemoveMediaButton
                       mediaId={heroMedia.id}
+                      onError={(msg) => setMessage(`Remove failed: ${msg}`)}
                       onRemoved={async () => {
-                        await qc.invalidateQueries({ queryKey: ["admin", "catalog", "pujas"] });
+                        await qc.invalidateQueries({
+                          queryKey: ["admin", "catalog", "pujas", "all"],
+                        });
                         await refetchMedia();
                         setMessage("Hero image removed.");
                       }}
@@ -918,6 +915,7 @@ export default function PujaBuilderPage() {
                           <RemoveMediaButton
                             mediaId={m.id}
                             label="Remove"
+                            onError={(msg) => setMessage(`Remove failed: ${msg}`)}
                             onRemoved={async () => {
                               await refetchGalleryMedia();
                               setMessage("Gallery image removed.");

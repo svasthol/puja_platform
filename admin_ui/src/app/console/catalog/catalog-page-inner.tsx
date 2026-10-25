@@ -79,15 +79,14 @@ export default function CatalogPageInner() {
     enabled: activeCat != null,
   });
 
-  const categoryImageMedia =
-    catMedia?.items.find(
-      (m) =>
-        m.upload_status === "ready" &&
-        m.is_active &&
-        m.id === selectedCategory?.image_media_id,
-    ) ??
-    catMedia?.items.find((m) => m.upload_status === "ready" && m.is_active) ??
-    null;
+  const categoryImageMedia = selectedCategory?.image_media_id
+    ? (catMedia?.items.find(
+        (m) =>
+          m.upload_status === "ready" &&
+          m.is_active &&
+          m.id === selectedCategory.image_media_id,
+      ) ?? null)
+    : null;
 
   const categoryPreviewUrl = categoryImageMedia?.public_url ?? null;
 
@@ -421,6 +420,7 @@ export default function CatalogPageInner() {
                         {canEdit && categoryImageMedia && (
                           <RemoveMediaButton
                             mediaId={categoryImageMedia.id}
+                            onError={(msg) => setMessage(`Remove failed: ${msg}`)}
                             onRemoved={async () => {
                               await qc.invalidateQueries({
                                 queryKey: ["admin", "catalog", "categories"],

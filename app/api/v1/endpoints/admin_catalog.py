@@ -1084,7 +1084,7 @@ async def deactivate_catalog_media(
     """Soft-remove catalogue media (is_active=false); clears hero/category/addon links."""
     media = (
         await db.execute(select(PujaMedia).where(PujaMedia.id == media_id))
-    ).scalar_one_or_none()
+    ).scalars().scalar_one_or_none()
     if media is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Media not found.")
 

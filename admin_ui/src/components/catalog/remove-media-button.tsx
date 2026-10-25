@@ -11,12 +11,14 @@ export function RemoveMediaButton({
   label = "Remove image",
   confirmMessage = "Remove this image from the catalogue? It will be hidden in the customer app.",
   onRemoved,
+  onError,
 }: {
   mediaId: string;
   disabled?: boolean;
   label?: string;
   confirmMessage?: string;
   onRemoved: () => void | Promise<void>;
+  onError?: (message: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -26,6 +28,9 @@ export function RemoveMediaButton({
     try {
       await deactivateCatalogMedia(mediaId);
       await onRemoved();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not remove image.";
+      onError?.(msg);
     } finally {
       setBusy(false);
     }
