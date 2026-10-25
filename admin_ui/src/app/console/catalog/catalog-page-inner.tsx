@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { CatalogReadOnlyBanner } from "@/components/catalog/read-only-banner";
 import { MediaUploader } from "@/components/catalog/media-uploader";
+import { RemoveMediaButton } from "@/components/catalog/remove-media-button";
 import { Header } from "@/components/layout/header";
 import { PageContent } from "@/components/layout/page-content";
 import { Alert } from "@/components/ui/alert";
@@ -78,11 +79,17 @@ export default function CatalogPageInner() {
     enabled: activeCat != null,
   });
 
-  const categoryPreviewUrl =
-    catMedia?.items.find((m) => m.upload_status === "ready" && m.id === selectedCategory?.image_media_id)
-      ?.public_url ??
-    catMedia?.items.find((m) => m.upload_status === "ready")?.public_url ??
+  const categoryImageMedia =
+    catMedia?.items.find(
+      (m) =>
+        m.upload_status === "ready" &&
+        m.is_active &&
+        m.id === selectedCategory?.image_media_id,
+    ) ??
+    catMedia?.items.find((m) => m.upload_status === "ready" && m.is_active) ??
     null;
+
+  const categoryPreviewUrl = categoryImageMedia?.public_url ?? null;
 
   const [editDesc, setEditDesc] = useState("");
 
@@ -393,7 +400,7 @@ export default function CatalogPageInner() {
 
                     <Card>
                       <CardTitle className="text-base">Category image</CardTitle>
-                      <div className="mt-4">
+                      <div className="mt-4 space-y-3">
                         <MediaUploader
                           entityType="category"
                           entityId={categoryEntityUuid(selectedCategory.id)}
@@ -411,6 +418,20 @@ export default function CatalogPageInner() {
                             setMessage("Category image updated.");
                           }}
                         />
+                        {canEdit && categoryImageMedia && (
+                          <RemoveMediaButton
+                            mediaId={categoryImageMedia.id}
+                            onRemoved={async () => {
+                              await qc.invalidateQueries({
+                                queryKey: ["admin", "catalog", "categories"],
+                              });
+                              await qc.invalidateQueries({
+                                queryKey: ["admin", "catalog", "media", "category", activeCat],
+                              });
+                              setMessage("Category image removed.");
+                            }}
+                          />
+                        )}
                       </div>
                     </Card>
                   </div>

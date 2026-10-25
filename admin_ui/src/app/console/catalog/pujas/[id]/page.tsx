@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { CatalogReadOnlyBanner } from "@/components/catalog/read-only-banner";
 import { MediaUploader } from "@/components/catalog/media-uploader";
+import { RemoveMediaButton } from "@/components/catalog/remove-media-button";
 import { Header } from "@/components/layout/header";
 import { PageContent } from "@/components/layout/page-content";
 import { Alert } from "@/components/ui/alert";
@@ -96,15 +97,27 @@ export default function PujaBuilderPage() {
     enabled: tab === "media" && !!puja,
   });
 
-  const heroUrl =
-    mediaData?.items.find((m) => m.upload_status === "ready" && m.id === puja?.hero_media_id)
-      ?.public_url ??
-    mediaData?.items.find((m) => m.upload_status === "ready" && m.entity_type === "puja")
-      ?.public_url ??
+  const heroMedia =
+    mediaData?.items.find(
+      (m) =>
+        m.upload_status === "ready" &&
+        m.is_active &&
+        m.id === puja?.hero_media_id,
+    ) ??
+    mediaData?.items.find(
+      (m) =>
+        m.upload_status === "ready" &&
+        m.is_active &&
+        m.entity_type === "puja",
+    ) ??
     null;
 
+  const heroUrl = heroMedia?.public_url ?? null;
+
   const galleryItems =
-    galleryMediaData?.items.filter((m) => m.upload_status === "ready") ?? [];
+    galleryMediaData?.items.filter(
+      (m) => m.upload_status === "ready" && m.is_active,
+    ) ?? [];
 
   const [form, setForm] = useState<Partial<Puja>>({});
 
@@ -839,7 +852,7 @@ export default function PujaBuilderPage() {
               <CardTitle>Hero image</CardTitle>
               <CardDescription>Sets puja hero_media_id after upload.</CardDescription>
               {canEdit && (
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
                   <MediaUploader
                     entityType="puja"
                     entityId={pujaId}
@@ -855,6 +868,16 @@ export default function PujaBuilderPage() {
                       setMessage("Hero image set.");
                     }}
                   />
+                  {heroMedia && (
+                    <RemoveMediaButton
+                      mediaId={heroMedia.id}
+                      onRemoved={async () => {
+                        await qc.invalidateQueries({ queryKey: ["admin", "catalog", "pujas"] });
+                        await refetchMedia();
+                        setMessage("Hero image removed.");
+                      }}
+                    />
+                  )}
                 </div>
               )}
             </Card>
@@ -889,6 +912,18 @@ export default function PujaBuilderPage() {
                           alt={m.alt_text ?? ""}
                           className="aspect-square w-full object-cover"
                         />
+                      )}
+                      {canEdit && (
+                        <div className="border-t border-surface-border p-2">
+                          <RemoveMediaButton
+                            mediaId={m.id}
+                            label="Remove"
+                            onRemoved={async () => {
+                              await refetchGalleryMedia();
+                              setMessage("Gallery image removed.");
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                   ))}
