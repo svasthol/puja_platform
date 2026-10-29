@@ -31,6 +31,7 @@ on:
           - data_services_only
           - install_systemd
           - admin_only
+          - nginx_tls
         default: full
       run_data_services:
         description: "(legacy) Install PG16+PostGIS+Redis — use component=data_services_only"
@@ -95,8 +96,16 @@ jobs:
           cd "${REPO_ROOT}"
           export GIT_REF="origin/${GIT_REF}" DEPLOY_COMPONENT RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1 VENV_DIR=/opt/mana-guruji/venv
           export SKIP_REDIS="${{ vars.STAGING_SKIP_HOST_REDIS == 'true' && '1' || '0' }}"
+          export CERTBOT_EMAIL="${{ secrets.STAGING_CERTBOT_EMAIL }}"
           chmod +x scripts/linux/remote_staging_deploy.sh
           ./scripts/linux/remote_staging_deploy.sh
+
+      - name: HTTPS health (after nginx_tls)
+        if: github.event_name == 'workflow_dispatch' && inputs.component == 'nginx_tls'
+        continue-on-error: true
+        run: |
+          curl -fsS https://api-stg.managuruji.in/health/live && echo "https health/live OK" \
+            || echo "WARN: HTTPS not ready — check STAGING_CERTBOT_EMAIL + DNS (STAGING_NGINX_TLS.md)"
 
       - name: Health check (localhost)
         continue-on-error: true
@@ -143,8 +152,9 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           SKIP_REDIS_FLAG="${{ vars.STAGING_SKIP_HOST_REDIS == 'true' && '1' || '0' }}"
+          CERTBOT_EMAIL="${{ secrets.STAGING_CERTBOT_EMAIL }}"
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
-            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} DEPLOY_COMPONENT=${DEPLOY_COMPONENT} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} SKIP_REDIS=${SKIP_REDIS_FLAG} bash -s" <<'REMOTE'
+            "REPO_ROOT=${REPO_DIR} GIT_REF=origin/${GIT_REF} DEPLOY_COMPONENT=${DEPLOY_COMPONENT} RUN_DATA_SERVICES=${RUN_DATA_SERVICES} RUN_DB_BOOTSTRAP=${RUN_DB_BOOTSTRAP} RUN_MIGRATE=${RUN_MIGRATE} RUN_PYTHON_BOOTSTRAP=${RUN_PYTHON_BOOTSTRAP} SKIP_REDIS=${SKIP_REDIS_FLAG} CERTBOT_EMAIL=${CERTBOT_EMAIL} bash -s" <<'REMOTE'
           set -euo pipefail
           if [[ ! -d "${REPO_ROOT}/.git" ]]; then
             echo "First-time: sudo mkdir -p /opt/mana-guruji && sudo chown opc:opc /opt/mana-guruji"
@@ -154,9 +164,24 @@ jobs:
           cd "${REPO_ROOT}"
           export GIT_REF RUN_DATA_SERVICES RUN_DB_BOOTSTRAP RUN_MIGRATE RUN_PYTHON_BOOTSTRAP RESTART_SERVICES=1
           export VENV_DIR=/opt/mana-guruji/venv SKIP_REDIS="${SKIP_REDIS:-0}"
+          export CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
           chmod +x scripts/linux/remote_staging_deploy.sh
           ./scripts/linux/remote_staging_deploy.sh
           REMOTE
+
+      - name: HTTPS health (after nginx_tls)
+        if: github.event_name == 'workflow_dispatch' && inputs.component == 'nginx_tls'
+        continue-on-error: true
+        env:
+          SSH_USER: ${{ secrets.STAGING_SSH_USER || 'opc' }}
+          SSH_HOST: ${{ secrets.STAGING_HOST }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" \
+            'curl -fsS https://api-stg.managuruji.in/health/live && echo "https health/live OK" || echo "WARN: see spec/plans/STAGING_NGINX_TLS.md"'
 
       - name: Health check (on VM localhost)
         continue-on-error: true

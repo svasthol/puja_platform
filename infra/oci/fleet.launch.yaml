@@ -26,7 +26,6 @@ environments:
         memory_gb: 12
         assign_public_ip: optional
         services:
-          - nginx
           - fastapi
           - celery_worker
           - celery_redbeat
@@ -40,7 +39,6 @@ environments:
         memory_gb: 12
         assign_public_ip: optional
         services:
-          - nginx
           - fastapi
           - celery_worker
           - pgbouncer
@@ -96,11 +94,19 @@ environments:
         memory_gb: 6
         boot_volume_gb: 50
         assign_public_ip: bastion_ssh
+        services:
+          - nginx
+          - fastapi
+          - postgresql16
+          - celery_worker
+          - celery_redbeat
 
 load_balancer:
   type: network_load_balancer
   backends: [app-1, app-2]
   listener_ports: [443, 80]
+  # TLS terminates at NLB; forward to app uvicorn :8000 — no nginx on prod app nodes.
+  backend_port: 8000
   health_check:
     path: /health/live
     protocol: HTTP

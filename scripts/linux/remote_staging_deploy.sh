@@ -39,6 +39,10 @@ case "$DEPLOY_COMPONENT" in
   install_systemd)
     RUN_DATA_SERVICES=0 RUN_DB_BOOTSTRAP=0 RUN_MIGRATE=0 RUN_PYTHON_BOOTSTRAP=0 RUN_SYSTEMD_INSTALL=1 RESTART_SERVICES=1
     ;;
+  nginx_tls)
+    RUN_DATA_SERVICES=0 RUN_DB_BOOTSTRAP=0 RUN_MIGRATE=0 RUN_PYTHON_BOOTSTRAP=0 RUN_SYSTEMD_INSTALL=0
+    RUN_ADMIN_DEPLOY=0 RESTART_SERVICES=0 RUN_NGINX_TLS=1
+    ;;
   *)
     log "ERROR: unknown DEPLOY_COMPONENT=${DEPLOY_COMPONENT}"
     exit 1
@@ -115,6 +119,16 @@ if [[ "${RUN_REDIS_ENSURE:-0}" == "1" ]]; then
     set +a
     export VENV_DIR
     "${VENV_DIR}/bin/python" scripts/ensure_redis_logical_dbs.py --strict || log "WARN: redis ensure failed"
+  fi
+fi
+
+if [[ "${RUN_NGINX_TLS:-0}" == "1" ]]; then
+  chmod +x deploy/staging/install_nginx_tls.sh 2>/dev/null || true
+  export CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    ./deploy/staging/install_nginx_tls.sh
+  else
+    sudo -E ./deploy/staging/install_nginx_tls.sh
   fi
 fi
 

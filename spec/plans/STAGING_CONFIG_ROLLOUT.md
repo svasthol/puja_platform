@@ -6,6 +6,13 @@
 
 Execute **one phase at a time**. Mark the CSV row **Completed** only after its **Verify** step passes.
 
+**Edge / TLS policy**
+
+| Environment | Public HTTPS |
+|-------------|----------------|
+| **Staging** | **nginx on `stg-aio-1`** — reverse proxy **`:443` → `:8000`** (OCI DNS + cert). Acts as staging edge; not an OCI Load Balancer SKU. |
+| **Production** | **OCI NLB** terminates TLS → **uvicorn `:8000` on `app-1` / `app-2`**. **No nginx on prod app VMs.** |
+
 **Git / deploy procedure:** [`DEVELOPER_RELEASE_FLOW.md`](./DEVELOPER_RELEASE_FLOW.md) (code via `push dev`; config via `api.env` on VM).
 
 ---
@@ -105,7 +112,32 @@ Catalogue **text/categories/prices** live in **Postgres**. S3 only holds **image
 
 ---
 
+## Phase 2b — Staging nginx (HTTPS edge, OCI DNS)
+
+**Staging only.** Production uses **NLB → uvicorn** without nginx (see edge policy above).
+
+| Step | Action |
+|------|--------|
+| 2b.1 | OCI DNS **A record** `api-stg.<domain>` → `stg-aio-1` public IP |
+| 2b.2 | Install nginx + TLS cert on **`stg-aio-1`**; proxy **`443` → `127.0.0.1:8000`** |
+| 2b.3 | `curl -sS https://api-stg.<domain>/health/live` and `/health/ready` |
+| 2b.4 | Set `KYC_REDIRECT_URL=https://api-stg.<domain>/v1/pujari/kyc/callback` before Phase 3 Setu register |
+
+Repo artifacts (when added): `deploy/nginx/staging-api.conf`, `deploy/staging/install_nginx_tls.sh`. CI: **`deploy-staging` component `nginx_tls`** — see [`STAGING_NGINX_TLS.md`](./STAGING_NGINX_TLS.md).
+
+---
+
 ## Phase 3 — KYC (Setu + redirect URL)
+
+**Not Phase 2.** Catalogue Phase 2 is Postgres + **catalog** presign (`S3_BUCKET_CATALOG`). Partner KYC uses a **separate private bucket** (`S3_BUCKET_KYC`) configured in **Phase 1** — same `api.env` keys, verified by `verify_staging_storage.py` (catalog **and** kyc roundtrip).
+
+| Flow | Uses OCI presigned URL? |
+|------|-------------------------|
+| **Setu DigiLocker** (redirect + callback) | **No** — HTTPS to Setu; API stores pulled docs in `S3_BUCKET_KYC` server-side |
+| **Partner selfie** | **Yes** — `presign_kyc_put` → app PUT to KYC bucket (`partner_kyc_service`) |
+| **Admin KYC queue view** | **Yes** — `presign_kyc_get` for stored proof objects |
+
+**Before Setu dashboard work:** confirm Phase 1 strict smoke passed for **both** buckets. Optional E2E after Phase 3 env: partner onboarding selfie presign + confirm on staging.
 
 | Variable | Staging value pattern |
 |----------|----------------------|

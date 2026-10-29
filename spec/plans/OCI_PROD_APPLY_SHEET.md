@@ -98,7 +98,7 @@ bash scripts/bootstrap.sh
 | 4.1 | Render secrets to `/etc/mana-guruji/api.env` from Vault | **MANUAL** / **ANSIBLE** | `app-*` | ☐ |
 | 4.2 | Runtime **`DATABASE_URL`** = `postgresql+psycopg://puja_app:…@127.0.0.1:6432/Mana_Guruji` (PgBouncer local) | **MANUAL** | `api.env` | ☐ |
 | 4.3 | Deploy API + workers + beat (Podman quadlets or systemd) | **CI** / **MANUAL** | `app-*` | ☐ |
-| 4.4 | nginx TLS on app nodes; NLB → backends | **MANUAL** / **ANSIBLE** | `app-*` | ☐ |
+| 4.4 | **NLB TLS** → app nodes **`:8000` (uvicorn)** — **no nginx on prod app VMs** | **MANUAL** / **ANSIBLE** | `app-*` | ☐ |
 | 4.5 | Razorpay / Setu webhook URLs → public `https://api.<domain>/...` | **MANUAL** | Vendor dashboards | ☐ |
 | 4.6 | `GET https://api.<domain>/health` → ok; `sweep_age_seconds` sane | **MANUAL** | curl / monitor | ☐ |
 

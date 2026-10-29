@@ -54,8 +54,11 @@
 | `db_bootstrap_only` | `bootstrap.sh` once |
 | `data_services_only` | PG/PostGIS/Redis install script |
 | `install_systemd` | `deploy/staging/install_systemd.sh` + restart |
+| `nginx_tls` | `deploy/staging/install_nginx_tls.sh` — nginx + certbot for `api-stg` / `admin-stg` ([`STAGING_NGINX_TLS.md`](./STAGING_NGINX_TLS.md); secret **`STAGING_CERTBOT_EMAIL`**) |
 
 Set **git_ref** to any branch (e.g. `dev`). Prod uses the same pattern in **Deploy production** when rollout is wired.
+
+**HTTPS edge (Step 2):** After Wix A records point at `stg-aio-1`, run **Deploy staging** with **`component=nginx_tls`** (manual only). Requires GitHub Environment secret **`STAGING_CERTBOT_EMAIL`** (Let’s Encrypt contact).
 
 **Redis micro:** **Deploy Redis staging** → `terraform_action=apply`, then set `REDIS_URL` from terraform output on `stg-aio-1` and `STAGING_SKIP_HOST_REDIS=true`.
 
