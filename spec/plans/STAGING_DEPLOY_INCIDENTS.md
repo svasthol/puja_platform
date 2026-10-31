@@ -32,6 +32,8 @@
 | 20 | Admin `next build` — `Cannot find module 'tailwindcss'` | `NODE_ENV=production` in `admin.env` before `npm ci` → devDeps skipped (~39 packages) | `install_admin.sh` exports only `NEXT_PUBLIC_*`; runtime `NODE_ENV` in systemd unit |
 | 21 | S3 smoke: `head_bucket OK`, `put/get NotImplemented` | boto3 ≥1.36 default S3 checksums; OCI compat API rejects them (not IAM) | `app/services/s3_boto.py`: path-style + `request_checksum_calculation=when_required`; verify with `scripts/verify_staging_storage.py` |
 | 22 | `git checkout` blocked / deploy drift on VM | Uncommitted edits on `stg-aio-1` clone (scripts, celerybeat files) | `git fetch && git checkout -f dev && git reset --hard origin/dev`; routine deploy uses `git checkout -f` in `remote_staging_deploy.sh` |
+| 23 | Certbot HTTP-01 timeout on `:80` | OCI security list: only laptop `/32` on 8000/3000; **no 80/443** | Open **80+443** `0.0.0.0/0` on staging SL; re-run certbot — [`STAGING_NGINX_TLS.md`](./STAGING_NGINX_TLS.md) |
+| 24 | nginx **502**, log `(13: Permission denied)` to `127.0.0.1:8000` | **SELinux** blocks `httpd_t` → upstream TCP | `sudo setsebool -P httpd_can_network_connect 1`; `install_nginx_tls.sh` sets this on OL9 |
 
 ---
 

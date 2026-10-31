@@ -31,6 +31,7 @@
 | 0.3 | Provision VMs per **[`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md)** / [`fleet.launch.yaml`](../../infra/oci/fleet.launch.yaml); fill inventory | **TERRAFORM** or **MANUAL** | OCI Compute | ☐ |
 | 0.4 | NLB → app nodes `:443` / `:80`; health check **`/health/live`** | **TERRAFORM** or **MANUAL** | OCI LB | ☐ |
 | 0.5 | Object Storage buckets: `kyc`, `catalog`, `pg-backups`; Vault secrets | **TERRAFORM** or **MANUAL** | OCI | ☐ |
+| 0.5b | Object Storage **IAM**: prod compartment; group `mana-guruji-prod-api`; KYC private + catalog public-read policies — [`OCI_OBJECT_STORAGE_IAM.md`](./OCI_OBJECT_STORAGE_IAM.md) | **MANUAL** | OCI Policies | ☐ |
 | 0.6 | DNS: `api.<domain>`, `admin.<domain>` → NLB | **MANUAL** | OCI DNS or registrar | ☐ |
 
 ---

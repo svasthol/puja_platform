@@ -214,8 +214,8 @@ def store_kyc_bytes(
         "Body": body,
         "ContentType": content_type,
     }
-    # SSE-KMS on AWS only — MinIO/R2 custom endpoints often reject aws:kms.
-    if not _effective_s3_endpoint(settings.S3_ENDPOINT_URL):
+    # SSE-KMS on AWS only — MinIO/R2/OCI custom endpoints often reject aws:kms.
+    if not effective_s3_endpoint(settings.S3_ENDPOINT_URL):
         put_kwargs["ServerSideEncryption"] = "aws:kms"
     try:
         client.put_object(**put_kwargs)

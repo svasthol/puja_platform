@@ -49,9 +49,10 @@ Execute **one phase at a time**. Mark the CSV row **Completed** only after its *
 
 | Resource | Recommended name | Notes |
 |----------|------------------|--------|
-| Bucket (catalog) | `mana-guruji-stg-catalog` | Private; JPEG/PNG/WebP via presigned PUT |
-| Bucket (KYC) | `mana-guruji-stg-kyc` | **Private**; presigned PUT/GET only |
-| Customer secret key | IAM policy: read/write both buckets | One key pair in `api.env` is OK |
+| Bucket (catalog) | `mana-guruji-stg-catalog` | **Public** read for customer URLs (`S3_CATALOG_PUBLIC_URL`); admin upload via API presign |
+| Bucket (KYC) | `mana-guruji-stg-kyc` | **Private**; presigned PUT/GET + server upload only |
+| IAM | Policies in compartment `mana-guruji-staging` | Catalog: `any-user` read (optional). KYC: `Allow group … manage objects` on KYC bucket only — see [`OCI_OBJECT_STORAGE_IAM.md`](./OCI_OBJECT_STORAGE_IAM.md) |
+| Customer secret key | One key pair in `api.env` | Same user as API S3 calls; staging smoke: `verify_staging_storage.py --strict` |
 | Compat endpoint | `https://<namespace>.compat.objectstorage.ap-hyderabad-1.oraclecloud.com` | Must match `S3_REGION=ap-hyderabad-1` |
 
 **Not in git yet:** Terraform module for buckets — track as `STG-IAC-005` (optional). Until then: **OCI Console + PM row**.
@@ -159,8 +160,9 @@ Register **exact** `KYC_REDIRECT_URL` in Setu dashboard.
 | Item | Action |
 |------|--------|
 | `RAZORPAY_*` | Same test keys as dev |
-| Webhook | Razorpay dashboard → `http://140.245.245.201:8000/v1/webhooks/razorpay` (or HTTPS domain) |
+| Webhook | Razorpay dashboard → `https://api-stg.managuruji.in/v1/webhooks/razorpay` |
 | `RAZORPAY_WEBHOOK_SECRET` | Must match dashboard |
+| One-shot verify | On VM: `scripts/staging_razorpay_webhook_smoke.py` — real test card + Razorpay-delivered webhook (phone `+919811119999`) |
 
 **Blindspot:** Webhook URL is **not** an env var — must be configured in Razorpay.
 

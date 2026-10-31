@@ -40,6 +40,11 @@ if command -v firewall-cmd >/dev/null 2>&1; then
   $SUDO firewall-cmd --reload 2>/dev/null || true
 fi
 
+if command -v getenforce >/dev/null 2>&1 && [[ "$($SUDO getenforce 2>/dev/null || echo Disabled)" != "Disabled" ]]; then
+  log "SELinux: enabling httpd_can_network_connect (nginx → :8000 / :3000)..."
+  $SUDO setsebool -P httpd_can_network_connect 1
+fi
+
 $SUDO nginx -t
 $SUDO systemctl enable nginx
 $SUDO systemctl restart nginx
@@ -68,6 +73,11 @@ fi
 
 $SUDO nginx -t
 $SUDO systemctl reload nginx
+
+if command -v systemctl >/dev/null 2>&1; then
+  log "Enabling certbot renewal timer..."
+  $SUDO systemctl enable --now certbot-renew.timer 2>/dev/null || true
+fi
 
 log "Verify:"
 log "  curl -sS https://${API_HOST}/health/live"

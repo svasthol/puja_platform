@@ -76,6 +76,18 @@ variable "developer_tcp_ports" {
   description = "TCP ports opened to developer_allowed_cidrs. Do not expose 5432 — DB is localhost on VM."
 }
 
+variable "public_web_allowed_cidrs" {
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  description = "Ingress for nginx / Let's Encrypt (TCP 80 HTTP-01, 443 HTTPS). LE must reach :80 from the public internet."
+}
+
+variable "public_web_tcp_ports" {
+  type        = list(number)
+  default     = [80, 443]
+  description = "Web edge ports on stg-aio-1 (firewalld http/https + OCI must match)."
+}
+
 variable "operating_system_version" {
   type        = string
   default     = "9"
