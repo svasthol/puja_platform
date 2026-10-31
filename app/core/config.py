@@ -4,6 +4,8 @@ All secrets (DB password, JWT secret, Razorpay keys) MUST be env vars;
 never hardcode them here. See .env.example for the required variables.
 """
 from functools import lru_cache
+from urllib.parse import urlparse, urlunparse
+
 from pydantic import PostgresDsn, RedisDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -159,6 +161,23 @@ class Settings(BaseSettings):
 
     # ---- Timezone (Asia/Kolkata for all business logic) ----------------------
     PLATFORM_TIMEZONE: str = "Asia/Kolkata"  # never use server default; use this explicitly
+
+    def redis_url_for_db(self, db: int) -> str:
+        """Same host/auth as REDIS_URL, different logical DB index (0–15)."""
+        parsed = urlparse(str(self.REDIS_URL))
+        return urlunparse(parsed._replace(path=f"/{db}"))
+
+    @property
+    def redis_cache_url(self) -> str:
+        return self.redis_url_for_db(self.REDIS_DB_CACHE)
+
+    @property
+    def redis_celery_url(self) -> str:
+        return self.redis_url_for_db(self.REDIS_DB_CELERY)
+
+    @property
+    def redis_presence_url(self) -> str:
+        return self.redis_url_for_db(self.REDIS_DB_PRESENCE)
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

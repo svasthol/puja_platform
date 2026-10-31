@@ -8,10 +8,10 @@ from urllib.parse import urlparse
 
 import boto3
 from botocore.client import BaseClient
-from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.config import get_settings
+from app.services.s3_boto import effective_s3_endpoint, s3_boto_config
 
 _NON_DIGIT_RE = re.compile(r"\D")
 
@@ -47,35 +47,20 @@ def kyc_storage_configured() -> bool:
     return bool(ak and sk) or (not ak and not sk)
 
 
-def _effective_s3_endpoint(raw: str) -> str | None:
-    s = (raw or "").strip()
-    if not s or s.startswith("#"):
-        return None
-    if s.startswith("http://") or s.startswith("https://"):
-        return s
-    return None
-
-
 def _s3_client_kwargs(settings: Any) -> dict[str, Any]:
-    custom_endpoint = _effective_s3_endpoint(settings.S3_ENDPOINT_URL)
-    aws_endpoint = (
-        None
-        if custom_endpoint
-        else f"https://s3.{settings.S3_REGION}.amazonaws.com"
-    )
-    use_endpoint = custom_endpoint or aws_endpoint
+    custom_endpoint = effective_s3_endpoint(settings.S3_ENDPOINT_URL)
     kwargs: dict[str, Any] = {
         "service_name": "s3",
         "region_name": settings.S3_REGION,
-        "config": Config(signature_version="s3v4"),
+        "config": s3_boto_config(custom_endpoint),
     }
     ak = (settings.S3_ACCESS_KEY or "").strip()
     sk = (settings.S3_SECRET_KEY or "").strip()
     if ak and sk:
         kwargs["aws_access_key_id"] = ak
         kwargs["aws_secret_access_key"] = sk
-    if use_endpoint:
-        kwargs["endpoint_url"] = use_endpoint
+    if custom_endpoint:
+        kwargs["endpoint_url"] = custom_endpoint
     return kwargs
 
 
@@ -229,8 +214,8 @@ def store_kyc_bytes(
         "Body": body,
         "ContentType": content_type,
     }
-    # SSE-KMS on AWS only — MinIO/R2 custom endpoints often reject aws:kms.
-    if not _effective_s3_endpoint(settings.S3_ENDPOINT_URL):
+    # SSE-KMS on AWS only — MinIO/R2/OCI custom endpoints often reject aws:kms.
+    if not effective_s3_endpoint(settings.S3_ENDPOINT_URL):
         put_kwargs["ServerSideEncryption"] = "aws:kms"
     try:
         client.put_object(**put_kwargs)

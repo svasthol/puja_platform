@@ -64,6 +64,30 @@ variable "ssh_allowed_cidrs" {
   description = "Ingress CIDRs for TCP/22 on the staging security list."
 }
 
+variable "developer_allowed_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Laptop /32 for app ports (8000 API, 3000 admin, 6379 Redis). Postgres: SSH tunnel only."
+}
+
+variable "developer_tcp_ports" {
+  type        = list(number)
+  default     = [8000, 3000, 6379]
+  description = "TCP ports opened to developer_allowed_cidrs. Do not expose 5432 — DB is localhost on VM."
+}
+
+variable "public_web_allowed_cidrs" {
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  description = "Ingress for nginx / Let's Encrypt (TCP 80 HTTP-01, 443 HTTPS). LE must reach :80 from the public internet."
+}
+
+variable "public_web_tcp_ports" {
+  type        = list(number)
+  default     = [80, 443]
+  description = "Web edge ports on stg-aio-1 (firewalld http/https + OCI must match)."
+}
+
 variable "operating_system_version" {
   type        = string
   default     = "9"

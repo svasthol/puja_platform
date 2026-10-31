@@ -368,6 +368,56 @@ def _validate_seed_data() -> None:
             raise ValueError(f"{slug}: default_price must be > 0")
         if puja["price_max"] < puja["default_price"]:
             raise ValueError(f"{slug}: price_max must be >= default_price")
+        _validate_puja_i18n_parity(puja, PUJAS_TE[slug])
+
+
+def _validate_puja_i18n_parity(puja: dict[str, Any], te: dict[str, Any]) -> None:
+    """Strict en↔te parity for seeded content so staging mirrors prod exactly.
+
+    The seeder writes both locales from these dicts (see `_seed_content_and_addons`).
+    Unequal counts would publish a puja that reads differently in te vs en, which
+    violates the "no dummy / strict parity" catalogue rule. Current data passes;
+    this guard keeps future edits honest and fails fast before any DB write.
+    """
+    slug = puja["slug"]
+
+    # inclusions/exclusions are mandatory (seeder indexes them directly).
+    for kind in ("inclusions", "exclusions"):
+        en_items = puja.get(kind, [])
+        if not en_items:
+            raise ValueError(f"{slug}: '{kind}' must not be empty")
+        if any(not str(x).strip() for x in en_items):
+            raise ValueError(f"{slug}: '{kind}' has a blank entry")
+
+    # Count parity across every content block the seeder emits for both locales.
+    for kind in ("inclusions", "exclusions", "requirements"):
+        en_n = len(puja.get(kind, []))
+        te_n = len(te.get(kind, []))
+        if en_n != te_n:
+            raise ValueError(
+                f"{slug}: '{kind}' en/te count mismatch ({en_n} vs {te_n}) — "
+                "add the matching Telugu entries in catalog_hyderabad_te.py"
+            )
+
+    en_faqs = puja.get("faqs", [])
+    te_faqs = te.get("faqs", [])
+    if len(en_faqs) != len(te_faqs):
+        raise ValueError(
+            f"{slug}: 'faqs' en/te count mismatch "
+            f"({len(en_faqs)} vs {len(te_faqs)})"
+        )
+    for faq in en_faqs:
+        if not faq.get("q") or not faq.get("a"):
+            raise ValueError(f"{slug}: every FAQ needs both 'q' and 'a'")
+
+    # Every addon must have a Telugu bundle (seeder falls back to en name silently).
+    te_addons = te.get("addons", {})
+    for addon in puja.get("addons", []):
+        if addon["name"] not in te_addons:
+            raise ValueError(
+                f"{slug}: addon '{addon['name']}' has no Telugu translation "
+                "in catalog_hyderabad_te.py"
+            )
 
 
 def _deactivate_legacy_pujas(cur) -> int:

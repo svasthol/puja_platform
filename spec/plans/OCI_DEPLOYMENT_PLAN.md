@@ -96,7 +96,7 @@ flowchart TB
 
 1. **VCN:** public subnet (LB only) + private subnets (app, data, panchangam).
 2. **Security lists / NSGs:**
-   - LB → app `:8000` (or nginx `:443` on app nodes).
+   - LB → app **`:8000` (uvicorn)**. **Staging:** nginx **`:443` → `:8000`** on `stg-aio-1` only. **Prod:** NLB TLS — **no nginx on app nodes**.
    - App → Postgres `:5432`, Redis `:6379`.
    - App → panchangam **private IP** `:3001` only.
    - **No** public IP on Postgres, Redis, or panchangam.

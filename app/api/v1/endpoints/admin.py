@@ -16,7 +16,8 @@ import uuid
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import func, select, text
+from sqlalchemy import bindparam, func, select, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.crypto import current_key_version, encrypt_secret
@@ -182,30 +183,23 @@ async def set_booking_fee(
         )
     ).scalar_one_or_none()
     label = payload.label or (before or {}).get("label") or "Muhurat & Slot Lock Token"
-    await db.execute(
-        text(
-            """
-            INSERT INTO platform_settings (key, value_json, updated_at)
-            VALUES (
-                'booking_fee',
-                jsonb_build_object(
-                    'amount', CAST(:amt AS numeric),
-                    'currency', 'INR',
-                    'label', :label
-                ),
-                now()
-            )
-            ON CONFLICT (key) DO UPDATE SET
-                value_json = jsonb_build_object(
-                    'amount', CAST(:amt AS numeric),
-                    'currency', 'INR',
-                    'label', :label
-                ),
-                updated_at = now()
-            """
-        ),
-        {"amt": str(payload.amount), "label": label},
-    )
+    value_json = {
+        "amount": str(payload.amount),
+        "currency": "INR",
+        "label": label,
+    }
+    # Single JSONB bind — avoids PG "could not determine data type of parameter $N"
+    # when :label is used inside jsonb_build_object (psycopg + PG 16 on staging).
+    stmt = text(
+        """
+        INSERT INTO platform_settings (key, value_json, updated_at)
+        VALUES ('booking_fee', :vj, now())
+        ON CONFLICT (key) DO UPDATE SET
+            value_json = :vj,
+            updated_at = now()
+        """
+    ).bindparams(bindparam("vj", type_=JSONB))
+    await db.execute(stmt, {"vj": value_json})
     await record_admin_action(
         db,
         actor_user_id=p.user_id,

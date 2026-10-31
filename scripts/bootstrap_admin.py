@@ -32,6 +32,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv()
+_env_file = os.environ.get("ENV_FILE", "/etc/mana-guruji/api.env")
+if Path(_env_file).is_file():
+    load_dotenv(_env_file)
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -44,6 +47,13 @@ async def _run(phone: str, name: str, reset: bool) -> int:
     from app.core import totp
     from app.core.config import get_settings
     from app.core.crypto import TotpKeyUnavailable, current_key_version, encrypt_secret
+    from app.services.sms_phone import InvalidIndiaPhoneError, canonical_user_phone
+
+    try:
+        phone = canonical_user_phone(phone)
+    except InvalidIndiaPhoneError as exc:
+        print(f"ERROR: {exc}")
+        return 2
 
     settings = get_settings()
 

@@ -5,7 +5,7 @@
 
 **Repos:** Backend only — `puja_platform` ([Guruji](https://github.com/svasthol/Guruji.git)). Flutter is separate ([PujaPlatformFlutter](https://github.com/svasthol/PujaPlatformFlutter.git)).
 
-**Related:** [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md) · [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md) (**IaC apply tracker**) · [`infra/oci/terraform/environments/staging`](../../infra/oci/terraform/environments/staging) · [`OCI_PROD_MANUAL_RUNBOOK.md`](./OCI_PROD_MANUAL_RUNBOOK.md) · [`.github/OCI_CI_CD.md`](../../.github/OCI_CI_CD.md).
+**Related:** [`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md) · [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md) · [PM Staging](./project_pm/Mana_Guruji_OCI_PM_Tracker_Staging.csv) · [PM Production](./project_pm/Mana_Guruji_OCI_PM_Tracker_Production.csv) · [`infra/oci/terraform/environments/staging`](../../infra/oci/terraform/environments/staging) · [`OCI_PROD_MANUAL_RUNBOOK.md`](./OCI_PROD_MANUAL_RUNBOOK.md).
 
 ---
 
@@ -31,6 +31,7 @@
 | 0.3 | Provision VMs per **[`OCI_COMPUTE_FLEET.md`](./OCI_COMPUTE_FLEET.md)** / [`fleet.launch.yaml`](../../infra/oci/fleet.launch.yaml); fill inventory | **TERRAFORM** or **MANUAL** | OCI Compute | ☐ |
 | 0.4 | NLB → app nodes `:443` / `:80`; health check **`/health/live`** | **TERRAFORM** or **MANUAL** | OCI LB | ☐ |
 | 0.5 | Object Storage buckets: `kyc`, `catalog`, `pg-backups`; Vault secrets | **TERRAFORM** or **MANUAL** | OCI | ☐ |
+| 0.5b | Object Storage **IAM**: prod compartment; group `mana-guruji-prod-api`; KYC private + catalog public-read policies — [`OCI_OBJECT_STORAGE_IAM.md`](./OCI_OBJECT_STORAGE_IAM.md) | **MANUAL** | OCI Policies | ☐ |
 | 0.6 | DNS: `api.<domain>`, `admin.<domain>` → NLB | **MANUAL** | OCI DNS or registrar | ☐ |
 
 ---
@@ -98,7 +99,7 @@ bash scripts/bootstrap.sh
 | 4.1 | Render secrets to `/etc/mana-guruji/api.env` from Vault | **MANUAL** / **ANSIBLE** | `app-*` | ☐ |
 | 4.2 | Runtime **`DATABASE_URL`** = `postgresql+psycopg://puja_app:…@127.0.0.1:6432/Mana_Guruji` (PgBouncer local) | **MANUAL** | `api.env` | ☐ |
 | 4.3 | Deploy API + workers + beat (Podman quadlets or systemd) | **CI** / **MANUAL** | `app-*` | ☐ |
-| 4.4 | nginx TLS on app nodes; NLB → backends | **MANUAL** / **ANSIBLE** | `app-*` | ☐ |
+| 4.4 | **NLB TLS** → app nodes **`:8000` (uvicorn)** — **no nginx on prod app VMs** | **MANUAL** / **ANSIBLE** | `app-*` | ☐ |
 | 4.5 | Razorpay / Setu webhook URLs → public `https://api.<domain>/...` | **MANUAL** | Vendor dashboards | ☐ |
 | 4.6 | `GET https://api.<domain>/health` → ok; `sweep_age_seconds` sane | **MANUAL** | curl / monitor | ☐ |
 

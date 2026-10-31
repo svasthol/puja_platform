@@ -94,6 +94,10 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 (per-`app_context` TTL; customer/pujari keep 30 days). See SPEC_AMENDMENTS §19.
 
 - `POST /v1/auth/otp/request`      {phone} — Redis rate limit: 5/hour per phone.
+  **Phone canonical form:** server normalizes to **`+91` + 10 digits** (e.g. `9515165674` and
+  `+919515165674` → same user). Invalid Indian mobile → **422**. See `app/services/sms_phone.py`
+  (`canonical_user_phone`). After deploy, run `scripts/dedupe_users_by_canonical_phone.py` on
+  staging if test duplicates exist.
   Sends OTP via `sms_router` (FAST2SMS → MSG91 failover per `SMS_PROVIDER_ORDER`).
   Response: `{status: "otp_sent", sms_sent: bool, sms_provider: "fast2sms"|"msg91"|null}`.
   **DLT:** Indian providers require DLT registration even for test SMS — delivery may fail
@@ -237,9 +241,11 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
   drives finalize; returns `{status, scope, doc_types_created[], review_flags[]}`.
 - `GET  /v1/pujari/kyc/status`                 `{verification_status, required:[{doc_type, status}],
   active_digilocker_request?}` — includes in-flight DigiLocker row for app-kill resume.
-- `POST /v1/pujari/documents`                  **Selfie only** — presigned PUT to private KYC bucket
-  (gating `photo` doc; creates `pujari_documents.status='uploading'` until confirm).
-- `POST /v1/pujari/documents/{document_id}/confirm`  After presigned PUT — HEAD/S3 fetch, strip JPEG
+- `POST /v1/pujari/documents`                  **Selfie only** — presign metadata + `uploading` row
+  (returns legacy `upload_url`; **mobile uploads via PUT below**, not direct to S3/OCI).
+- `PUT  /v1/pujari/documents/{document_id}/upload`  Raw JPEG/PNG body + `Content-Type` — server
+  `store_kyc_bytes` (same pattern as admin catalog proxy). **204** on success.
+- `POST /v1/pujari/documents/{document_id}/confirm`  After upload — HEAD/S3 fetch, strip JPEG
   EXIF/GPS, set `uploaded_at`. **200** `{document_id, doc_type, status, file_url}`.
   **422** if object missing in S3.
 - `POST /v1/pujari/kyc/pan`                    `{pan, entity_type, consent, reason}` (reason ≥20 chars) — Setu `POST /api/verify/pan` when `KYC_SETU_PAN_PRODUCT_ID` set; stores `pan_hash`, sets `pan_status` (`operative` on success, `unverified` in non-prod without Setu). Response may include `verified_name`. Prod without product id → **503**.

@@ -38,13 +38,15 @@
 
 | Hostname | Role | OCPU | RAM (GB) | Boot (GB) | Extra volumes | Public IP |
 |----------|------|-----:|---------:|----------:|---------------|-----------|
-| `app-1` | nginx, FastAPI, Celery workers, RedBeat, PgBouncer, HAProxy `:5000`, etcd, Sentinel | 2 | 12 | 50 | — | Optional (Bastion preferred) |
+| `app-1` | FastAPI, Celery workers, RedBeat, PgBouncer, HAProxy `:5000`, etcd, Sentinel | 2 | 12 | 50 | — | Optional (Bastion preferred) |
 | `app-2` | Same + **Redis replica** | 2 | 12 | 50 | — | Optional |
 | `db-1` | PostgreSQL 16 + PostGIS, Patroni | 2 | 12 | 50 | **100 GB** data | **No** |
 | `db-2` | Patroni replica (**identical** to db-1) | 2 | 12 | 50 | **100 GB** data | **No** |
 | `cache-1` | Redis primary, etcd, Sentinel, pgBackRest | 1 | 6 | 50 | Optional staging for backups | **No** |
 
-**NLB:** Network Load Balancer → `app-1`, `app-2` ports **443/80**; health check **`GET /health/live`** only.
+**NLB:** TLS at load balancer → `app-1`, `app-2` **`:8000` (uvicorn)**. **No nginx on prod app nodes.** Health check **`GET /health/live`** only.
+
+**Staging:** **nginx** on `stg-aio-1` only — HTTPS edge to local API (see [`STAGING_CONFIG_ROLLOUT.md`](./STAGING_CONFIG_ROLLOUT.md)).
 
 ---
 
@@ -52,7 +54,7 @@
 
 | Hostname | OCPU | RAM (GB) | Boot (GB) | Notes |
 |----------|-----:|---------:|----------:|-------|
-| `stg-aio-1` | 1 | 6 | **50** | PG + Redis + API on one VM; **always-on** (no stop/start per deploy) |
+| `stg-aio-1` | 1 | 6 | **50** | PG + Redis + API + **nginx (TLS edge)** + Celery on one VM; **always-on** (no stop/start per deploy) |
 
 Use for **OL9 + aarch64** `pip install -r requirements.txt` gate before prod fleet.
 
@@ -117,7 +119,7 @@ Legacy cost write-up (local only, not in Guruji git): `mana_guruji/infra/OCI_COM
 | db-1 | | | data-private | |
 | db-2 | | | data-private | |
 | cache-1 | | | data-private | |
-| stg-aio-1 | | | staging | |
+| stg-aio-1 | `…vlukjq` *(full OCID in OCI_INFRA_STATUS)* | `10.60.1.98` | staging public | `mana-guruji-staging` |
 
 ---
 
@@ -129,8 +131,9 @@ Legacy cost write-up (local only, not in Guruji git): `mana_guruji/infra/OCI_COM
 | Environment | `infra/oci/terraform/environments/staging` |
 | Creates | VCN `10.60.0.0/16`, public subnet, **`stg-aio-1`** instance |
 | Vars file | Copy `terraform.tfvars.example` → `terraform.tfvars` (gitignored) |
+| Apply status | **Done 2026-10-16** — public IP `140.245.245.201` |
 
-Progress: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md).
+Progress: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md) (**S1–S6** post-apply).
 
 ---
 
@@ -138,5 +141,6 @@ Progress: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md).
 
 | Date | Change |
 |------|--------|
+| 2026-10-16 | Staging `terraform apply` — `stg-aio-1` provisioned |
 | 2026-10-10 | Staging Terraform scaffold for `stg-aio-1` |
 | 2026-10-10 | SSOT created; Option B corrected; YAML for IaC/CI |

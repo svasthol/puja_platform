@@ -4,6 +4,10 @@ alwaysApply: true
 
 # Puja Booking Platform — Cursor AI Rules
 
+## Git workflow (mandatory — read before editing tracked files)
+
+**Never commit on `dev` or `main`.** Create **`bug/<name>`** or **`feature/<name>`** from `dev`, PR → `dev`, staging proves `dev`, then PR `dev` → `main`. Full procedure: **`spec/plans/DEVELOPER_RELEASE_FLOW.md` §0** and **`.cursor/rules/git-workflow.mdc`**.
+
 ## Read these spec files FIRST before writing any code
 
 1. `spec/ARCHITECTURE.md`   — stack, design rules, what NOT to do
@@ -63,6 +67,7 @@ before any dispatch, booking-gate, offer-TTL, or reconfirmation change. Migratio
 | **Resume after app kill** | `GET /v1/pujari/kyc/status` returns `active_digilocker_request`; authenticated resume may have `url: null` (poll-only). |
 | **Selfie gate** | Presign creates `status='uploading'` (migration **023**); confirm → `pending`; admin queue is `pending` only. |
 | **Setu timeout** | `KYC_SETU_READ_TIMEOUT` default 25s; public callback needs `KYC_REDIRECT_URL` (ngrok in dev). |
+| **Identity phone/name** | `canonical_user_phone` on OTP/admin login; Aadhaar → `users.full_name` when placeholder — `IDENTITY_PHONE_AND_NAME.md` |
 | **Flutter deep link** | `managuruji://kyc/complete` — Android partner manifest + iOS `CFBundleURLSchemes`. |
 
 Apply migration **023**: `python scripts/apply_migration_023.py`

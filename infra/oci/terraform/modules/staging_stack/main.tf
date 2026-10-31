@@ -66,6 +66,36 @@ resource "oci_core_security_list" "staging_ssh" {
       }
     }
   }
+
+  dynamic "ingress_security_rules" {
+    for_each = {
+      for pair in setproduct(var.developer_allowed_cidrs, var.developer_tcp_ports) :
+      "${pair[0]}_${pair[1]}" => { cidr = pair[0], port = pair[1] }
+    }
+    content {
+      protocol = "6"
+      source   = ingress_security_rules.value.cidr
+      tcp_options {
+        min = ingress_security_rules.value.port
+        max = ingress_security_rules.value.port
+      }
+    }
+  }
+
+  dynamic "ingress_security_rules" {
+    for_each = {
+      for pair in setproduct(var.public_web_allowed_cidrs, var.public_web_tcp_ports) :
+      "web_${pair[0]}_${pair[1]}" => { cidr = pair[0], port = pair[1] }
+    }
+    content {
+      protocol = "6"
+      source   = ingress_security_rules.value.cidr
+      tcp_options {
+        min = ingress_security_rules.value.port
+        max = ingress_security_rules.value.port
+      }
+    }
+  }
 }
 
 resource "oci_core_subnet" "public" {

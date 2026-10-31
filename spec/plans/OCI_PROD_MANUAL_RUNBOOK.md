@@ -130,10 +130,10 @@ sudo dnf -y install postgresql16-server postgresql16-contrib postgis34_16
 
 - Pool to `127.0.0.1:5000` or direct to primary — team choice; migrations **never** use 6432.
 
-**nginx:**
+**nginx (staging only — not on prod `app-*`):**
 
-- TLS certs (Let’s Encrypt DNS-01 or OCI Certificates).
-- Proxy to `127.0.0.1:8000` (uvicorn); WebSocket headers per `deploy/nginx` when added.
+- Install on **`stg-aio-1`** only: TLS (Let’s Encrypt or OCI Certificates via OCI DNS), proxy **`:443` → `127.0.0.1:8000`**.
+- Production: **OCI NLB** terminates TLS and forwards to uvicorn **`:8000`** — do **not** install nginx on prod app nodes.
 
 **Clone repo** (both app nodes):
 

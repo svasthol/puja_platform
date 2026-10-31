@@ -1,0 +1,94 @@
+﻿Workstream,Task_ID,Phase,Task_Name,Environment,Priority,Status,Owner,Planned_Start,Completed_Date,Depends_On,Mode,Spec_Reference,Notes
+
+Foundation,OCI-001,,Tenancy home region ap-hyderabad-1,Shared,P0,Completed,,,2026-10-10,,Manual,OCI_PROD_APPLY_SHEET.md §0.1,
+
+Foundation,OCI-002,,Local OCI API config (.oci + Set-OciConfig.ps1),Shared,P0,Completed,,,2026-10-10,,Manual,LOCAL_OCI_SETUP.md,
+
+Foundation,OCI-003,,Fleet SSOT in git (OCI_COMPUTE_FLEET + fleet.launch.yaml),Shared,P0,Completed,,,2026-10-10,,Docs,OCI_COMPUTE_FLEET.md,
+
+Foundation,OCI-004,,Create compartment mana-guruji-staging,Staging,P0,Completed,,,2026-10-10,,CLI,OCI_COMPARTMENTS.md,
+
+Staging-IaC,STG-IAC-001,,terraform.tfvars (compartment SSH CIDRs),Staging,P0,Completed,,,2026-10-16,OCI-004,Manual,infra/oci/terraform/environments/staging,
+
+Staging-IaC,STG-IAC-002,,terraform init plan apply (VCN + stg-aio-1),Staging,P0,Completed,,,2026-10-16,STG-IAC-001,Terraform,OCI_INFRA_STATUS.md,Public IP 140.245.245.201
+
+Staging-IaC,STG-IAC-003,,Record inventory OCIDs in OCI_INFRA_STATUS,Staging,P1,Completed,,,2026-10-16,STG-IAC-002,Manual,OCI_INFRA_STATUS.md,
+
+Staging-IaC,STG-IAC-004,,Optional E2 Micro stg-redis-1 (Terraform),Staging,P2,Completed,,,2026-10-17,STG-IAC-002,Terraform,STAGING_REDIS_MICRO.md,Provisioned; app uses external Redis 18.60.87.153 instead
+
+Staging-Configure,STG-S1,,SSH opc@stg-aio-1 (140.245.245.201),Staging,P0,Completed,,,2026-10-16,,STG-IAC-002,Manual,OCI_INFRA_STATUS.md §S1,OL 9.8 aarch64 stg-aio-1
+
+Staging-Configure,STG-S2,,OL9 Python 3.12 venv /opt/mana-guruji/venv aarch64,Staging,P0,Completed,,,2026-10-17,STG-S1,Manual,LINUX_RUNTIME_PIPELINE.md,verify_linux_runtime.py OK
+
+Staging-Configure,STG-S3,,PG16 + PostGIS on stg-aio-1,Staging,P0,Completed,,,2026-10-17,STG-S2,Manual,install_data_services_ol9.sh,Mana_Guruji DB; PGDG OL9 aarch64 fixups
+
+Staging-Configure,STG-S3b,,Redis (external 18.60.87.153 DB 0/1/2),Staging,P0,Completed,,,2026-10-17,STG-S3,Manual,ensure_redis_logical_dbs.py,Not host Redis; STAGING_SKIP_HOST_REDIS
+
+Staging-Configure,STG-S4,,bootstrap.sh + migrate.sh + apply_grants,Staging,P0,Completed,,,2026-10-17,STG-S3,GitHub/Manual,STAGING_DEPLOY_INCIDENTS.md,Alembic 011 + migrations 012-034
+
+Staging-Configure,STG-S4b,,/etc/mana-guruji/api.env (DB Redis origins secrets),Staging,P0,In Progress,,,,STG-S4,Manual,staging.api.env.example,ALLOWED_ORIGINS JSON; S3 Razorpay FCM TOTP as needed
+
+Staging-Configure,STG-S5,,systemd API + Celery worker + beat,Staging,P0,In Progress,,,2026-10-17,STG-S4,Manual,deploy/staging/install_systemd.sh,API active :8000; confirm Celery healthy
+
+Staging-Configure,STG-S5b,,OCI ingress + firewalld 22/8000/3000 laptop /32,Staging,P0,Completed,,,2026-10-17,STG-S5,Manual,STAGING_DEPLOY_INCIDENTS.md,firewall-cmd --reload required
+
+Staging-Configure,STG-S6,,GET /health/live from laptop + ready/degraded,Staging,P0,In Progress,,,2026-10-17,STG-S5,Manual,MVP_GO_NO_GO_CHECKLIST.md,live OK; full health + MVP A-F pending
+
+Staging-Configure,STG-S7,,Object Storage buckets staging (kyc catalog),Staging,P1,Not Started,,,,STG-S5,Manual,MVP_GO_NO_GO_CHECKLIST.md B10,S3 keys in api.env placeholders
+
+Staging-Configure,STG-S8,,GitHub self-hosted runner on stg-aio-1,Staging,P0,Completed,,,2026-10-17,STG-S1,Manual,STAGING_SELF_HOSTED_RUNNER.md,STAGING_DEPLOY_MODE=self-hosted
+
+CI-CD,CI-001,,ci.yml arm64 pip + deploy_preflight_repo,Shared,P0,In Progress,,,2026-10-17,STG-S2,GitHub,.github/workflows/ci.yml,pytest+PostGIS in CI not full gate yet
+
+CI-CD,CI-001b,,ci.yml pytest migrate chain strict,Shared,P0,Not Started,,,,CI-001,GitHub,.github/OCI_CI_CD.md,
+
+CI-CD,CI-002,,build-push.yml OCIR linux/arm64,Shared,P1,Not Started,,,,CI-001,GitHub,.github/OCI_CI_CD.md,
+
+CI-CD,CI-003,,deploy-staging.yml self-hosted migrate,Staging,P0,Completed,,,2026-10-17,STG-S4,GitHub,STAGING_DEPLOY_PIPELINE.md,component dispatch db-verify redis-ensure
+
+CI-CD,CI-005,,infra-terraform-staging.yml plan,Shared,P2,In Progress,,,2026-10-17,STG-IAC-002,GitHub,infra-terraform-staging.yml,apply local; deploy-redis-staging workflow
+
+Validation,VAL-001,,DB verify workflow vs spec/db,Staging,P0,Not Started,,,,STG-S4,GitHub,db-verify.yml,Run Actions DB verify strict
+
+Validation,VAL-002,,compare dev vs staging DB (optional),Staging,P2,Not Started,,,,VAL-001,GitHub,compare_database_schemas.py,DEV_DATABASE_URL secret
+
+Validation,VAL-003,,Celery beat + queue smoke on staging,Staging,P0,Not Started,,,,STG-S5,Manual,,redis DB 1 broker; journalctl worker/beat
+
+Validation,VAL-004,,MVP_GO_NO_GO_CHECKLIST A-F on staging,Staging,P0,Not Started,,,,STG-S6,Manual,MVP_GO_NO_GO_CHECKLIST.md,Gate before prod
+
+Validation,VAL-005,,check_tds_readiness --strict (staging),Staging,P1,Not Started,,,,STG-S4,Manual,MVP_GO_NO_GO_CHECKLIST.md §C,
+
+Backend,BE-001,,Wire presence keys to Redis DB 2,Staging,P2,Not Started,,,,STG-S3b,Code,redis_presence_url,presence still on cache DB 0
+
+Backend,BE-002,,bootstrap_admin.py first admin TOTP,Staging,P0,Not Started,,,,STG-S4,Manual,admin_ui/README.md,
+
+Backend,BE-003,,Razorpay test webhooks to staging API,Staging,P1,Not Started,,,,STG-S6,Manual,OCI_PROD_APPLY_SHEET.md,
+
+Mobile-Admin,MOB-001,,Flutter customer APK staging API_BASE_URL,Staging,P1,Not Started,,,,STG-S6,Manual,MOBILE_FLUTTER.md,http://140.245.245.201:8000
+
+Mobile-Admin,MOB-002,,Flutter partner APK staging smoke,Staging,P1,Not Started,,,,STG-S6,Manual,mana_guruji_mobile/AGENTS.md,dispatch OTP FCM optional
+
+Mobile-Admin,MOB-003,,Admin UI on stg-aio-1 install_admin.sh :3000,Staging,P0,In Progress,,,,STG-S5,GitHub/Manual,STAGING_ADMIN_UI.md,component admin_only or full; CORS 140.245.245.201:3000
+
+Mobile-Admin,MOB-004,,Admin login TOTP smoke on staging,Staging,P0,Not Started,,,,MOB-003,Manual,,depends BE-002
+
+Mobile-Admin,MOB-005,,ALLOWED_ORIGINS for admin + public API URL,Staging,P0,Completed,,,2026-10-17,STG-S5,Manual,api.env,no outer single quotes on JSON array
+
+Staging-Configure,STG-CFG-001,,OCI buckets mana-guruji-stg-catalog + stg-kyc,Staging,P0,Not Started,,,,STG-S4b,Manual/OCI,STAGING_CONFIG_ROLLOUT.md §1.1,Private buckets ap-hyderabad-1
+
+Staging-Configure,STG-CFG-002,,api.env S3 block single key pair no duplicates,Staging,P0,Not Started,,,,STG-CFG-001,Manual,deploy/env/staging.api.env.example,restart api+celery after edit
+
+Staging-Configure,STG-CFG-003,,verify_staging_storage.py + Actions smoke,Staging,P0,In Progress,,,,STG-CFG-002,GitHub,staging-storage-smoke.yml,script in repo; run workflow after CFG-002
+
+Staging-Configure,STG-CFG-004,,bootstrap_catalog.py Hyderabad seed on staging DB,Staging,P0,Not Started,,,,STG-CFG-003,Manual,admin_ui/README.md,not Admin CSV upload — ops script
+
+Staging-Configure,STG-CFG-005,,Admin catalogue image presign upload smoke,Staging,P0,Not Started,,,,STG-CFG-004,Manual,CATALOG_SYNC.md,JPEG PNG WebP
+
+Staging-Configure,STG-CFG-006,,KYC_REDIRECT_URL + Setu sandbox register,Staging,P1,Not Started,,,,STG-CFG-003,Manual,STAGING_CONFIG_ROLLOUT.md §3,/v1/pujari/kyc/callback public URL
+
+Staging-Configure,STG-CFG-007,,Razorpay test webhook to staging API,Staging,P1,Not Started,,,,STG-S6,Manual,STAGING_CONFIG_ROLLOUT.md §4,RAZORPAY_WEBHOOK_SECRET match dashboard
+
+Staging-IaC,STG-IAC-005,,Terraform OCI buckets catalog+kyc optional,Staging,P2,Not Started,,,,STG-CFG-001,Terraform,STAGING_CONFIG_ROLLOUT.md,until then manual console
+
+CI-CD,CI-006,,staging-storage-smoke.yml workflow,Staging,P0,In Progress,,,,STG-CFG-003,GitHub,.github/workflows/staging-storage-smoke.yml,self-hosted only
+

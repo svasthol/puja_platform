@@ -1,4 +1,4 @@
-﻿-- =============================================================================
+-- =============================================================================
 -- TRIGGER 1 â€” payment_splits.net_pujari_amount (computed, never written by app code)
 -- v2: refuses a negative payout â€” a fee/GST misconfiguration must fail loudly,
 -- never silently write a negative amount a payout worker would then act on.
