@@ -93,6 +93,14 @@ def _normalize_name(value: str | None) -> str:
     return " ".join(cleaned.split())
 
 
+def _is_placeholder_name(value: str | None) -> bool:
+    """True when the user has not set a real display name (OTP default)."""
+    normalized = _normalize_name(value)
+    if not normalized:
+        return True
+    return normalized == _normalize_name("New User")
+
+
 def _names_mismatch(registered: str | None, digilocker: str | None) -> bool:
     a = _normalize_name(registered)
     b = _normalize_name(digilocker)
@@ -666,8 +674,14 @@ async def _finalize_locked(
     age = _age_from_dob(identity.date_of_birth)
     if age is not None and age < 18:
         flags.append("age_under_18")
-    if _names_mismatch(user.full_name, identity.name):
-        flags.append("name_mismatch")
+    aadhaar_name = (identity.name or "").strip()
+    if aadhaar_name:
+        legal_name = aadhaar_name[:150]
+        if _is_placeholder_name(user.full_name):
+            user.full_name = legal_name
+            user.updated_at = _now()
+        elif _names_mismatch(user.full_name, aadhaar_name):
+            flags.append("name_mismatch")
 
     vendor_prefix = row.vendor_request_id
     created_types: list[str] = []

@@ -47,6 +47,13 @@ async def _run(phone: str, name: str, reset: bool) -> int:
     from app.core import totp
     from app.core.config import get_settings
     from app.core.crypto import TotpKeyUnavailable, current_key_version, encrypt_secret
+    from app.services.sms_phone import InvalidIndiaPhoneError, canonical_user_phone
+
+    try:
+        phone = canonical_user_phone(phone)
+    except InvalidIndiaPhoneError as exc:
+        print(f"ERROR: {exc}")
+        return 2
 
     settings = get_settings()
 

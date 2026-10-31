@@ -94,6 +94,10 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 (per-`app_context` TTL; customer/pujari keep 30 days). See SPEC_AMENDMENTS §19.
 
 - `POST /v1/auth/otp/request`      {phone} — Redis rate limit: 5/hour per phone.
+  **Phone canonical form:** server normalizes to **`+91` + 10 digits** (e.g. `9515165674` and
+  `+919515165674` → same user). Invalid Indian mobile → **422**. See `app/services/sms_phone.py`
+  (`canonical_user_phone`). After deploy, run `scripts/dedupe_users_by_canonical_phone.py` on
+  staging if test duplicates exist.
   Sends OTP via `sms_router` (FAST2SMS → MSG91 failover per `SMS_PROVIDER_ORDER`).
   Response: `{status: "otp_sent", sms_sent: bool, sms_provider: "fast2sms"|"msg91"|null}`.
   **DLT:** Indian providers require DLT registration even for test SMS — delivery may fail

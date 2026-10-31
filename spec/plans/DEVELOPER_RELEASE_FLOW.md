@@ -14,17 +14,39 @@
 
 ---
 
+## 0. Mandatory Git procedure (most important)
+
+**Every code change** (backend, admin UI, mobile, deploy scripts, migrations) follows this — **no exceptions** for “small fixes”. Applies to **humans and Cursor agents** (see `.cursor/rules/git-workflow.mdc`).
+
+| Step | Action |
+|------|--------|
+| 1 | **`git checkout dev`** → **`git pull origin dev`** |
+| 2 | Create a **new branch** — never work on `dev` or `main` directly |
+| 3 | **Bug:** `bug/<meaningful-kebab-name>` · **Feature:** `feature/<meaningful-kebab-name>` |
+| 4 | Commit on the topic branch; push **`origin bug/…`** or **`origin feature/…`** |
+| 5 | Open **PR → `dev`** · merge when **CI** green (= **L1** testing) |
+| 6 | **Staging (L2):** merge to `dev` triggers **Deploy staging**; run manual checks on `stg-aio-1` |
+| 7 | When release-ready: **PR `dev` → `main`** with checklist §5.2 · prod will deploy from **`main`** |
+
+**Never:** direct commits or pushes to **`dev`** or **`main`** for routine work.
+
+**Optional:** test a branch on staging **before** merging to `dev` — **Actions → Deploy staging** → `git_ref=bug/your-branch`.
+
+**Not in git:** staging/prod secrets and URLs in `/etc/mana-guruji/*.env` — track template updates in `deploy/env/*.example`.
+
+---
+
 ## 1. Branch model (single procedure)
 
 | Branch | Who pushes | What runs automatically | What it means |
 |--------|------------|-------------------------|---------------|
-| **`dev`** | Developers (daily) | **CI** on push/PR; **Deploy staging** on push to `dev` (app paths) | **Integration + live staging** — `stg-aio-1` tracks `origin/dev` |
+| **`bug/*` / `feature/*`** | Developer / agent | **CI** on PR to `dev` | **All implementation** happens here |
+| **`dev`** | **PR merge only** (no direct push) | **CI** on push/PR; **Deploy staging** on push to `dev` (app paths) | **Integration + live staging** — `stg-aio-1` tracks `origin/dev` |
 | **`main`** | **Promotion only** (PR merge from `dev`) | **CI** on push/PR | **Release line** — same SHA we will ship to prod; default branch for new Actions workflows |
-| **Feature branches** (optional) | Developer | **CI** when PR opened to `dev` or `main` | Short-lived; merge into `dev` |
 
 **Rules**
 
-1. Routine work lands on **`dev`** first; staging proves it.
+1. All work starts on **`bug/*` or `feature/*`**; lands on **`dev`** only via PR; staging proves it.
 2. **`main` is not a second dev branch** — merge `dev` → `main` only after staging checks for that release slice (see §5).
 3. **No manual `git pull` on prod app nodes** (future). Staging may be reset with `git reset --hard origin/dev` if the VM clone drifted — not a substitute for fixing deploy.
 4. **Secrets never in git** — laptop `.env`, VM `/etc/mana-guruji/api.env`, GitHub Environment secrets only.
@@ -67,12 +89,14 @@ flowchart LR
 ```bash
 git checkout dev
 git pull origin dev
+git checkout -b bug/short-name    # or: feature/short-name
 # edit, test locally (Postgres/Redis; S3 optional — empty S3_ENDPOINT_URL = real AWS if configured)
-git add … && git commit -m "feat: …"
-git push origin dev
+git add … && git commit -m "fix: …"   # or feat: …
+git push -u origin bug/short-name
+# open PR → dev on GitHub; merge when CI green (see §0)
 ```
 
-Optional: open **PR `feature/*` → `dev`** for review; merge on GitHub when **CI** is green.
+Do **not** `git push origin dev` for routine changes — merge via PR only (§0).
 
 ### 2.2 What GitHub does (automatic)
 
@@ -208,4 +232,4 @@ Do once per repo; details in [`STAGING_GITHUB_SETUP.md`](./STAGING_GITHUB_SETUP.
 | Assume Actions sidebar lists all workflows | Merge workflow YAML to `main` or use workflow URL + branch `dev` |
 | Hand-build prod servers | STG-GATE + digest deploy (when live) |
 
-*Last updated: 2026-10-24*
+*Last updated: 2026-10-31 — §0 mandatory `bug/*` / `feature/*` workflow*
