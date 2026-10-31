@@ -13,7 +13,7 @@ Execute **one phase at a time**. Mark the CSV row **Completed** only after its *
 | **Staging** | **nginx on `stg-aio-1`** — reverse proxy **`:443` → `:8000`** (OCI DNS + cert). Acts as staging edge; not an OCI Load Balancer SKU. |
 | **Production** | **OCI NLB** terminates TLS → **uvicorn `:8000` on `app-1` / `app-2`**. **No nginx on prod app VMs.** |
 
-**Git / deploy procedure:** [`DEVELOPER_RELEASE_FLOW.md`](./DEVELOPER_RELEASE_FLOW.md) (code via `push dev`; config via `api.env` on VM).
+**Git / deploy procedure:** [`DEVELOPER_RELEASE_FLOW.md`](./DEVELOPER_RELEASE_FLOW.md) **§0 (mandatory `bug/*` / `feature/*` → PR `dev`)**; staging deploy tracks **`dev`**; config via `api.env` on VM.
 
 ---
 
@@ -21,6 +21,7 @@ Execute **one phase at a time**. Mark the CSV row **Completed** only after its *
 
 | Rule | Why |
 |------|-----|
+| **Code only on `bug/*` or `feature/*`** — merge to `dev` via PR | See **DEVELOPER_RELEASE_FLOW §0**; no direct `dev`/`main` commits |
 | Same **variable names** in laptop `.env` and VM `api.env` | One codebase (`app/core/config.py`) |
 | **Different values** per environment | Secrets, URLs, buckets |
 | **One line per key** in `api.env` | Duplicates (`S3_*` twice) silently break KYC vs catalog |

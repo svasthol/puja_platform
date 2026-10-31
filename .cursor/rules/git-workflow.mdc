@@ -1,0 +1,34 @@
+---
+description: Mandatory Git branching — never commit on dev/main; use bug/* or feature/* and PR to dev
+alwaysApply: true
+---
+
+# Git workflow (mandatory — humans and agents)
+
+**SSOT:** `spec/plans/DEVELOPER_RELEASE_FLOW.md` §0 and §1.
+
+## Before any code change in git
+
+1. **Do not** commit or push directly to **`dev`** or **`main`**.
+2. **Create a topic branch** from up-to-date **`dev`**:
+   - **Bug fix:** `bug/<short-kebab-name>` (e.g. `bug/phone-canonical-otp`)
+   - **New feature / enhancement:** `feature/<short-kebab-name>` (e.g. `feature/aadhaar-display-name`)
+3. Commit all work on that branch only.
+4. Open a **PR → `dev`**; merge only when **CI** is green (and review if your team requires it).
+5. **Staging (L2)** validates **`dev`** after merge (Deploy staging on push to `dev`).
+6. Promote **`dev` → `main`** only via PR after staging sign-off (checklist in DEVELOPER_RELEASE_FLOW §5.2). **Prod** will ship from **`main`**.
+
+## Agent behavior
+
+- When the user asks to fix or implement something that requires repo changes: **check current branch**. If on `dev` or `main`, **create and checkout** an appropriate `bug/*` or `feature/*` branch before editing (unless the user explicitly says otherwise).
+- **Do not** run `git push origin dev` or `git push origin main` for routine work.
+- **Do not** merge to `dev` or `main` unless the user explicitly requests that step (e.g. after they tested).
+- Commits on topic branches only when the user asked to commit; follow user git safety rules (no force push to main, etc.).
+
+## Optional: prove a branch on staging before merging to dev
+
+**Actions → Deploy staging → Run workflow** with `git_ref=<your-branch>`. Default path is merge to `dev` first, then auto-deploy.
+
+## Config vs code
+
+VM secrets (`/etc/mana-guruji/api.env`, `admin.env`) are **not** git — document template changes in `deploy/env/*.example` when new keys are added.
