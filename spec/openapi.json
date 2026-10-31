@@ -2041,6 +2041,71 @@
         ]
       }
     },
+    "/v1/pujari/documents/{document_id}/upload": {
+      "put": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Upload Selfie Document",
+        "description": "Raw image body after presign — server-side S3 put (mobile uses this instead of direct presigned PUT).",
+        "operationId": "upload_selfie_document_v1_pujari_documents__document_id__upload_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/pujari/documents/{document_id}/confirm": {
       "post": {
         "tags": [

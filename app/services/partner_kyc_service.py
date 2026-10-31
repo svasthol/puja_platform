@@ -32,6 +32,7 @@ from app.models.kyc import KycConsent, KycIdentityRegistry, KycVerificationReque
 from app.services.kyc_storage import (
     KycStorageError,
     KycStorageNotConfigured,
+    SELFIE_CONTENT_TYPES,
     fetch_kyc_bytes,
     kyc_partner_folder,
     presign_kyc_put,
@@ -838,6 +839,59 @@ async def presign_selfie(
         doc_status="uploading",
     )
     return doc_id, url, expires, s3_key
+
+
+async def upload_selfie_body(
+    db: AsyncSession,
+    *,
+    pujari_id: uuid.UUID,
+    document_id: uuid.UUID,
+    body: bytes,
+    content_type: str,
+) -> None:
+    """Store selfie bytes server-side (mobile→API→S3; avoids OCI presigned PUT quirks)."""
+    doc = (
+        await db.execute(
+            select(PujariDocument).where(
+                PujariDocument.id == document_id,
+                PujariDocument.pujari_id == pujari_id,
+                PujariDocument.doc_type == "photo",
+                PujariDocument.is_current.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if doc is None:
+        raise PartnerKycError("Selfie document not found.", status_code=404)
+    if doc.status != "uploading":
+        raise PartnerKycError(
+            f"Selfie document is already {doc.status}.",
+            status_code=409,
+        )
+
+    ct = (content_type or "").split(";")[0].strip().lower()
+    if ct not in SELFIE_CONTENT_TYPES:
+        raise PartnerKycError(
+            f"Unsupported selfie content type: {content_type or '(missing)'}",
+            status_code=422,
+        )
+    expected_suffix = f".{SELFIE_CONTENT_TYPES[ct]}"
+    if not doc.file_url.lower().endswith(expected_suffix):
+        raise PartnerKycError(
+            "Selfie Content-Type does not match the presigned document.",
+            status_code=422,
+        )
+
+    try:
+        store_kyc_bytes(s3_key=doc.file_url, body=body, content_type=ct)
+    except KycStorageNotConfigured as exc:
+        raise PartnerKycError(
+            "KYC document storage not configured.",
+            status_code=502,
+        ) from exc
+    except ValueError as exc:
+        raise PartnerKycError(str(exc), status_code=422) from exc
+    except KycStorageError as exc:
+        raise PartnerKycError(str(exc), status_code=502) from exc
 
 
 async def confirm_selfie(

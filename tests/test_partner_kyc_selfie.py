@@ -100,6 +100,45 @@ async def test_presign_selfie_creates_document_row(session):
 
 
 @pytest.mark.asyncio
+async def test_upload_selfie_body_stores_in_s3(session):
+    pid = await _seed_pujari(session)
+    await session.commit()
+
+    stored: dict[str, bytes] = {}
+
+    def _fake_presign(**kwargs):
+        return ("https://s3.example/upload", 900)
+
+    def _fake_store(**kwargs):
+        stored["body"] = kwargs["body"]
+        return kwargs["s3_key"]
+
+    with (
+        patch(
+            "app.services.partner_kyc_service.presign_kyc_put",
+            side_effect=_fake_presign,
+        ),
+        patch("app.services.partner_kyc_service.store_kyc_bytes", side_effect=_fake_store),
+    ):
+        doc_id, _, _, _ = await kyc_svc.presign_selfie(
+            session,
+            pujari_id=pid,
+            content_type="image/jpeg",
+            content_length=len(_MIN_JPEG),
+        )
+        await kyc_svc.upload_selfie_body(
+            session,
+            pujari_id=pid,
+            document_id=doc_id,
+            body=_MIN_JPEG,
+            content_type="image/jpeg",
+        )
+    await session.commit()
+
+    assert stored["body"] == _MIN_JPEG
+
+
+@pytest.mark.asyncio
 async def test_confirm_selfie_strips_exif_and_sets_uploaded_at(session):
     pid = await _seed_pujari(session)
     doc_id = await _insert_photo_doc(session, pid)

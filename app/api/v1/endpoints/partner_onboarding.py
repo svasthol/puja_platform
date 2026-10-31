@@ -193,6 +193,29 @@ async def presign_selfie_document(
     )
 
 
+@router.put("/documents/{document_id}/upload", status_code=status.HTTP_204_NO_CONTENT)
+async def upload_selfie_document(
+    document_id: uuid.UUID,
+    request: Request,
+    p: Principal = Depends(require_pujari),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Upload selfie bytes via API (server-side S3 put — reliable on OCI vs mobile presigned PUT)."""
+    pid = await _pujari_id(db, p.user_id)
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    body = await request.body()
+    try:
+        await kyc_svc.upload_selfie_body(
+            db,
+            pujari_id=pid,
+            document_id=document_id,
+            body=body,
+            content_type=content_type,
+        )
+    except PartnerKycError as exc:
+        raise _map_kyc_error(exc) from exc
+
+
 @router.post("/documents/{document_id}/confirm", response_model=SelfieConfirmResponse)
 async def confirm_selfie_document(
     document_id: uuid.UUID,

@@ -37,7 +37,19 @@ def validate_pan(pan: str) -> str:
 
 
 def _map_kyc_vendor_error(exc: KycVendorError) -> HTTPException:
-    if exc.code in ("consent_required", "reason_too_short", "pan_not_found"):
+    if exc.code == "pan_not_found":
+        settings = get_settings()
+        base = (settings.KYC_SETU_BASE_URL or "").lower()
+        if "sandbox" in base or settings.APP_ENV != "production":
+            detail = (
+                "Setu sandbox does not verify real PANs against Income Tax. "
+                "For local/staging tests use sandbox PAN ABCDE1234A (ABCDE1234B = invalid). "
+                "Your PAN format may be correct; switch to production Setu only when going live."
+            )
+        else:
+            detail = str(exc)
+        return HTTPException(http.HTTP_422_UNPROCESSABLE_ENTITY, detail)
+    if exc.code in ("consent_required", "reason_too_short"):
         return HTTPException(http.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
     if exc.code == "vendor_config":
         return HTTPException(http.HTTP_503_SERVICE_UNAVAILABLE, str(exc))

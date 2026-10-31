@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 from typing import Any
 from urllib.parse import urljoin
 
@@ -77,6 +78,28 @@ def _base_url() -> str:
 
 def _map_status(setu_status: str) -> str:
     return _SETU_STATUS_MAP.get(setu_status.lower(), "created")
+
+
+_UNICODE_PUNCT_TO_ASCII = str.maketrans(
+    {
+        "\u2014": "-",  # em dash
+        "\u2013": "-",  # en dash
+        "\u2212": "-",  # minus
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+    }
+)
+_NON_ASCII_PRINTABLE_RE = re.compile(r"[^\x20-\x7E]+")
+
+
+def normalize_setu_pan_reason(reason: str) -> str:
+    """Setu PAN API allows printable ASCII only; normalize common Unicode punctuation."""
+    s = (reason or "").strip().translate(_UNICODE_PUNCT_TO_ASCII)
+    s = _NON_ASCII_PRINTABLE_RE.sub("", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 
 
 class SetuDigiLockerClient:
@@ -244,7 +267,7 @@ class SetuDigiLockerClient:
                 code="consent_required",
                 retryable=False,
             )
-        reason = reason.strip()
+        reason = normalize_setu_pan_reason(reason)
         if len(reason) < 20:
             raise KycVendorError(
                 "Reason must be at least 20 characters for Setu PAN verification",
