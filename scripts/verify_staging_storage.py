@@ -4,20 +4,30 @@
 Run on stg-aio-1 after /etc/mana-guruji/api.env is configured:
 
   cd /opt/mana-guruji/src/puja_platform
-  set -a && source /etc/mana-guruji/api.env && set +a
   /opt/mana-guruji/venv/bin/python scripts/verify_staging_storage.py --strict
+
+  (Script loads ENV_FILE or /etc/mana-guruji/api.env automatically; or:
+   set -a && source /etc/mana-guruji/api.env && set +a)
 
 Used by: .github/workflows/staging-storage-smoke.yml
 """
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from dotenv import load_dotenv
+
+load_dotenv()
+_env_file = os.environ.get("ENV_FILE", "/etc/mana-guruji/api.env")
+if Path(_env_file).is_file():
+    load_dotenv(_env_file, override=False)
 
 from botocore.exceptions import BotoCoreError, ClientError
 
