@@ -32,8 +32,10 @@ After deploying this change:
 
 ```bash
 cd /opt/mana-guruji/src/puja_platform
-python scripts/dedupe_users_by_canonical_phone.py        # dry-run
-python scripts/dedupe_users_by_canonical_phone.py --apply  # merge dupes
+source /opt/mana-guruji/venv/bin/activate
+set -a && source /etc/mana-guruji/api.env && set +a
+python scripts/dedupe_users_by_canonical_phone.py        # dry-run (DATABASE_URL)
+python scripts/dedupe_users_by_canonical_phone.py --apply  # needs DATABASE_MIGRATE_URL in api.env
 ```
 
 Review admin **Partners** list. **`--apply`** tombstones orphan `users.phone` to `dedupe-merged-<uuid>` (frees the unique key), sets survivor to `+91…`, and deletes an orphan **pending** pujari when the survivor is **verified** (both had profiles). Other “both pujari” cases still need manual review.

@@ -8,7 +8,8 @@ Usage:
   python scripts/dedupe_users_by_canonical_phone.py           # dry-run (default)
   python scripts/dedupe_users_by_canonical_phone.py --apply   # merge + re-point pujaris
 
-Requires DATABASE_URL (or /etc/mana-guruji/api.env via ENV_FILE).
+Dry-run uses DATABASE_URL (puja_app). **--apply** uses DATABASE_MIGRATE_URL or
+DATABASE_ADMIN_URL from api.env — puja_app has no DELETE on pujaris (apply_grants).
 """
 from __future__ import annotations
 
@@ -34,6 +35,26 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
 from app.services.sms_phone import InvalidIndiaPhoneError, canonical_user_phone
+
+
+def _async_db_url(raw: str) -> str:
+    if raw.startswith("postgresql://"):
+        return raw.replace("postgresql://", "postgresql+psycopg://", 1)
+    return raw
+
+
+def _apply_database_url() -> str:
+    """Migrate/admin role for writes that DELETE orphan pujaris."""
+    raw = os.environ.get("DATABASE_MIGRATE_URL") or os.environ.get("DATABASE_ADMIN_URL")
+    if not raw:
+        settings = get_settings()
+        print(
+            "ERROR: --apply requires DATABASE_MIGRATE_URL or DATABASE_ADMIN_URL in api.env "
+            "(puja_app cannot DELETE FROM pujaris).",
+            file=sys.stderr,
+        )
+        return str(settings.DATABASE_URL)
+    return _async_db_url(raw)
 
 
 def _canonical_safe(raw: str) -> str | None:
@@ -109,7 +130,14 @@ async def _run(*, apply: bool) -> int:
         print("Dry-run only. Re-run with --apply to merge (staging/test data recommended).")
         return 0
 
-    engine = create_async_engine(str(settings.DATABASE_URL))
+    apply_url = _apply_database_url()
+    if not (
+        os.environ.get("DATABASE_MIGRATE_URL") or os.environ.get("DATABASE_ADMIN_URL")
+    ):
+        return 2
+
+    print("Apply using DATABASE_MIGRATE_URL or DATABASE_ADMIN_URL (not runtime puja_app).")
+    engine = create_async_engine(apply_url)
     try:
         async with engine.begin() as conn:
             for canon, group in dupes.items():
