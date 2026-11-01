@@ -102,7 +102,7 @@ Does **not** run migrate or restart API unless you run `full` / `backend_only` s
 1. `/etc/mana-guruji/api.env`:
    - `KYC_REDIRECT_URL=https://api-stg.managuruji.in/v1/pujari/kyc/callback`
    - `ALLOWED_ORIGINS` includes `https://admin-stg.managuruji.in`
-2. `/etc/mana-guruji/admin.env`: `NEXT_PUBLIC_API_URL=https://api-stg.managuruji.in` → `./deploy/staging/install_admin.sh`
+2. `/etc/mana-guruji/admin.env`: `NEXT_PUBLIC_API_URL=https://api-stg.managuruji.in/v1` (must include **`/v1`**) → `./deploy/staging/install_admin.sh`
 3. `sudo systemctl restart mana-guruji-api mana-guruji-celery-worker mana-guruji-celery-beat`
 4. Register Setu callback URL (exact match)
 5. Flutter: `--dart-define=API_BASE_URL=https://api-stg.managuruji.in`

@@ -84,7 +84,11 @@ Staging-Configure,STG-CFG-004,,bootstrap_catalog.py Hyderabad seed on staging DB
 
 Staging-Configure,STG-CFG-005,,Admin catalogue image presign upload smoke,Staging,P0,Not Started,,,,STG-CFG-004,Manual,CATALOG_SYNC.md,JPEG PNG WebP
 
-Staging-Configure,STG-CFG-006,,KYC_REDIRECT_URL + Setu sandbox register,Staging,P1,Not Started,,,,STG-CFG-003,Manual,STAGING_CONFIG_ROLLOUT.md §3,/v1/pujari/kyc/callback public URL
+Staging-Configure,STG-CFG-006,,KYC_REDIRECT_URL + Setu sandbox register,Staging,P1,In Progress,,,,STG-CFG-003,Manual,STAGING_CONFIG_ROLLOUT.md §3,Laptop Setu E2E OK; HTTPS callback + dashboard pending — KYC_SETU_SANDBOX_STATUS.md
+
+Staging-Validate,STG-KYC-001,,Partner Setu sandbox E2E on staging device,Staging,P0,In Progress,,,2026-11-01,STG-CFG-006,Manual,KYC_SETU_SANDBOX_STATUS.md,Laptop dev PASS; Flutter staging URL build pending
+
+Staging-Validate,STG-KYC-002,,Admin A-KYC approve partner docs,Staging,P0,Not Started,,,,STG-KYC-001,Manual,KYC_ONBOARDING.md,verification_status=verified
 
 Staging-Configure,STG-CFG-007,,Razorpay test webhook to staging API,Staging,P1,Not Started,,,,STG-S6,Manual,STAGING_CONFIG_ROLLOUT.md §4,RAZORPAY_WEBHOOK_SECRET match dashboard
 

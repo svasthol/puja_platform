@@ -68,6 +68,37 @@ Or `git pull` after the `install_admin.sh` fix on `dev` and re-run the script.
 
 Edit `NEXT_PUBLIC_API_URL` in `/etc/mana-guruji/admin.env`, then re-run `./deploy/staging/install_admin.sh` (rebuild required).
 
+## Login works on `http://140.245.245.201:3000` but fails on `https://admin-stg.managuruji.in`
+
+Admin login is a **browser** `fetch` from the page origin to **`NEXT_PUBLIC_API_URL`** (baked in at `next build`). FQDN failure with IP success is almost always one of:
+
+| Cause | Symptom | Fix |
+|-------|---------|-----|
+| **CORS** | DevTools → failed `OPTIONS` or “blocked by CORS”; generic “Login failed” | Add **`https://admin-stg.managuruji.in`** to `ALLOWED_ORIGINS` in `api.env`, restart API |
+| **Wrong API URL in build** | Request goes to `http://140.245.245.201:8000/...` from HTTPS page (mixed content blocked) or missing `/v1` → 404 | Set `NEXT_PUBLIC_API_URL=https://api-stg.managuruji.in/v1`, re-run `install_admin.sh` |
+| **TOTP / phone** | Same on both URLs | Unlikely if IP login works — phone must match `users.phone` (`+91…`); reset via `bootstrap_admin.py` |
+
+**Verify in browser (FQDN login page):** DevTools → Network → submit login → check POST URL is `https://api-stg.managuruji.in/v1/admin/auth/login` and status **200** (not blocked, not 404).
+
+**On VM (after DNS + nginx TLS):**
+
+```bash
+# 1) api.env — JSON array, no outer single quotes
+# ALLOWED_ORIGINS=[ "...","https://admin-stg.managuruji.in","http://140.245.245.201:3000", ... ]
+
+sudo nano /etc/mana-guruji/api.env
+sudo systemctl restart mana-guruji-api
+
+# 2) admin.env — must end with /v1
+grep NEXT_PUBLIC /etc/mana-guruji/admin.env
+# NEXT_PUBLIC_API_URL=https://api-stg.managuruji.in/v1
+
+cd /opt/mana-guruji/src/puja_platform
+./deploy/staging/install_admin.sh
+```
+
+See also [`STAGING_NGINX_TLS.md`](./STAGING_NGINX_TLS.md) “After HTTPS works”.
+
 ## Files
 
 | Path | Role |

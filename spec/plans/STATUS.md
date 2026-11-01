@@ -9,7 +9,7 @@ gates: [`MASTER.md`](./MASTER.md).
 this file on every task). Status changes happen here and only here; track files own
 Spec / Files / Acceptance / Depends-on.
 
-**Last audited:** 2026-10-10 (OCI staging Terraform scaffold + fleet SSOT in git)
+**Last audited:** 2026-11-01 (Setu sandbox laptop sign-off + identity PR #7 → `dev`)
 
 ---
 
@@ -22,9 +22,9 @@ Tracker: [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md). PM sheets: [Staging](./
 | OCI-FLEET-SSOT | COMPLETED | `fleet.launch.yaml` + `OCI_COMPUTE_FLEET.md` |
 | OCI-LOCAL-CLI | COMPLETED | `.oci/` + `infra/oci/LOCAL_OCI_SETUP.md` |
 | OCI-TF-STG-AIO | COMPLETED | Terraform apply **2026-10-16** — `stg-aio-1` live ([`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md)) |
-| OCI-STG-CONFIGURE | IN_PROGRESS | **S1** done; **S2** [`LINUX_RUNTIME_PIPELINE.md`](./LINUX_RUNTIME_PIPELINE.md) |
+| OCI-STG-CONFIGURE | IN_PROGRESS | **S1** done; **S2** runtime; KYC sandbox laptop done — [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md) |
 | OCI-CI-LINUX-ARM64 | COMPLETED | `.github/workflows/ci.yml` |
-| OCI-GHA-DEPLOY-STG | IN_PROGRESS | `deploy-staging.yml` + `remote_staging_deploy.sh` — first-boot VM + `staging` secrets |
+| OCI-GHA-DEPLOY-STG | COMPLETED | `deploy-staging.yml` self-hosted on `stg-aio-1`; merge **`dev`** → deploy verified 2026-11-01; optional **`bug/staging-deploy-git-clarity`** for VM git UX |
 | OCI-GHA-TF-STG-PLAN | COMPLETED | `infra-terraform-staging.yml` (optional CI plan) |
 | OCI-TF-PROD-5NODE | PENDING | After staging OL9/migrate smoke |
 | OCI-ANSIBLE | PENDING | Patroni, Redis, app roles |
@@ -91,7 +91,7 @@ Exposure at launch (OFF): **s.201 risk** — **v3** post-₹5L slice at 0.1% (op
 | L-SPRINT-2-TDS-ADMIN-OPS-UX | COMPLETED | Bookings ops tabs, `GET /admin/pujaris/fy-earnings`, admin UI pages |
 | L-SPRINT-2-TDS-PAN-FY-GATES | COMPLETED | ₹4.5L warn / ₹5L block without **operative PAN** — `PAN_FY_GATES.md`; blocks accept + heartbeat; **confirm-balance warn+allow** (Phase 0b) |
 | L-SPRINT-2-TDS-FY-GATE-0B | COMPLETED | **`FY_PAN_GATE_BLOCKED`** 422 `{code,message}`; confirm-balance **`FY_PAN_GATE_WARN`** on `TdsAccrualInfo.message_code`; tests `test_pujari_fy_pan_gate_confirm_balance.py` |
-| L-SPRINT-2-TDS-KYC-PAN | COMPLETED | Setu `POST /api/verify/pan` via `setu_digilocker_client.verify_pan` + `submit_partner_pan`; **`KYC_SETU_PAN_PRODUCT_ID`** required in prod; `pan_enc` filing still P3 |
+| L-SPRINT-2-TDS-KYC-PAN | COMPLETED | Setu `POST /api/verify/pan` + reason ASCII normalize; sandbox QA **`ABCDE1234A`** on laptop 2026-11-01 — [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md) |
 | L-SPRINT-2-TDS-SPEC-DOCS | COMPLETED | DATABASE + grants (R12) + API_CONTRACTS TDS/tax-profile/admin ops |
 | L-SPRINT-2-TDS-OPENAPI | COMPLETED | `python scripts/export_openapi.py` → `spec/openapi.json` (app-config TDS flags in schema) |
 | L-SPRINT-2-TDS-RUNTIME-CONFIG | COMPLETED | `spec/plans/TDS_RUNTIME_CONFIG.md`; TDS flags on `GET /v1/app-config`; `.env - Copy.example` TDS block |
@@ -176,7 +176,7 @@ Customer + partner apps share one Flutter codebase (build flavors). Repo:
 | P-FLUTTER-E2E-SMOKE | IN_PROGRESS | **A, B, D, E — PASS** (2026-08-03). **C1–C4** via `test/PARTNER_FCM_SOUND.md`; checklist: `test/PARTNER_E2E_SMOKE.md` |
 | P-FLUTTER-AVAILABILITY | PENDING | Weekly hours + date blocks UI — backend ready (`B-AVAIL`/`B-UNAVAIL`); unblocked after onboarding sign-off |
 | P-FLUTTER-REGISTER | COMPLETED | Register screen + `POST /v1/pujari/register`; device-verified on physical Android (2026-08-30) |
-| P-FLUTTER-KYC | COMPLETED | DigiLocker + selfie + admin approve → `verified` → online → offer display + accept; physical Android (2026-08-30) |
+| P-FLUTTER-KYC | COMPLETED | DigiLocker + selfie (API upload after PR #7) + PAN sandbox; admin approve → `verified`; canonical phone OTP — see [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md) |
 | P-FLUTTER-PAN-PROFILE | COMPLETED | KYC hub PAN step + `partner_pan_profile_screen`; `GET/PUT /me/tax-profile`, `POST /kyc/pan` (2026-09-14) |
 | P-FLUTTER-TAX-SUMMARY | COMPLETED | FY facilitation summary from `GET /me/tax-summary`; entry from bookings tab (2026-09-14) |
 | P-FLUTTER-PAN-FY-GATE-UX | COMPLETED | Gate level UI + ⚠ on bookings tab when `fy_pan_gate_level` is warn or block |
@@ -372,12 +372,14 @@ Snapshot handoff: [`PANCHANGAM_STATUS_SNAPSHOT.md`](./PANCHANGAM_STATUS_SNAPSHOT
 | B-EARNINGS | PENDING | 3 | blocked_by: P-SPLITS; + TDS line, ₹4.5L nudge |
 | B-AVAIL | COMPLETED | 1 | `PUT/GET /v1/me/availability` replace-all |
 | B-UNAVAIL | COMPLETED | 1 | `PUT/GET /v1/me/unavailability` replace-all |
-| B-KYC | COMPLETED | 0.5 | Setu DigiLocker + selfie presign/confirm + admin approve → `verified`; hardened Aug 2026: resume-after-kill (`active_digilocker_request`), `uploading` selfie gate, Setu read timeout 25s |
+| B-KYC | COMPLETED | 0.5 | Setu DigiLocker + selfie + admin approve → `verified`; sandbox laptop sign-off 2026-11-01 — [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md) |
 | B-KYC-VENDOR | COMPLETED | 0.5 | `partner_kyc_service` + Setu async client + self-healing poll finalize |
-| B-KYC-SELFIE | COMPLETED | 0.5 | presign (`uploading`) + confirm → `pending` (EXIF strip); migration **023** |
+| B-KYC-SELFIE | COMPLETED | 0.5 | presign + **API upload** + confirm (EXIF strip); migration **023**; merged PR #7 2026-11-01 |
+| B-IDENTITY-PHONE-NAME | COMPLETED | 0.5 | Canonical +91 OTP + Aadhaar → `users.full_name`; [`IDENTITY_PHONE_AND_NAME.md`](./IDENTITY_PHONE_AND_NAME.md) |
 | B-DEVICE | COMPLETED | 2 | `POST/DELETE /v1/me/devices`; upsert by `device_token` |
 | B-CANCEL | COMPLETED | 5 | `POST /v1/bookings/{id}/pujari-cancel` → requested + `rebroadcast(fresh=True)`; `test_pujari_cancel.py` |
 | B-REGISTER | COMPLETED | 0.5 | `POST /v1/pujari/register` — idempotent pending pujari bootstrap |
+| STG-SETU-SANDBOX-E2E | IN_PROGRESS | 0.5 | Setu sandbox partner path — laptop **PASS** 2026-11-01; staging device + admin approve pending — [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md) |
 
 ---
 

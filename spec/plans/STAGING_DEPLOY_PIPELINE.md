@@ -13,7 +13,7 @@
 [GitHub]  deploy-staging.yml — SSH to 140.245.245.201
     ↓
 [VM]      remote_staging_deploy.sh
-            → git pull
+            → git fetch; checkout deploy-staging @ origin/dev
             → bootstrap_python_runtime.sh (pip)
             → migrate.sh (DB)
             → systemctl restart api/worker/beat
@@ -57,6 +57,26 @@
 | `nginx_tls` | `deploy/staging/install_nginx_tls.sh` — nginx + certbot for `api-stg` / `admin-stg` ([`STAGING_NGINX_TLS.md`](./STAGING_NGINX_TLS.md); secret **`STAGING_CERTBOT_EMAIL`**) |
 
 Set **git_ref** to any branch (e.g. `dev`). Prod uses the same pattern in **Deploy production** when rollout is wired.
+
+### VM git layout (avoid false “behind dev” alarms)
+
+After **Deploy staging**, the clone at `/opt/mana-guruji/src/puja_platform` should look like:
+
+| Branch | Role |
+|--------|------|
+| **`deploy-staging`** (checked out) | **Running API/admin code** — hard-reset to `origin/dev` (or pinned `git_ref`) every deploy |
+| **`dev`** | Optional local pointer; may look stale until deploy syncs it — **do not** use it to judge whether CD worked |
+
+Verify deploy success:
+
+```bash
+cd /opt/mana-guruji/src/puja_platform
+git fetch origin
+git rev-parse HEAD origin/dev   # must match after a green deploy
+git log -1 --oneline
+```
+
+Compare **`HEAD`** to GitHub **`dev`**, not an old local **`dev`** branch at `7e54401`-era SHAs.
 
 **HTTPS edge (Step 2):** After Wix A records point at `stg-aio-1`, run **Deploy staging** with **`component=nginx_tls`** (manual only). Requires GitHub Environment secret **`STAGING_CERTBOT_EMAIL`** (Let’s Encrypt contact).
 

@@ -43,11 +43,17 @@ def _canonical_safe(raw: str) -> str | None:
         return None
 
 
+def _tombstone_phone(user_id: uuid.UUID) -> str:
+    """Free users.phone unique key after merge (not a dialable number)."""
+    return f"dedupe-merged-{user_id}"
+
+
 def _score_row(row: dict) -> tuple:
     """Higher = prefer as survivor."""
     verified = 1 if row.get("verification_status") == "verified" else 0
     has_pujari = 1 if row.get("pujari_id") else 0
-    return (verified, has_pujari, row["created_at"] or "")
+    phone_is_canonical = 1 if row.get("phone") == row.get("canonical") else 0
+    return (verified, has_pujari, phone_is_canonical, row["created_at"] or "")
 
 
 async def _run(*, apply: bool) -> int:
@@ -109,10 +115,11 @@ async def _run(*, apply: bool) -> int:
             for canon, group in dupes.items():
                 group_sorted = sorted(group, key=_score_row, reverse=True)
                 survivor_id = uuid.UUID(str(group_sorted[0]["id"]))
+                survivor = group_sorted[0]
                 for orphan in group_sorted[1:]:
                     orphan_id = uuid.UUID(str(orphan["id"]))
                     orphan_pujari = orphan.get("pujari_id")
-                    survivor_pujari = group_sorted[0].get("pujari_id")
+                    survivor_pujari = survivor.get("pujari_id")
                     if orphan_pujari and not survivor_pujari:
                         await conn.execute(
                             text(
@@ -122,14 +129,31 @@ async def _run(*, apply: bool) -> int:
                             {"survivor": str(survivor_id), "pid": str(orphan_pujari)},
                         )
                     elif orphan_pujari and survivor_pujari:
-                        print(
-                            f"WARN both have pujaris for {canon}: "
-                            f"survivor_pujari={survivor_pujari} orphan_pujari={orphan_pujari} "
-                            "— manual merge required; skipping orphan pujari move"
-                        )
+                        if (
+                            survivor.get("verification_status") == "verified"
+                            and orphan.get("verification_status") == "pending"
+                        ):
+                            await conn.execute(
+                                text("DELETE FROM pujaris WHERE id = :pid"),
+                                {"pid": str(orphan_pujari)},
+                            )
+                            print(
+                                f"  deleted orphan pending pujari {orphan_pujari} "
+                                f"(survivor {survivor_pujari} is verified) for {canon}"
+                            )
+                        else:
+                            print(
+                                f"WARN both have pujaris for {canon}: "
+                                f"survivor_pujari={survivor_pujari} orphan_pujari={orphan_pujari} "
+                                "— manual merge required; skipping orphan pujari move"
+                            )
+                    # Release canonical phone on unique index before survivor is updated.
                     await conn.execute(
-                        text("UPDATE users SET is_active = false, updated_at = now() WHERE id = :id"),
-                        {"id": str(orphan_id)},
+                        text(
+                            "UPDATE users SET phone = :ph, is_active = false, updated_at = now() "
+                            "WHERE id = :id"
+                        ),
+                        {"ph": _tombstone_phone(orphan_id), "id": str(orphan_id)},
                     )
                 await conn.execute(
                     text("UPDATE users SET phone = :ph, updated_at = now() WHERE id = :id"),

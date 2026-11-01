@@ -1,6 +1,6 @@
 # Identity — canonical phone + Aadhaar display name
 
-**Status:** Shipped in `bug/phone-canonical-otp` (2026-10-31).
+**Status:** Merged to **`dev`** (puja_platform PR #7, Flutter PR #1, 2026-11-01). Sign-off: [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md).
 
 ## Problem
 
@@ -36,7 +36,7 @@ python scripts/dedupe_users_by_canonical_phone.py        # dry-run
 python scripts/dedupe_users_by_canonical_phone.py --apply  # merge dupes
 ```
 
-Review admin **Partners** list; deactivate stray test users manually if both rows had a pujari.
+Review admin **Partners** list. **`--apply`** tombstones orphan `users.phone` to `dedupe-merged-<uuid>` (frees the unique key), sets survivor to `+91…`, and deletes an orphan **pending** pujari when the survivor is **verified** (both had profiles). Other “both pujari” cases still need manual review.
 
 ## Prod
 

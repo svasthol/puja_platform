@@ -3,8 +3,9 @@
 **PM tracker CSV:** [`Mana_Guruji_OCI_PM_Tracker_Staging.csv`](./Mana_Guruji_OCI_PM_Tracker_Staging.csv)  
 **Config rollout (ordered):** [`STAGING_CONFIG_ROLLOUT.md`](../STAGING_CONFIG_ROLLOUT.md) · env SSOT: [`ENV_STAGING_REFERENCE.md`](../ENV_STAGING_REFERENCE.md)  
 **STG → prod (pipelines + gates):** [`STG_TO_PROD_PIPELINE.md`](../STG_TO_PROD_PIPELINE.md) · incidents: [`STAGING_DEPLOY_INCIDENTS.md`](../STAGING_DEPLOY_INCIDENTS.md)  
-**Last updated:** 2026-10-24  
-**Host:** `stg-aio-1` · `140.245.245.201` · API `http://140.245.245.201:8000`
+**Last updated:** 2026-11-01  
+**Host:** `stg-aio-1` · `140.245.245.201` · API `http://140.245.245.201:8000` (HTTPS when **STG-CFG-006** / nginx_tls done)  
+**Setu / KYC sign-off SSOT:** [`KYC_SETU_SANDBOX_STATUS.md`](../KYC_SETU_SANDBOX_STATUS.md)
 
 ---
 
@@ -22,6 +23,9 @@
 | CORS config | `ALLOWED_ORIGINS` includes admin + public API URLs |
 | **Object Storage** | **STG-CFG-001..003** — OCI buckets, `api.env` S3 block, `verify_staging_storage.py --strict` OK (`7e54401`) |
 | **Docs** | **CI-007** — `STG_TO_PROD_PIPELINE.md` (promotion model + prod pipelines to build) |
+| **Identity + OTP** | Canonical **`+91`** phone + Aadhaar display name — merged **`dev`** PR #7 (2026-11-01) |
+| **Setu sandbox (laptop)** | DigiLocker + selfie (API upload) + PAN **`ABCDE1234A`** operative — see [`KYC_SETU_SANDBOX_STATUS.md`](../KYC_SETU_SANDBOX_STATUS.md) |
+| **CD** | Deploy staging on merge **`dev`** verified (`deploy-staging` branch = `origin/dev`) |
 
 ---
 
@@ -29,6 +33,9 @@
 
 | ID | Task | Priority |
 |----|------|----------|
+| STG-CFG-006 | **`KYC_REDIRECT_URL`** (HTTPS) + Setu dashboard callback; DigiLocker on staging device | P0 |
+| STG-KYC-001 | Partner onboarding E2E on **staging** API + Flutter build (laptop dev done) | P0 |
+| STG-KYC-002 | Admin approve KYC docs → `verification_status=verified` | P0 |
 | STG-S4b | Finish `api.env`: Razorpay test, `TOTP_ENC_KEYS`, `SECRET_KEY`, optional FCM path (S3 **done**) | P0 |
 | STG-S5 | Confirm **Celery worker + beat** active; broker on Redis **DB 1** after latest code deploy | P0 |
 | STG-S6 | `/health/ready` (or full health) not degraded — DB + Redis | P0 |
@@ -71,12 +78,13 @@
 
 ## Suggested order (next 1–2 weeks)
 
-1. **STG-CFG-004..005** — catalog bootstrap + admin image upload  
-2. **BE-002** + **MOB-003/004** — admin against staging API  
-3. **STG-S5** — Celery verification (**VAL-003**)  
-4. **VAL-001** + **VAL-004** — DB + MVP gate  
-5. **CI-006** — storage smoke in Actions  
-6. **MOB-001/002** — Flutter device smoke  
-7. **STG-CFG-006..007** / **BE-003** — KYC redirect + Razorpay webhooks  
+1. **STG-CFG-006** + **STG-KYC-001** — HTTPS KYC callback + partner onboarding on staging device ([`KYC_SETU_SANDBOX_STATUS.md`](../KYC_SETU_SANDBOX_STATUS.md))  
+2. **STG-KYC-002** + **BE-002** + **MOB-003/004** — admin KYC approve + console  
+3. **STG-CFG-004..005** — catalog bootstrap + admin image upload  
+4. **STG-S5** — Celery verification (**VAL-003**)  
+5. **VAL-001** + **VAL-004** — DB + MVP gate  
+6. **CI-006** — storage smoke in Actions  
+7. **MOB-001/002** — Flutter device smoke (partner build from **`dev`** with staging URL)  
+8. **STG-CFG-007** / **BE-003** — Razorpay webhooks  
 
 **Production:** blocked until **STG-GATE** (**STG-S6** + **VAL-004** + **INC-REVIEW**) in production CSV — see [`STG_TO_PROD_PIPELINE.md`](../STG_TO_PROD_PIPELINE.md).

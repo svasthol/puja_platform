@@ -1,6 +1,7 @@
 # Partner KYC onboarding — vendor-agnostic plan (DigiLocker first)
 
-**Status:** IMPLEMENTED (Aug 2026). Setu DigiLocker sandbox + production via `KYC_SETU_*` env.
+**Status:** IMPLEMENTED (Aug 2026). Setu DigiLocker sandbox + production via `KYC_SETU_*` env.  
+**Sandbox sign-off (completed vs pending):** [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md) (updated 2026-11-01).
 **Owner track:** Phase 0.5 supply onboarding (`B-REGISTER`, `B-KYC`).
 **Task status lives only in [`STATUS.md`](./STATUS.md)** — this file is scope/design, never a `Status:` source.
 

@@ -136,7 +136,7 @@ Repo artifacts (when added): `deploy/nginx/staging-api.conf`, `deploy/staging/in
 | Flow | Uses OCI presigned URL? |
 |------|-------------------------|
 | **Setu DigiLocker** (redirect + callback) | **No** — HTTPS to Setu; API stores pulled docs in `S3_BUCKET_KYC` server-side |
-| **Partner selfie** | **Yes** — `presign_kyc_put` → app PUT to KYC bucket (`partner_kyc_service`) |
+| **Partner selfie** | **Presign + `PUT /v1/pujari/documents/{id}/upload`** (API → KYC bucket); legacy presigned URL still returned but mobile uses API path ([`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md)) |
 | **Admin KYC queue view** | **Yes** — `presign_kyc_get` for stored proof objects |
 
 **Before Setu dashboard work:** confirm Phase 1 strict smoke passed for **both** buckets. Optional E2E after Phase 3 env: partner onboarding selfie presign + confirm on staging.
@@ -222,7 +222,7 @@ When adding a new env var to staging `api.env`:
 | STG-CFG-003 | `verify_staging_storage.py` + Actions smoke | **Completed** (VM); run `staging-storage-smoke.yml` for CI-006 |
 | STG-CFG-004 | `bootstrap_catalog.py` on staging | Not Started |
 | STG-CFG-005 | Admin catalogue image upload smoke | Not Started |
-| STG-CFG-006 | KYC redirect + Setu sandbox | Not Started |
+| STG-CFG-006 | KYC redirect + Setu sandbox register | **In Progress** | Laptop Setu E2E OK; **HTTPS** `KYC_REDIRECT_URL` + dashboard register pending — [`KYC_SETU_SANDBOX_STATUS.md`](./KYC_SETU_SANDBOX_STATUS.md) |
 | STG-CFG-007 | Razorpay webhook staging URL | Not Started |
 
 *Last updated: 2026-10-24*

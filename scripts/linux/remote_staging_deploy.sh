@@ -61,6 +61,17 @@ else
   git pull --ff-only origin "$(echo "$GIT_REF" | sed 's|origin/||')"
 fi
 
+DEPLOYED_SHA="$(git rev-parse HEAD)"
+REMOTE_SHA="$(git rev-parse "${GIT_REF}")"
+if [[ "$DEPLOYED_SHA" != "$REMOTE_SHA" ]]; then
+  log "ERROR: HEAD (${DEPLOYED_SHA}) != ${GIT_REF} (${REMOTE_SHA}) after sync"
+  exit 1
+fi
+log "deploy-staging @ ${DEPLOYED_SHA} — $(git log -1 --oneline)"
+# Local branch 'dev' is not checked out by deploy; update it so 'git branch -vv' on VM is not misleading.
+git branch -f dev "${GIT_REF}" 2>/dev/null || true
+log "Runtime code = branch deploy-staging (same commit as ${GIT_REF}); local dev ref synced for inspection only"
+
 chmod +x scripts/linux/*.sh scripts/migrate.sh scripts/bootstrap.sh 2>/dev/null || true
 
 if [[ "$RUN_DATA_SERVICES" == "1" ]]; then
