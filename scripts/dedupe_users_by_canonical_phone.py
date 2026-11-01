@@ -65,8 +65,12 @@ def _canonical_safe(raw: str) -> str | None:
 
 
 def _tombstone_phone(user_id: uuid.UUID) -> str:
-    """Free users.phone unique key after merge (not a dialable number)."""
-    return f"dedupe-merged-{user_id}"
+    """Free users.phone unique key after merge (not a dialable number).
+
+    ``users.phone`` is VARCHAR(15) — longest real value is ``+91`` + 10 digits (13).
+    """
+    # +8 + 13 hex chars = 15; fails canonical_user_phone (not +91 Indian mobile).
+    return f"+8{user_id.hex[:13]}"
 
 
 def _score_row(row: dict) -> tuple:

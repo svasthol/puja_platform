@@ -38,7 +38,7 @@ python scripts/dedupe_users_by_canonical_phone.py        # dry-run (DATABASE_URL
 python scripts/dedupe_users_by_canonical_phone.py --apply  # needs DATABASE_MIGRATE_URL in api.env
 ```
 
-Review admin **Partners** list. **`--apply`** tombstones orphan `users.phone` to `dedupe-merged-<uuid>` (frees the unique key), sets survivor to `+91…`, and deletes an orphan **pending** pujari when the survivor is **verified** (both had profiles). Other “both pujari” cases still need manual review.
+Review admin **Partners** list. **`--apply`** tombstones orphan `users.phone` to **`+8` + 13 hex** (15 chars max; frees the unique key), sets survivor to `+91…`, and deletes an orphan **pending** pujari when the survivor is **verified** (both had profiles). Other “both pujari” cases still need manual review.
 
 ## Prod
 
