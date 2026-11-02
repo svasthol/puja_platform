@@ -177,6 +177,15 @@ async def redis_delete(key: str) -> int:
     return await redis_execute(_op)
 
 
+async def redis_ttl(key: str) -> int:
+    """Remaining TTL in whole seconds. -1 = key exists without expiry, -2 = missing."""
+
+    async def _op(r: aioredis.Redis) -> int:
+        return int(await r.ttl(key))
+
+    return await redis_execute(_op)
+
+
 async def redis_getdel(key: str) -> str | None:
     async def _op(r: aioredis.Redis) -> str | None:
         return await r.getdel(key)
