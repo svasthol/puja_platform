@@ -80,15 +80,15 @@ def _too_many(detail: str, retry_after: int) -> HTTPException:
     )
 
 
-async def _rate_limit(key: str, limit: int, window_s: int) -> None:
+async def _rate_limit(key: str, limit: int, window_s: int, *, detail: str | None = None) -> int:
+    """Increment window counter; raise 429 if over limit. Returns current count."""
     count = await redis_incr(key)
     if count == 1:
         await redis_expire(key, window_s)
     if count > limit:
-        raise _too_many(
-            "Too many requests. Try later.",
-            await _retry_after_seconds(key, window_s),
-        )
+        msg = detail or "Too many requests. Try later."
+        raise _too_many(msg, await _retry_after_seconds(key, window_s))
+    return count
 
 
 # --------------------------------------------------------------------------- #
@@ -140,7 +140,13 @@ async def _record_otp_failure(phone: str) -> int:
 # --------------------------------------------------------------------------- #
 @router.post("/otp/request", status_code=http.HTTP_202_ACCEPTED)
 async def otp_request(payload: OtpRequest, db: AsyncSession = Depends(get_db_txn)):
-    await _rate_limit(f"otp_req:{payload.phone}", settings.OTP_RATE_LIMIT_PER_HOUR, 3600)
+    hourly_limit = settings.OTP_RATE_LIMIT_PER_HOUR
+    send_count = await _rate_limit(
+        f"otp_req:{payload.phone}",
+        hourly_limit,
+        3600,
+        detail=f"Too many OTP requests. Maximum {hourly_limit} codes per hour.",
+    )
     await _enforce_send_cooldown(payload.phone)
     otp = f"{secrets.randbelow(10**6):06d}"
     now = dt.datetime.now(dt.UTC)
@@ -179,6 +185,7 @@ async def otp_request(payload: OtpRequest, db: AsyncSession = Depends(get_db_txn
         "status": "otp_sent",
         "sms_sent": sms_result.sent,
         "sms_provider": sms_result.provider,
+        "otp_sends_remaining_this_hour": max(0, hourly_limit - send_count),
     }
     # Dev ergonomics: Swagger / E2E Log can read the code when SMS did not send.
     if settings.DEBUG and not sms_result.sent:

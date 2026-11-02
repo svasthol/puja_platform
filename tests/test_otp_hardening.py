@@ -102,7 +102,7 @@ async def test_resend_supersedes_prior_active_otp(session):
     """After a resend there must be exactly ONE live OTP for the phone."""
     phone = _uniq_phone()
     with (
-        patch.object(auth_ep, "_rate_limit", new_callable=AsyncMock),
+        patch.object(auth_ep, "_rate_limit", new_callable=AsyncMock, return_value=1),
         patch.object(auth_ep, "_enforce_send_cooldown", new_callable=AsyncMock),
         patch.object(auth_ep.sms_router, "send_otp_sms", new_callable=AsyncMock) as sms,
     ):
@@ -131,7 +131,7 @@ async def test_lockout_carries_across_resend(session):
     from app.services.sms_types import SmsSendResult
 
     with (
-        patch.object(auth_ep, "_rate_limit", new_callable=AsyncMock),
+        patch.object(auth_ep, "_rate_limit", new_callable=AsyncMock, return_value=1),
         patch.object(auth_ep, "_enforce_send_cooldown", new_callable=AsyncMock),
         patch.object(auth_ep, "_otp_failures", side_effect=counter.failures),
         patch.object(auth_ep, "_record_otp_failure", side_effect=counter.record),
@@ -190,7 +190,7 @@ async def test_cooldown_blocks_concurrent_requests():
             pass
 
     with (
-        patch.object(auth_ep, "_rate_limit", new_callable=AsyncMock),
+        patch.object(auth_ep, "_rate_limit", new_callable=AsyncMock, return_value=1),
         patch.object(auth_ep, "redis_set_nx", side_effect=nx.set_nx),
         patch.object(auth_ep, "redis_ttl", new_callable=AsyncMock) as ttl,
         patch.object(auth_ep.sms_router, "send_otp_sms", new_callable=AsyncMock) as sms,
