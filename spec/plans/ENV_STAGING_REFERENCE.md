@@ -74,7 +74,7 @@ Also required on VM for **ops** (not FastAPI): `DATABASE_MIGRATE_URL`, `DATABASE
 | `MSG91_TXN_TEMPLATE_ID` | "" |
 | `OTP_EXPIRE_MINUTES` | 10 |
 | `OTP_MAX_ATTEMPTS` | 5 |
-| `OTP_RATE_LIMIT_PER_HOUR` | 5 |
+| `OTP_RATE_LIMIT_PER_HOUR` | 3 |
 | `PAN_ACCEPT_GATE_ENABLED` | false |
 | `PANCHANGAM_API_KEY` | "" |
 | `PANCHANGAM_DEFAULT_CITIES` | ["Hyderabad"] |

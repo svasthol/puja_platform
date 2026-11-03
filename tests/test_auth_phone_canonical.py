@@ -24,12 +24,16 @@ class _FakeSession:
     def add(self, obj):
         self.added.append(obj)
 
+    async def execute(self, *_a, **_k):
+        return None
+
 
 @pytest.mark.asyncio
 async def test_otp_request_stores_canonical_phone():
     db = _FakeSession()
     with (
         patch("app.api.v1.endpoints.auth._rate_limit", new_callable=AsyncMock),
+        patch("app.api.v1.endpoints.auth._enforce_send_cooldown", new_callable=AsyncMock),
         patch(
             "app.api.v1.endpoints.auth.sms_router.send_otp_sms",
             new_callable=AsyncMock,

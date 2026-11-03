@@ -227,7 +227,11 @@ class _FakeRedisCounter:
 async def test_otp_lockout_persists_across_rollbacks(session):
     """5 wrong OTPs -> locked, even though each 401 rolls the DB txn back.
     The correct OTP must ALSO be rejected once locked."""
-    phone = _uniq_phone()
+    # Canonical digit-only phone: OtpVerify now validates/canonicalises the phone,
+    # and the inserted row must match what otp_verify queries with.
+    import random
+
+    phone = "+919" + f"{random.randint(0, 10**9 - 1):09d}"
     now = dt.datetime.now(dt.UTC)
     otp_id = uuid.uuid4()
     session.add(
@@ -246,16 +250,17 @@ async def test_otp_lockout_persists_across_rollbacks(session):
 
     fake = _FakeRedisCounter()
 
-    async def fake_failures(row_id):
-        return await fake.get_int(f"otp_fail:{row_id}")
+    async def fake_failures(ph):
+        return await fake.get_int(f"otp_lockout:{ph}")
 
-    async def fake_record(row_id):
-        return await fake.incr(f"otp_fail:{row_id}")
+    async def fake_record(ph):
+        return await fake.incr(f"otp_lockout:{ph}")
 
     with (
         patch.object(auth_ep, "_rate_limit", new_callable=AsyncMock),
         patch.object(auth_ep, "_otp_failures", side_effect=fake_failures),
         patch.object(auth_ep, "_record_otp_failure", side_effect=fake_record),
+        patch.object(auth_ep, "redis_ttl", new_callable=AsyncMock, return_value=600),
         patch.object(auth_ep, "redis_delete", new_callable=AsyncMock),
     ):
         for _ in range(5):
@@ -266,17 +271,19 @@ async def test_otp_lockout_persists_across_rollbacks(session):
             assert exc.value.status_code == 401
             await session.rollback()  # mirror get_db_txn behaviour on error
 
-        # 6th wrong attempt: locked out (400, not 401).
+        # 6th wrong attempt: locked out (429 + Retry-After, not 401).
         with pytest.raises(HTTPException) as exc:
             await auth_ep.otp_verify(OtpVerify(phone=phone, otp="000000"), db=session)
-        assert exc.value.status_code == 400
+        assert exc.value.status_code == 429
         assert "Too many attempts" in exc.value.detail
+        assert "Retry-After" in (exc.value.headers or {})
         await session.rollback()
 
         # Even the CORRECT OTP is rejected once locked.
         with pytest.raises(HTTPException) as exc:
             await auth_ep.otp_verify(OtpVerify(phone=phone, otp="111111"), db=session)
-        assert exc.value.status_code == 400
+        assert exc.value.status_code == 429
         await session.rollback()
 
-    assert fake.store[f"otp_fail:{otp_id}"] == 5
+    # Lockout is now keyed per phone, so it survives resends (new OTP rows).
+    assert fake.store[f"otp_lockout:{phone}"] == 5

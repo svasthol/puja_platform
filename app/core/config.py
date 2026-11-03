@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     OTP_EXPIRE_MINUTES: int = 10
     OTP_MAX_ATTEMPTS: int = 5
-    OTP_RATE_LIMIT_PER_HOUR: int = 5         # per phone number
+    OTP_RATE_LIMIT_PER_HOUR: int = 3         # max OTP send+resend per phone per hour
+    OTP_RESEND_COOLDOWN_SECONDS: int = 20    # min gap between OTP sends per phone
 
     # ---- Admin auth (P-ADMIN-AUTH — per-app_context TTL) ---------------------
     # An account that can override refunds / edit the catalogue must not carry a

@@ -11,12 +11,16 @@ Sprint 4-0 (P-ADMIN-AUTH-FIX + P-AUTH-FIX — SPEC_AMENDMENTS §19.1):
   salts differ per call — which silently broke refresh AND logout.
 * Refresh-token REUSE (a rotated/revoked jti presented again) is treated as
   theft: every live session for that user+app_context is revoked.
-* OTP lockout lives in Redis (`otp_fail:{row_id}`), NOT the DB row: the
-  request transaction rolls back on the 401, discarding any `attempts`
-  increment — and an autonomous DB write would deadlock against our own
-  FOR UPDATE row lock. Redis INCR is atomic, outlives the rollback, and the
-  key TTL matches the OTP's own expiry. (Same bug class as
-  IDEMPOTENT_BOOKING.md's "expired ORM object in the except block".)
+* OTP lockout lives in Redis, keyed PER PHONE (`otp_lockout:{phone}`), NOT the
+  DB row: the request transaction rolls back on the 401, discarding any
+  `attempts` increment — and an autonomous DB write would deadlock against our
+  own FOR UPDATE row lock. A per-phone key (not per-row) is deliberate: a
+  per-row counter reset on every resend, so the 5-attempt cap was bypassable by
+  simply requesting a new code (bug/otp-resend-lockout). Redis INCR is atomic,
+  outlives the rollback, and the key TTL matches the OTP's own expiry.
+* Resend supersedes: `otp/request` expires any still-live OTP for the phone so
+  only the freshly-sent code can verify, and it enforces a per-phone send
+  cooldown (atomic SET NX). 429s carry a `Retry-After` from the key's real TTL.
 
 OTP + verify are Redis rate-limited (per API_CONTRACTS). OTP is stored HASHED.
 """
@@ -33,7 +37,13 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.redis_client import redis_delete, redis_expire, redis_incr
+from app.core.redis_client import (
+    redis_delete,
+    redis_expire,
+    redis_incr,
+    redis_set_nx,
+    redis_ttl,
+)
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -52,35 +62,73 @@ log = structlog.get_logger()
 settings = get_settings()
 
 
-async def _rate_limit(key: str, limit: int, window_s: int) -> None:
+async def _retry_after_seconds(key: str, default: int) -> int:
+    """Seconds a client should wait, read from the key's real TTL.
+
+    TTL returns -1 (no expiry) or -2 (missing); in both cases fall back to the
+    window default so the header is always a parseable positive int.
+    """
+    ttl = await redis_ttl(key)
+    return ttl if ttl and ttl > 0 else default
+
+
+def _too_many(detail: str, retry_after: int) -> HTTPException:
+    return HTTPException(
+        http.HTTP_429_TOO_MANY_REQUESTS,
+        detail,
+        headers={"Retry-After": str(max(retry_after, 1))},
+    )
+
+
+async def _rate_limit(key: str, limit: int, window_s: int, *, detail: str | None = None) -> int:
+    """Increment window counter; raise 429 if over limit. Returns current count."""
     count = await redis_incr(key)
     if count == 1:
         await redis_expire(key, window_s)
     if count > limit:
-        raise HTTPException(http.HTTP_429_TOO_MANY_REQUESTS, "Too many requests. Try later.")
+        msg = detail or "Too many requests. Try later."
+        raise _too_many(msg, await _retry_after_seconds(key, window_s))
+    return count
 
 
 # --------------------------------------------------------------------------- #
-# OTP lockout counter (Redis — survives the request-transaction rollback)
+# OTP send cooldown + lockout (Redis — PER PHONE so a resend cannot reset them)
 # --------------------------------------------------------------------------- #
-def _otp_fail_key(otp_row_id: uuid.UUID) -> str:
-    return f"otp_fail:{otp_row_id}"
+def _otp_cooldown_key(phone: str) -> str:
+    return f"otp_cooldown:{phone}"
 
 
-async def _otp_failures(otp_row_id: uuid.UUID) -> int:
+def _otp_lockout_key(phone: str) -> str:
+    return f"otp_lockout:{phone}"
+
+
+async def _enforce_send_cooldown(phone: str) -> None:
+    """Atomic per-phone cooldown between sends — two concurrent taps cannot both
+    pass (SET NX is atomic in Redis)."""
+    cooldown = settings.OTP_RESEND_COOLDOWN_SECONDS
+    acquired = await redis_set_nx(_otp_cooldown_key(phone), "1", ex=cooldown)
+    if not acquired:
+        raise _too_many(
+            "Please wait before requesting another code.",
+            await _retry_after_seconds(_otp_cooldown_key(phone), cooldown),
+        )
+
+
+async def _otp_failures(phone: str) -> int:
     # INCR-with-0 would mutate; a plain GET via the resilient executor:
     from app.core.redis_client import redis_execute
 
     async def _op(r):  # noqa: ANN001
-        val = await r.get(_otp_fail_key(otp_row_id))
+        val = await r.get(_otp_lockout_key(phone))
         return int(val) if val is not None else 0
 
     return await redis_execute(_op)
 
 
-async def _record_otp_failure(otp_row_id: uuid.UUID) -> int:
-    """Atomic INCR; TTL bound to the OTP's own lifetime (+60s clock skew)."""
-    key = _otp_fail_key(otp_row_id)
+async def _record_otp_failure(phone: str) -> int:
+    """Atomic INCR; TTL bound to the OTP's own lifetime (+60s clock skew).
+    Keyed per phone so a resend (new OTP row) does NOT reset the counter."""
+    key = _otp_lockout_key(phone)
     count = await redis_incr(key)
     if count == 1:
         await redis_expire(key, settings.OTP_EXPIRE_MINUTES * 60 + 60)
@@ -92,9 +140,27 @@ async def _record_otp_failure(otp_row_id: uuid.UUID) -> int:
 # --------------------------------------------------------------------------- #
 @router.post("/otp/request", status_code=http.HTTP_202_ACCEPTED)
 async def otp_request(payload: OtpRequest, db: AsyncSession = Depends(get_db_txn)):
-    await _rate_limit(f"otp_req:{payload.phone}", settings.OTP_RATE_LIMIT_PER_HOUR, 3600)
+    hourly_limit = settings.OTP_RATE_LIMIT_PER_HOUR
+    send_count = await _rate_limit(
+        f"otp_req:{payload.phone}",
+        hourly_limit,
+        3600,
+        detail=f"Too many OTP requests. Maximum {hourly_limit} codes per hour.",
+    )
+    await _enforce_send_cooldown(payload.phone)
     otp = f"{secrets.randbelow(10**6):06d}"
     now = dt.datetime.now(dt.UTC)
+    # Resend supersedes: expire any still-live OTP for this phone so only the
+    # freshly-sent code can verify (one live code per phone).
+    await db.execute(
+        update(OtpVerification)
+        .where(
+            OtpVerification.phone == payload.phone,
+            OtpVerification.verified_at.is_(None),
+            OtpVerification.expires_at > now,
+        )
+        .values(expires_at=now)
+    )
     db.add(
         OtpVerification(
             id=uuid.uuid4(),
@@ -119,6 +185,7 @@ async def otp_request(payload: OtpRequest, db: AsyncSession = Depends(get_db_txn
         "status": "otp_sent",
         "sms_sent": sms_result.sent,
         "sms_provider": sms_result.provider,
+        "otp_sends_remaining_this_hour": max(0, hourly_limit - send_count),
     }
     # Dev ergonomics: Swagger / E2E Log can read the code when SMS did not send.
     if settings.DEBUG and not sms_result.sent:
@@ -146,20 +213,26 @@ async def otp_verify(payload: OtpVerify, db: AsyncSession = Depends(get_db_txn))
     if row is None:
         raise HTTPException(http.HTTP_400_BAD_REQUEST, "No active OTP. Request a new one.")
 
-    # Lockout: Redis counter (per OTP row) — the DB `attempts` column cannot be
-    # the enforcement point because the 401 below rolls the transaction back.
-    failures = await _otp_failures(row.id)
-    if failures >= settings.OTP_MAX_ATTEMPTS or row.attempts >= settings.OTP_MAX_ATTEMPTS:
-        raise HTTPException(http.HTTP_400_BAD_REQUEST, "Too many attempts. Request a new OTP.")
+    # Lockout: Redis counter PER PHONE — the DB `attempts` column cannot be the
+    # enforcement point because the 401 below rolls the transaction back, and a
+    # per-row key would reset on every resend (the bug this PR fixes).
+    failures = await _otp_failures(payload.phone)
+    if failures >= settings.OTP_MAX_ATTEMPTS:
+        raise _too_many(
+            "Too many attempts. Request a new OTP later.",
+            await _retry_after_seconds(
+                _otp_lockout_key(payload.phone), settings.OTP_EXPIRE_MINUTES * 60
+            ),
+        )
 
     if not await verify_secret_async(payload.otp, row.otp_hash):
-        count = await _record_otp_failure(row.id)
+        count = await _record_otp_failure(payload.phone)
         log.warning("otp_verify_failed", phone=payload.phone, failures=count)
         raise HTTPException(http.HTTP_401_UNAUTHORIZED, "Incorrect OTP.")
 
     row.verified_at = now
     row.attempts = min(failures, settings.OTP_MAX_ATTEMPTS)  # persist for audit (commits now)
-    await redis_delete(_otp_fail_key(row.id))
+    await redis_delete(_otp_lockout_key(payload.phone))
 
     # upsert user
     user = (await db.execute(select(User).where(User.phone == payload.phone))).scalar_one_or_none()
