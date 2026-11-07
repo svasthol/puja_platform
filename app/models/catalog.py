@@ -112,6 +112,11 @@ class Pujari(Base):
     __tablename__ = "pujaris"
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True)
+    customer_profile_photo_doc_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("pujari_documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     bio: Mapped[str | None] = mapped_column(Text)
     years_experience: Mapped[int | None] = mapped_column(SmallInteger)
     verification_status: Mapped[str] = mapped_column(String(20), default="pending")

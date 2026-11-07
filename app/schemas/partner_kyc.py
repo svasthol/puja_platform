@@ -50,9 +50,16 @@ class KycDocRequirement(BaseModel):
 
 
 class PartnerKycStatusResponse(BaseModel):
+    """Partner-facing KYC queue snapshot.
+
+    `photo_change_under_review`: new photo doc is pending/rejected while an older verified
+    photo exists, or pending while customers still see a published pointer (Slice C).
+    """
+
     verification_status: str
     required: list[KycDocRequirement]
     active_digilocker_request: KycActiveDigilockerRequest | None = None
+    photo_change_under_review: bool = False
 
 
 class SelfiePresignRequest(BaseModel):

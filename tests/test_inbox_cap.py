@@ -215,23 +215,36 @@ async def _insert_broadcast_target(
 
 
 def _set_presence(*pujari_ids: str) -> None:
-    import redis as redis_lib
+    """Mirror dispatch worker + API: same sync Redis client and key shape as ``presence_redis_key``."""
+    from app.core.redis_keys import presence_redis_key
+    from app.workers.redis_sync import get_sync_redis
 
-    from app.core.config import get_settings
-
-    r = redis_lib.from_url(str(get_settings().REDIS_URL))
+    r = get_sync_redis()
     for pid in pujari_ids:
-        r.set(f"presence:{pid}", "1", ex=120)
+        r.set(presence_redis_key(pid), "1", ex=120)
 
 
 def _clear_presence(*pujari_ids: str) -> None:
-    import redis as redis_lib
+    from app.core.redis_keys import presence_redis_key
+    from app.workers.redis_sync import get_sync_redis
 
-    from app.core.config import get_settings
-
-    r = redis_lib.from_url(str(get_settings().REDIS_URL))
+    r = get_sync_redis()
     for pid in pujari_ids:
-        r.delete(f"presence:{pid}")
+        r.delete(presence_redis_key(pid))
+
+
+async def _reset_dispatch_presence_state(session) -> None:
+    """Clear Redis presence + DB is_online so shared dev Redis/DB does not leak dispatch tests.
+
+    Dispatch falls back to ``pujaris.is_online`` when no candidate has a TTL key; stale keys
+    from other runs can produce ``dispatch_online_pujari_not_in_candidate_pool`` and zero offers.
+    """
+    rows = (
+        await session.execute(text("SELECT id::text FROM pujaris"))
+    ).scalars().all()
+    _clear_presence(*rows)
+    await session.execute(text("UPDATE pujaris SET is_online = false, updated_at = now()"))
+    await session.commit()
 
 
 def _clear_pujari_live_offers_sync(cur, *pujari_ids: str) -> None:

@@ -40,6 +40,8 @@ from app.services.kyc_storage import (
 )
 from app.services.kyc_types import KycVendorError
 from app.services.kyc_vendor import get_kyc_vendor
+from app.services.kyc_verification import recompute_pujari_verification
+from app.services.profile_photo_publish import clear_customer_profile_photo_if_reference_stale
 
 log = structlog.get_logger()
 settings = get_settings()
@@ -494,6 +496,8 @@ async def _upsert_document(
         ),
         {"pid": str(pujari_id), "dtype": doc_type},
     )
+    if doc_type == "photo":
+        await clear_customer_profile_photo_if_reference_stale(db, pujari_id=pujari_id)
     version = (
         await db.execute(
             text(
@@ -945,7 +949,56 @@ async def confirm_selfie(
     doc.uploaded_at = _now()
     doc.status = "pending"
     await db.flush()
+    await recompute_pujari_verification(db, pujari_id)
     return doc
+
+
+async def _photo_change_under_review(
+    db: AsyncSession, *, pujari_id: uuid.UUID
+) -> bool:
+    """Slice C — partner re-uploaded photo; ops must approve before customers see it."""
+    pub = (
+        await db.execute(
+            text(
+                """
+                SELECT customer_profile_photo_doc_id::text
+                FROM pujaris WHERE id = :pid
+                """
+            ),
+            {"pid": str(pujari_id)},
+        )
+    ).scalar_one_or_none()
+    published_id = uuid.UUID(pub) if pub else None
+
+    current = (
+        await db.execute(
+            select(PujariDocument.id, PujariDocument.status).where(
+                PujariDocument.pujari_id == pujari_id,
+                PujariDocument.doc_type == "photo",
+                PujariDocument.is_current.is_(True),
+            )
+        )
+    ).first()
+    if current is None:
+        return False
+    cur_id, cur_status = current[0], current[1]
+    if cur_status not in ("pending", "rejected"):
+        return False
+
+    if published_id is not None and published_id != cur_id:
+        return True
+
+    older_verified = (
+        await db.execute(
+            select(PujariDocument.id).where(
+                PujariDocument.pujari_id == pujari_id,
+                PujariDocument.doc_type == "photo",
+                PujariDocument.is_current.is_(False),
+                PujariDocument.status == "verified",
+            )
+        )
+    ).scalar_one_or_none()
+    return older_verified is not None
 
 
 async def get_partner_kyc_status(
@@ -954,6 +1007,7 @@ async def get_partner_kyc_status(
     str,
     list[tuple[str, str | None, uuid.UUID | None]],
     KycVerificationRequest | None,
+    bool,
 ]:
     await _lazy_expire_stale(db, pujari_id)
     pujari = (
@@ -981,7 +1035,8 @@ async def get_partner_kyc_status(
         else:
             visible = _partner_visible_doc_status(doc.status)
             required.append((doc_type, visible, doc.id if visible else None))
-    return pujari.verification_status, required, live
+    photo_change = await _photo_change_under_review(db, pujari_id=pujari_id)
+    return pujari.verification_status, required, live, photo_change
 
 
 async def digilocker_resume_url(live: KycVerificationRequest) -> str | None:

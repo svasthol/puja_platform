@@ -31,3 +31,7 @@ firebase-service-account.json
 **/override.tf.json
 **/*_override.tf
 **/*_override.tf.json
+
+# Local E2E log capture (see logs/README.md) — keep README + .gitkeep only
+logs/*.log
+logs/archive/
