@@ -213,7 +213,7 @@ def test_worker_sets_immediate_advance_windows(uniq):
 
 
 def test_worker_sets_instant_windows(uniq):
-    """Instant class gets now()+30m deadline, not slot-3h."""
+    """Instant deadline follows compute_dispatch_windows — max(now+30m, slot−buffer) when slot ahead (§21.6.C)."""
     conn = get_connection()
     bid = uniq.id()
     slot_date = uniq.date2
@@ -253,6 +253,18 @@ def test_worker_sets_instant_windows(uniq):
             starts_at, deadline, now_db = cur.fetchone()
 
         assert abs((starts_at - now_db).total_seconds()) < 120
-        assert abs((deadline - (starts_at + dt.timedelta(minutes=30))).total_seconds()) < 2
+        settings = LaunchDispatchSettings()
+        now_for_policy = now_db
+        if getattr(now_for_policy, "tzinfo", None) is None:
+            now_for_policy = now_for_policy.replace(tzinfo=dt.UTC)
+        hour_s, minute_s, _sec_s = slot_time.split(":")
+        _, expected_deadline = compute_dispatch_windows(
+            dt.date.fromisoformat(slot_date),
+            dt.time(int(hour_s), int(minute_s)),
+            settings,
+            booking_class="instant",
+            now=now_for_policy,
+        )
+        assert abs((deadline - expected_deadline).total_seconds()) < 2
     finally:
         conn.close()

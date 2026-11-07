@@ -38,6 +38,19 @@ class PujariBookingAddress(BaseModel):
     longitude: float | None
 
 
+class PartnerBookingSelfStrip(BaseModel):
+    """Same trust fields as customer `pujari` when feature_trust_card_enabled is on."""
+
+    display_name: str
+    identity_verified: bool
+    verification_status: str
+    assignment_version: int
+    public_name_ops_approved: bool = False
+    trusted_on_platform: bool = False
+    profile_photo_url: str | None = None
+    profile_photo_url_expires_in: int | None = None
+
+
 class PujariBookingDetail(BaseModel):
     id: uuid.UUID
     status: str
@@ -60,3 +73,4 @@ class PujariBookingDetail(BaseModel):
     relationship_manager: RelationshipManagerPublic | None
     reconfirm_ping_sent_at: dt.datetime | None = None
     pujari_confirmed_at: dt.datetime | None = None
+    partner_self: PartnerBookingSelfStrip | None = None

@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
     bookings,
     catalog,
     devices,
+    me_profile,
     offers,
     panchangam,
     partner_onboarding,
@@ -36,6 +37,7 @@ api_router.include_router(panchangam.router)
 api_router.include_router(auth.router)
 api_router.include_router(admin_auth.router)
 api_router.include_router(devices.router)
+api_router.include_router(me_profile.router)
 api_router.include_router(addresses.router)
 api_router.include_router(service_areas.router)
 api_router.include_router(catalog.router)

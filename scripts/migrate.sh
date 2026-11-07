@@ -41,6 +41,11 @@ done
 echo "migrate.sh: apply_migrations_028_032.py"
 python scripts/apply_migrations_028_032.py
 
+for n in 035 036; do
+  echo "migrate.sh: apply_migration_${n}.py"
+  python "scripts/apply_migration_${n}.py"
+done
+
 export DATABASE_URL="$ADMIN_URL"
 echo "migrate.sh: apply_grants.py"
 python scripts/apply_grants.py

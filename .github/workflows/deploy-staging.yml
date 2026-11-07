@@ -9,6 +9,7 @@ on:
       - "app/**"
       - "scripts/**"
       - "migrations/**"
+      - "spec/db/**"
       - "deploy/**"
       - "admin_ui/**"
       - "scripts/verify_staging_storage.py"

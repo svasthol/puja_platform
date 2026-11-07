@@ -24,6 +24,7 @@ alwaysApply: true
 11. `spec/MOBILE_FLUTTER.md` — Flutter implementation contract (mobile repo: `mana_guruji_mobile`)
 12. `spec/plans/CATALOG_SYNC.md` — catalogue visibility matrix (admin ↔ `GET /v1/pujas` ↔ customer UI); read before catalog Flutter or admin catalogue work
 13. `spec/SWEEP_RELIABILITY.md` — sweep heartbeat, deadline exhaust, beat supervision (P-SWEEP-RELIABILITY, migration 024)
+14. `spec/plans/TRUST_CARD_CUSTOMER_PARTNER.md` — customer `pujari` trust block + partner mirror (`/v1/me`, booking detail); read before trust-card UI or profile photo work
 
 ## Puja MVP launch policy (SPEC_AMENDMENTS §21) — normative
 

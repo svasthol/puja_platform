@@ -217,6 +217,10 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
   payment breakdown (`payment_mode`, `total_amount`, `amount_due_online`,
   `amount_due_offline`, `balance_collected_at`?) + assigned pujari +
   **relationship_manager** (after confirm) + history + refund status if any.
+  **Trust card** (`feature_trust_card_enabled`): `pujari` is a privacy-safe block with
+  `display_name`, `identity_verified`, `public_name_ops_approved`, `trusted_on_platform`,
+  optional `profile_photo_url` + `profile_photo_url_expires_in`, `assignment_version`.
+  See `spec/plans/TRUST_CARD_CUSTOMER_PARTNER.md`.
   **Flutter:** after Razorpay SDK success, status may remain `payment_pending` until
   webhook — show **“Confirming payment…”** until `requested` or terminal failure;
   only then show class-appropriate dispatch UX. **No customer phone exposed to pujari
@@ -240,7 +244,7 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `GET  /v1/pujari/kyc/requests/{request_id}`  Self-healing poll — re-verifies Setu status,
   drives finalize; returns `{status, scope, doc_types_created[], review_flags[]}`.
 - `GET  /v1/pujari/kyc/status`                 `{verification_status, required:[{doc_type, status}],
-  active_digilocker_request?}` — includes in-flight DigiLocker row for app-kill resume.
+  active_digilocker_request?, photo_change_under_review?}` — includes in-flight DigiLocker row for app-kill resume. **`photo_change_under_review`** (Slice C): **true** when a new **`photo`** doc is `pending`/`rejected` while customers still see a previous published selfie or an older verified photo row exists (`TRUST_CARD_CUSTOMER_PARTNER.md`).
 - `POST /v1/pujari/documents`                  **Selfie only** — presign metadata + `uploading` row
   (returns legacy `upload_url`; **mobile uploads via PUT below**, not direct to S3/OCI).
 - `PUT  /v1/pujari/documents/{document_id}/upload`  Raw JPEG/PNG body + `Content-Type` — server
@@ -252,6 +256,7 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `GET  /v1/me/tax-profile`                    entity type + PAN on file + completeness
 - `PUT  /v1/me/tax-profile`                    `{entity_type}` — PAN via `/kyc/pan`
 - `GET  /v1/me/tax-summary`                    FY facilitation gross (collected bookings, TDS-aligned `total_amount` sum), TDS accrued, ₹5L threshold copy, **`fy_pan_gate_level`** (`ok`|`warn`|`block`), **`individual_fy_pan_warn_inr`** (default ₹4.5L), **`requires_pan_before_continue`**. See `spec/plans/PAN_FY_GATES.md`.
+- `GET  /v1/me`                                customer → `{app_context, user_id}`. pujari → `partner` block (display name, subtitle, verification) + when trust card flag is on: `trust_card_enabled`, optional published `profile_photo_url`, `trusted_on_platform`, `public_name_ops_approved`. See `spec/plans/TRUST_CARD_CUSTOMER_PARTNER.md`.
 - **FY PAN enforcement** (`PUJARI_FY_PAN_GATE_ENABLED`, default false): **422** `FY_PAN_GATE_BLOCKED` on `PUT /v1/me/heartbeat` and offer accept at ₹5L+ without operative PAN; confirm-balance **warn+allow** with `tds.message_code=FY_PAN_GATE_WARN` (no FY 422). See `PAN_FY_GATES.md`.
 - `POST /v1/me/devices`                        {device_token, platform} — FCM target
   (customer or pujari token). Upsert by `device_token` (globally unique).
@@ -273,6 +278,7 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `GET  /v1/pujari/bookings/{id}`              assigned pujari only; `status` confirmed+
   required. Returns full service address, `latitude`/`longitude`, static map URL,
   `area_label`, puja/time/money, **relationship_manager** — **no customer phone**.
+  When trust card flag is on: optional `partner_self` (same trust strip as customer `pujari`).
 - `POST /v1/pujari/bookings/{id}/reconfirm`    assigned pujari only (`app_context=pujari`);
   booking must be `confirmed`, advance-class, and have `booking_reconfirmations.ping_sent_at`
   set (T−24h ping delivered). Sets `pujari_confirmed_at = now()` idempotently.

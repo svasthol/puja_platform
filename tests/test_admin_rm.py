@@ -48,6 +48,19 @@ async def _mk_admin(session) -> uuid.UUID:
     return uid
 
 
+async def _set_trust_flag(session, enabled: bool) -> None:
+    await session.execute(
+        text(
+            """
+            INSERT INTO platform_settings (key, value_json, updated_at)
+            VALUES ('feature_trust_card_enabled', CAST(:val AS jsonb), now())
+            ON CONFLICT (key) DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = now()
+            """
+        ),
+        {"val": '{"enabled": true}' if enabled else '{"enabled": false}'},
+    )
+
+
 async def _make_requested_booking_with_offer(
     session, uniq, *, slot_date: str | None = None, slot_time: str = "10:00"
 ) -> tuple[str, str]:
@@ -204,6 +217,8 @@ async def test_customer_no_rm_before_confirm(session, seed, uniq):
 
 @pytest.mark.asyncio
 async def test_pujari_booking_detail_includes_rm_and_address(session, seed, uniq):
+    await _set_trust_flag(session, False)
+    await session.commit()
     actor = await _mk_admin(session)
     await rm_ep.create_relationship_manager(
         RelationshipManagerCreate(

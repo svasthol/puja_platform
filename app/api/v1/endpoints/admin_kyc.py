@@ -4,6 +4,7 @@ RBAC: read → require_admin; approve/reject → require_admin_role (admin only)
 """
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -21,14 +22,20 @@ from app.schemas.admin_kyc import (
     KycPujariStatusResponse,
     KycReviewRequest,
     KycReviewResponse,
+    PublicNameApproveRequest,
+    PublicNameApproveResponse,
+    PublicNameQueueItem,
+    PublicNameQueueResponse,
 )
 from app.schemas.common import decode_cursor, encode_cursor
 from app.schemas.partner_kyc import IdentityDenyRequest, IdentityDenyResponse
 from app.services.audit import record_admin_action
 from app.services.kyc_storage import presign_kyc_get
 from app.services.kyc_verification import recompute_pujari_verification, required_docs_verified
+from app.services.profile_photo_publish import sync_pujari_customer_profile_photo_pointer
 from app.services import partner_kyc_service as kyc_svc
 from app.services.partner_kyc_service import PartnerKycError
+from app.services.trust_card import normalize_public_name_candidate
 
 router = APIRouter(prefix="/admin/kyc", tags=["admin-kyc"])
 
@@ -233,6 +240,14 @@ async def _review_document(
     doc.status = new_status
     await db.flush()
 
+    await sync_pujari_customer_profile_photo_pointer(
+        db,
+        pujari_id=doc.pujari_id,
+        document_id=doc.id,
+        doc_type=doc.doc_type,
+        new_status=new_status,
+    )
+
     pujari_status = await recompute_pujari_verification(db, doc.pujari_id)
     all_ok = pujari_status == "verified"
 
@@ -342,4 +357,120 @@ async def deny_identity(
         registry_id=row.id,
         digilocker_id_hash=row.digilocker_id_hash,
         state=row.state,
+    )
+
+
+@router.get("/public-name-queue", response_model=PublicNameQueueResponse)
+async def list_public_name_queue(
+    _p: Principal = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Partners with a pending customer-facing display name awaiting approval."""
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT p.id AS pujari_id, u.full_name, u.phone, p.verification_status,
+                       p.public_name, p.public_name_pending,
+                       (
+                         SELECT MAX(a.created_at)
+                         FROM public_name_audit a
+                         WHERE a.pujari_id = p.id AND a.action = 'proposed'
+                       ) AS proposed_at
+                FROM pujaris p
+                JOIN users u ON u.id = p.user_id
+                WHERE p.public_name_pending IS NOT NULL
+                ORDER BY proposed_at DESC NULLS LAST, p.updated_at DESC
+                LIMIT 100
+                """
+            )
+        )
+    ).mappings().all()
+    items = [
+        PublicNameQueueItem(
+            pujari_id=r["pujari_id"],
+            partner_name=r["full_name"],
+            phone=r["phone"],
+            verification_status=r["verification_status"],
+            public_name_pending=r["public_name_pending"],
+            public_name=r["public_name"],
+            proposed_at=r["proposed_at"],
+        )
+        for r in rows
+    ]
+    return PublicNameQueueResponse(items=items)
+
+
+@router.post(
+    "/pujaris/{pujari_id}/approve-public-name",
+    response_model=PublicNameApproveResponse,
+)
+async def approve_public_name(
+    pujari_id: uuid.UUID,
+    payload: PublicNameApproveRequest,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT public_name, public_name_pending
+                FROM pujaris WHERE id = :pid FOR UPDATE
+                """
+            ),
+            {"pid": str(pujari_id)},
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pujari not found.")
+    pending = normalize_public_name_candidate(row["public_name_pending"])
+    if pending is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "No pending public name to approve.",
+        )
+
+    now = dt.datetime.now(dt.UTC)
+    await db.execute(
+        text(
+            """
+            UPDATE pujaris
+            SET public_name = :name,
+                public_name_pending = NULL,
+                public_name_approved_at = :now,
+                updated_at = :now
+            WHERE id = :pid
+            """
+        ),
+        {"pid": str(pujari_id), "name": pending, "now": now},
+    )
+    await db.execute(
+        text(
+            """
+            INSERT INTO public_name_audit (pujari_id, action, name_value, admin_user_id)
+            VALUES (:pid, 'approved', :name, :uid)
+            """
+        ),
+        {"pid": str(pujari_id), "name": pending, "uid": str(p.user_id)},
+    )
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="approve_public_name",
+        entity_type="pujari",
+        entity_id=str(pujari_id),
+        before={
+            "public_name": row["public_name"],
+            "public_name_pending": row["public_name_pending"],
+        },
+        after={"public_name": pending, "public_name_pending": None},
+        change_reason=payload.change_reason,
+        ip=_client_ip(request),
+    )
+    return PublicNameApproveResponse(
+        pujari_id=pujari_id,
+        public_name=pending,
+        approved_at=now,
     )

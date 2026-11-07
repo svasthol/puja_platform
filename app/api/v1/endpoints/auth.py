@@ -289,6 +289,9 @@ async def _resolve_refresh_session(
     """Decode the refresh JWT and load its session row (FOR UPDATE) by jti."""
     try:
         claims = decode_token(token, verify_exp=verify_exp)
+    except pyjwt.ExpiredSignatureError:
+        # Refresh with verify_exp=True only — distinguishes JWT TTL vs DB session.
+        raise HTTPException(http.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
     except pyjwt.PyJWTError:
         raise HTTPException(http.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
     if claims.get("type") != "refresh":

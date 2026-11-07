@@ -271,9 +271,12 @@ async def partner_kyc_status(
 ):
     pid = await _pujari_id(db, p.user_id)
     try:
-        verification_status, required, live = await kyc_svc.get_partner_kyc_status(
-            db, pid
-        )
+        (
+            verification_status,
+            required,
+            live,
+            photo_change_under_review,
+        ) = await kyc_svc.get_partner_kyc_status(db, pid)
     except PartnerKycError as exc:
         raise _map_kyc_error(exc) from exc
 
@@ -296,4 +299,5 @@ async def partner_kyc_status(
             for t, st, doc_id in required
         ],
         active_digilocker_request=active,
+        photo_change_under_review=photo_change_under_review,
     )

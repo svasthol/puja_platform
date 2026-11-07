@@ -13,6 +13,7 @@ from app.core.dependencies import Principal, require_pujari
 from app.db.engine import get_db, get_db_txn
 from app.schemas.common import decode_cursor, encode_cursor
 from app.schemas.pujari_booking import (
+    PartnerBookingSelfStrip,
     PujariBookingAddress,
     PujariBookingDetail,
     PujariBookingListResponse,
@@ -23,6 +24,7 @@ from app.schemas.relationship_manager import RelationshipManagerPublic
 from app.services.pujari_reconfirm import pujari_reconfirm_booking
 from app.services.pricing import BOOKING_FEE_LABEL
 from app.services.relationship_manager import fetch_rm_public, status_exposes_rm
+from app.services.trust_card import load_feature_trust_card_enabled, partner_trust_profile_block
 
 router = APIRouter(prefix="/pujari/bookings", tags=["pujari-bookings"])
 
@@ -175,7 +177,7 @@ async def get_pujari_booking(
                     b.duration_minutes, b.payment_mode, b.total_amount,
                     b.booking_fee, b.amount_due_online, b.amount_due_offline,
                     b.balance_collected_at, b.balance_collected_amount,
-                    b.pujari_id, pj_user.id AS pujari_user_id,
+                    b.pujari_id, b.pujari_assignment_version, pj_user.id AS pujari_user_id,
                     pu.name AS puja_name,
                     a.line1, a.line2, a.city, a.pincode,
                     a.latitude, a.longitude,
@@ -216,6 +218,28 @@ async def get_pujari_booking(
     if status_exposes_rm(row["status"]):
         relationship_manager = await fetch_rm_public(db, booking_id)
 
+    trust_on = await load_feature_trust_card_enabled(db)
+    assign_ver = int(row.get("pujari_assignment_version") or 0)
+    partner_self = None
+    if trust_on:
+        strip = await partner_trust_profile_block(
+            db,
+            pujari_id=row["pujari_id"],
+            trust_enabled=True,
+            assignment_version=assign_ver,
+        )
+        if strip:
+            partner_self = PartnerBookingSelfStrip(
+                display_name=strip["display_name"],
+                identity_verified=strip["identity_verified"],
+                verification_status=strip["verification_status"],
+                assignment_version=strip["assignment_version"],
+                public_name_ops_approved=strip.get("public_name_ops_approved", False),
+                trusted_on_platform=strip.get("trusted_on_platform", False),
+                profile_photo_url=strip.get("profile_photo_url"),
+                profile_photo_url_expires_in=strip.get("profile_photo_url_expires_in"),
+            )
+
     return PujariBookingDetail(
         id=row["id"],
         status=row["status"],
@@ -249,6 +273,7 @@ async def get_pujari_booking(
         relationship_manager=relationship_manager,
         reconfirm_ping_sent_at=row["reconfirm_ping_sent_at"],
         pujari_confirmed_at=row["pujari_confirmed_at"],
+        partner_self=partner_self,
     )
 
 

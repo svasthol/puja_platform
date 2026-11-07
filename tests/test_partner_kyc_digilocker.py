@@ -278,7 +278,9 @@ async def test_kyc_status_includes_active_digilocker_request(session):
             session, pujari_id=pid, ip=None, user_agent=None
         )
         await session.commit()
-        verification, required, live = await kyc_svc.get_partner_kyc_status(session, pid)
+        verification, required, live, _photo_chg = (
+            await kyc_svc.get_partner_kyc_status(session, pid)
+        )
     assert verification == "pending"
     assert live is not None
     assert live.id == row.id

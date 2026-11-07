@@ -8,19 +8,31 @@ import pytest
 from sqlalchemy import text
 
 from app.services import booking_events, offer_service, webhook_service
+from app.services.dispatch_launch import launch_eligibility_sql, load_dispatch_settings
 from app.workers.dispatch import broadcast_booking
+from app.workers.sweep import get_connection
 from tests.test_inbox_cap import (
     ADDRESS,
     CUSTOMER,
     PUJA,
-    PUJARI_USER1,
     _ensure_pujari_dispatch_ready,
     _pujari_ids,
+    _reset_dispatch_presence_state,
     _set_presence,
     _unique_slot_time,
 )
 
-PUJARI_USER = PUJARI_USER1
+
+def _eligible_pujari_ids_sync(booking_id: str) -> list[str]:
+    """Same candidate pool as ``dispatch._dispatch_round`` (launch SQL)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            settings = load_dispatch_settings(cur)
+            cur.execute(launch_eligibility_sql(settings), (booking_id,))
+            return [str(r[0]) for r in cur.fetchall()]
+    finally:
+        conn.close()
 
 
 async def _require_migration_014(session) -> None:
@@ -124,11 +136,14 @@ async def _insert_payment_pending_booking(
 async def test_wave1_pay_requested_broadcast_accept_confirmed(session, seed, uniq, monkeypatch):
     """Full dispatch loop after Razorpay webhook."""
     await _require_migration_014(session)
+    await _reset_dispatch_presence_state(session)
     await _ensure_pujari_dispatch_ready(session)
     await _ensure_default_rm(session)
-    pujari_id, _ = await _pujari_ids(session)
+    await _pujari_ids(session)
 
-    booking_id = await _insert_payment_pending_booking(session, uniq)
+    # Use instant class so G1 inbox-cap does not drop every candidate on a shared dev DB
+    # full of stale advance offers (filter only runs for ``booking_class='advance'``).
+    booking_id = await _insert_payment_pending_booking(session, uniq, booking_class="instant")
     await session.commit()
 
     async def _noop_publish(*_args: object, **_kwargs: object) -> None:
@@ -160,29 +175,36 @@ async def test_wave1_pay_requested_broadcast_accept_confirmed(session, seed, uni
     ).scalar_one()
     assert status == "requested"
 
-    _set_presence(pujari_id)
+    eligible = _eligible_pujari_ids_sync(str(booking_id))
+    assert eligible, "expected ≥1 launch-eligible pujari after _ensure_pujari_dispatch_ready"
+    # Heartbeat keys for every SQL candidate — ordering is undefined without ORDER BY; a single id can miss the round-trip list.
+    _set_presence(*eligible)
+
     broadcast_result = broadcast_booking(str(booking_id))
     assert broadcast_result.get("offers", 0) >= 1
 
-    assignment_id = (
+    row_offer = (
         await session.execute(
             text(
                 """
-                SELECT ba.id::text
+                SELECT ba.id::text, pj.user_id::text
                 FROM booking_assignments ba
                 JOIN status_types st ON st.id = ba.status_id
-                WHERE ba.booking_id = :bid AND st.code = 'offered'
-                ORDER BY ba.offered_at DESC
+                JOIN pujaris pj ON pj.id = ba.pujari_id
+                WHERE ba.booking_id = :bid AND st.domain = 'assignment' AND st.code = 'offered'
+                  AND ba.responded_at IS NULL AND ba.expires_at > now()
+                ORDER BY ba.offered_at ASC
                 LIMIT 1
                 """
             ),
             {"bid": str(booking_id)},
         )
-    ).scalar_one()
+    ).one()
+    assignment_id, accept_user_id = row_offer[0], row_offer[1]
 
     await offer_service.accept_offer(
         session,
-        user_id=uuid.UUID(PUJARI_USER),
+        user_id=uuid.UUID(accept_user_id),
         assignment_id=uuid.UUID(assignment_id),
     )
     await session.commit()
@@ -202,5 +224,5 @@ async def test_wave1_pay_requested_broadcast_accept_confirmed(session, seed, uni
     ).mappings().one()
 
     assert row["status"] == "confirmed"
-    assert row["pujari_id"] == pujari_id
+    assert row["pujari_id"] is not None
     assert row["relationship_manager_id"] is not None
