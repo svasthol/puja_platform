@@ -2041,6 +2041,71 @@
         ]
       }
     },
+    "/v1/pujari/documents/{document_id}/upload": {
+      "put": {
+        "tags": [
+          "pujari-onboarding"
+        ],
+        "summary": "Upload Selfie Document",
+        "description": "Raw image body after presign — server-side S3 put (mobile uses this instead of direct presigned PUT).",
+        "operationId": "upload_selfie_document_v1_pujari_documents__document_id__upload_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/pujari/documents/{document_id}/confirm": {
       "post": {
         "tags": [
@@ -10580,6 +10645,11 @@
                 "type": "null"
               }
             ]
+          },
+          "photo_change_under_review": {
+            "type": "boolean",
+            "title": "Photo Change Under Review",
+            "default": false
           }
         },
         "type": "object",
@@ -11603,6 +11673,66 @@
         ],
         "title": "PujariBookingAddress"
       },
+      "PartnerBookingSelfStrip": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "identity_verified": {
+            "type": "boolean",
+            "title": "Identity Verified"
+          },
+          "verification_status": {
+            "type": "string",
+            "title": "Verification Status"
+          },
+          "assignment_version": {
+            "type": "integer",
+            "title": "Assignment Version"
+          },
+          "public_name_ops_approved": {
+            "type": "boolean",
+            "title": "Public Name Ops Approved",
+            "default": false
+          },
+          "trusted_on_platform": {
+            "type": "boolean",
+            "title": "Trusted On Platform",
+            "default": false
+          },
+          "profile_photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Photo Url"
+          },
+          "profile_photo_url_expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Photo Url Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "identity_verified",
+          "verification_status",
+          "assignment_version"
+        ],
+        "title": "PartnerBookingSelfStrip"
+      },
       "PujariBookingDetail": {
         "properties": {
           "id": {
@@ -11749,6 +11879,17 @@
               }
             ],
             "title": "Pujari Confirmed At"
+          },
+          "partner_self": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerBookingSelfStrip"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Self"
           }
         },
         "type": "object",

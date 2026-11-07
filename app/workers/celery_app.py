@@ -35,8 +35,8 @@ configure_logging(debug=settings.DEBUG)
 
 celery_app = Celery(
     "mana_guruji",
-    broker=str(settings.REDIS_URL),
-    backend=str(settings.REDIS_URL),
+    broker=settings.redis_celery_url,
+    backend=settings.redis_celery_url,
     include=[
         "app.workers.sweep",
         "app.workers.dispatch",

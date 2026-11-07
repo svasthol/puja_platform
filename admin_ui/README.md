@@ -18,6 +18,16 @@ See [COMPATIBILITY.md](./COMPATIBILITY.md) — aligned with `spec/STACK_VERSIONS
 - **Node.js 20 LTS or 22 LTS** (`>=20.18`, `<23`) — see `COMPATIBILITY.md`
 - API running at `http://127.0.0.1:8000` with migration 009 applied
 - `TOTP_ENC_KEYS` set; first admin bootstrapped (`scripts/bootstrap_admin.py`)
+
+**Staging VM (`stg-aio-1`):** API config in `/etc/mana-guruji/api.env`; hosted Admin uses `/etc/mana-guruji/admin.env` + `mana-guruji-admin.service` — see [`spec/plans/STAGING_ADMIN_UI.md`](../spec/plans/STAGING_ADMIN_UI.md).
+
+```bash
+set -a && source /etc/mana-guruji/api.env && set +a
+# bootstrap reads ENV_FILE or /etc/mana-guruji/api.env automatically after pull
+python scripts/bootstrap_admin.py --phone +91XXXXXXXXXX --name "Ops Admin" --reset
+```
+
+Requires `SECRET_KEY`, `DATABASE_URL`, and `TOTP_ENC_KEYS` in `api.env`.
 - Backend `ALLOWED_ORIGINS` includes `http://localhost:3000` and `http://127.0.0.1:3000` (default in `config.py`)
 
 ## Supported platforms

@@ -52,5 +52,8 @@ async def recompute_pujari_verification(
 
     if new_status == "verified":
         await ensure_partner_dispatch_readiness(db, pujari_id=pujari_id)
+        from app.services.trust_card import seed_public_name_pending
+
+        await seed_public_name_pending(db, pujari_id)
 
     return new_status

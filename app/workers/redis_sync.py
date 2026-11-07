@@ -25,7 +25,7 @@ def namespaced_key(base: str) -> str:
 def get_sync_redis() -> redis_lib.Redis:
     """Process-local sync client with connect/read timeouts (matches async pool policy)."""
     return redis_lib.from_url(
-        str(get_settings().REDIS_URL),
+        get_settings().redis_cache_url,
         decode_responses=True,
         socket_connect_timeout=5,
         socket_timeout=10,

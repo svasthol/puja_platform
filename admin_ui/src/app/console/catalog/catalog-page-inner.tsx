@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { CatalogReadOnlyBanner } from "@/components/catalog/read-only-banner";
 import { MediaUploader } from "@/components/catalog/media-uploader";
+import { RemoveMediaButton } from "@/components/catalog/remove-media-button";
 import { Header } from "@/components/layout/header";
 import { PageContent } from "@/components/layout/page-content";
 import { Alert } from "@/components/ui/alert";
@@ -78,11 +79,16 @@ export default function CatalogPageInner() {
     enabled: activeCat != null,
   });
 
-  const categoryPreviewUrl =
-    catMedia?.items.find((m) => m.upload_status === "ready" && m.id === selectedCategory?.image_media_id)
-      ?.public_url ??
-    catMedia?.items.find((m) => m.upload_status === "ready")?.public_url ??
-    null;
+  const categoryImageMedia = selectedCategory?.image_media_id
+    ? (catMedia?.items.find(
+        (m) =>
+          m.upload_status === "ready" &&
+          m.is_active &&
+          m.id === selectedCategory.image_media_id,
+      ) ?? null)
+    : null;
+
+  const categoryPreviewUrl = categoryImageMedia?.public_url ?? null;
 
   const [editDesc, setEditDesc] = useState("");
 
@@ -239,7 +245,7 @@ export default function CatalogPageInner() {
       />
       <PageContent>
         <CatalogReadOnlyBanner me={me} />
-        <Alert tone="info" className="mb-4">
+        <Alert tone="default" className="mb-4">
           <strong>Catalogue policy:</strong> there is no hard delete. &quot;Off&quot; / &quot;Disable&quot; sets{" "}
           <code className="text-xs">is_active=false</code> — the row stays in Postgres for bookings and
           history. Customer app reads <code className="text-xs">GET /v1/pujas</code> (active only).
@@ -393,7 +399,7 @@ export default function CatalogPageInner() {
 
                     <Card>
                       <CardTitle className="text-base">Category image</CardTitle>
-                      <div className="mt-4">
+                      <div className="mt-4 space-y-3">
                         <MediaUploader
                           entityType="category"
                           entityId={categoryEntityUuid(selectedCategory.id)}
@@ -411,6 +417,21 @@ export default function CatalogPageInner() {
                             setMessage("Category image updated.");
                           }}
                         />
+                        {canEdit && categoryImageMedia && (
+                          <RemoveMediaButton
+                            mediaId={categoryImageMedia.id}
+                            onError={(msg) => setMessage(`Remove failed: ${msg}`)}
+                            onRemoved={async () => {
+                              await qc.invalidateQueries({
+                                queryKey: ["admin", "catalog", "categories"],
+                              });
+                              await qc.invalidateQueries({
+                                queryKey: ["admin", "catalog", "media", "category", activeCat],
+                              });
+                              setMessage("Category image removed.");
+                            }}
+                          />
+                        )}
                       </div>
                     </Card>
                   </div>

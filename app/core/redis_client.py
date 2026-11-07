@@ -58,7 +58,7 @@ def _is_transient_redis_error(exc: BaseException) -> bool:
 
 def _create_pool() -> aioredis.Redis:
     return aioredis.from_url(
-        str(settings.REDIS_URL),
+        settings.redis_cache_url,
         encoding="utf-8",
         decode_responses=True,
         health_check_interval=30,
@@ -173,6 +173,15 @@ async def redis_set_nx(key: str, value: str, *, ex: int) -> bool:
 async def redis_delete(key: str) -> int:
     async def _op(r: aioredis.Redis) -> int:
         return await r.delete(key)
+
+    return await redis_execute(_op)
+
+
+async def redis_ttl(key: str) -> int:
+    """Remaining TTL in whole seconds. -1 = key exists without expiry, -2 = missing."""
+
+    async def _op(r: aioredis.Redis) -> int:
+        return int(await r.ttl(key))
 
     return await redis_execute(_op)
 

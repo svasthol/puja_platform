@@ -1,0 +1,22 @@
+# Bootstrap / verify Redis logical DBs 0,1,2 on the server in REDIS_URL (external or micro).
+# Redis has no CREATE DATABASE — this PINGs each index and sets a bootstrap marker key.
+name: Redis ensure staging
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ensure:
+    name: Ensure Redis DB 0/1/2
+    runs-on: [self-hosted, Linux, ARM64]
+    environment: staging
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Ensure logical databases
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          test -f /etc/mana-guruji/api.env || { echo "Missing api.env"; exit 1; }
+          set -a && source /etc/mana-guruji/api.env && set +a
+          /opt/mana-guruji/venv/bin/python scripts/ensure_redis_logical_dbs.py --strict

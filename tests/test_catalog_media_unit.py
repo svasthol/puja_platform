@@ -23,3 +23,16 @@ def test_public_url_none_when_unconfigured():
     with patch("app.services.catalog_media.get_settings") as gs:
         gs.return_value.S3_CATALOG_PUBLIC_URL = ""
         assert cm.public_url("catalog/x.png") is None
+
+
+def test_public_url_oci_native_encodes_slashes():
+    base = (
+        "https://objectstorage.ap-hyderabad-1.oraclecloud.com"
+        "/n/ns/b/mana-guruji-stg-catalog/o"
+    )
+    with patch("app.services.catalog_media.get_settings") as gs:
+        gs.return_value.S3_CATALOG_PUBLIC_URL = base
+        url = cm.public_url("catalog/puja/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.webp")
+    assert url == (
+        f"{base}/catalog%2Fpuja%2Faaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.webp"
+    )

@@ -14,12 +14,12 @@ from app.services.kyc_types import KycAadhaarAddress, KycIdentity, KycStartResul
 from app.services import partner_kyc_service as kyc_svc
 
 
-async def _seed_pujari(session) -> uuid.UUID:
+async def _seed_pujari(session, *, full_name: str = "Pandit Ram") -> uuid.UUID:
     uid = uuid.uuid4()
     pid = uuid.uuid4()
     await session.execute(
-        text("INSERT INTO users (id, full_name, phone) VALUES (:id, 'Pandit Ram', :ph)"),
-        {"id": str(uid), "ph": "+91975" + uuid.uuid4().hex[:7]},
+        text("INSERT INTO users (id, full_name, phone) VALUES (:id, :name, :ph)"),
+        {"id": str(uid), "name": full_name, "ph": "+91975" + uuid.uuid4().hex[:7]},
     )
     await session.execute(
         text(
@@ -145,6 +145,39 @@ async def test_self_heal_poll_without_callback(session):
 
 
 @pytest.mark.asyncio
+async def test_aadhaar_name_replaces_new_user_placeholder(session):
+    pid = await _seed_pujari(session, full_name="New User")
+    uid = (
+        await session.execute(
+            text("SELECT user_id FROM pujaris WHERE id = :pid"), {"pid": str(pid)}
+        )
+    ).scalar_one()
+    vendor = _FakeVendor()
+    await session.commit()
+
+    with (
+        patch("app.services.partner_kyc_service.get_kyc_vendor", return_value=vendor),
+        patch.object(kyc_svc.settings, "KYC_REDIRECT_URL", "https://api.example/kyc/callback"),
+        patch.object(kyc_svc.settings, "KYC_IDENTITY_PEPPER", "pepper"),
+        patch("app.services.kyc_storage.store_kyc_bytes", return_value="key"),
+        patch("app.services.partner_kyc_service.redis_set_nx", new_callable=AsyncMock, return_value=True),
+        patch("app.services.partner_kyc_service.redis_delete", new_callable=AsyncMock),
+    ):
+        row, _ = await kyc_svc.start_digilocker(
+            session, pujari_id=pid, ip=None, user_agent=None
+        )
+        await session.commit()
+        await kyc_svc.poll_and_finalize(session, request_id=row.id, pujari_id=pid)
+
+    name = (
+        await session.execute(
+            text("SELECT full_name FROM users WHERE id = :uid"), {"uid": str(uid)}
+        )
+    ).scalar_one()
+    assert name == "Pandit Ram"
+
+
+@pytest.mark.asyncio
 async def test_public_callback_no_bearer(session):
     pid = await _seed_pujari(session)
     vendor = _FakeVendor()
@@ -245,7 +278,9 @@ async def test_kyc_status_includes_active_digilocker_request(session):
             session, pujari_id=pid, ip=None, user_agent=None
         )
         await session.commit()
-        verification, required, live = await kyc_svc.get_partner_kyc_status(session, pid)
+        verification, required, live, _photo_chg = (
+            await kyc_svc.get_partner_kyc_status(session, pid)
+        )
     assert verification == "pending"
     assert live is not None
     assert live.id == row.id

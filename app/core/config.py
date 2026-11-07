@@ -4,6 +4,8 @@ All secrets (DB password, JWT secret, Razorpay keys) MUST be env vars;
 never hardcode them here. See .env.example for the required variables.
 """
 from functools import lru_cache
+from urllib.parse import urlparse, urlunparse
+
 from pydantic import PostgresDsn, RedisDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -44,7 +46,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     OTP_EXPIRE_MINUTES: int = 10
     OTP_MAX_ATTEMPTS: int = 5
-    OTP_RATE_LIMIT_PER_HOUR: int = 5         # per phone number
+    OTP_RATE_LIMIT_PER_HOUR: int = 3         # max OTP send+resend per phone per hour
+    OTP_RESEND_COOLDOWN_SECONDS: int = 20    # min gap between OTP sends per phone
 
     # ---- Admin auth (P-ADMIN-AUTH — per-app_context TTL) ---------------------
     # An account that can override refunds / edit the catalogue must not carry a
@@ -159,6 +162,23 @@ class Settings(BaseSettings):
 
     # ---- Timezone (Asia/Kolkata for all business logic) ----------------------
     PLATFORM_TIMEZONE: str = "Asia/Kolkata"  # never use server default; use this explicitly
+
+    def redis_url_for_db(self, db: int) -> str:
+        """Same host/auth as REDIS_URL, different logical DB index (0–15)."""
+        parsed = urlparse(str(self.REDIS_URL))
+        return urlunparse(parsed._replace(path=f"/{db}"))
+
+    @property
+    def redis_cache_url(self) -> str:
+        return self.redis_url_for_db(self.REDIS_DB_CACHE)
+
+    @property
+    def redis_celery_url(self) -> str:
+        return self.redis_url_for_db(self.REDIS_DB_CELERY)
+
+    @property
+    def redis_presence_url(self) -> str:
+        return self.redis_url_for_db(self.REDIS_DB_PRESENCE)
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

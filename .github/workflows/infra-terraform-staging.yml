@@ -1,0 +1,70 @@
+# Terraform plan for staging (optional CI drift check). Apply is manual from your laptop.
+# Set repository secrets OCI_* and STAGING_COMPARTMENT_OCID to enable plan in CI.
+name: Infra Terraform staging
+
+on:
+  pull_request:
+    paths:
+      - "infra/oci/terraform/**"
+      - ".github/workflows/infra-terraform-staging.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-plan:
+    name: terraform plan (staging)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/oci/terraform/environments/staging
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Skip when OCI secrets missing
+        id: check
+        run: |
+          if [[ -z "${{ secrets.OCI_PRIVATE_KEY }}" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "OCI secrets not set — run terraform plan locally. Staging VM already provisioned."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Terraform
+        if: steps.check.outputs.skip != 'true'
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure OCI provider
+        if: steps.check.outputs.skip != 'true'
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          echo "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${OCI_USER_OCID}
+          fingerprint=${OCI_FINGERPRINT}
+          tenancy=${OCI_TENANCY_OCID}
+          region=ap-hyderabad-1
+          key_file=${HOME}/.oci/oci_api_key.pem
+          EOF
+          echo "OCI_CLI_CONFIG_FILE=${HOME}/.oci/config" >> "$GITHUB_ENV"
+
+      - name: Terraform Init and Plan
+        if: steps.check.outputs.skip != 'true'
+        env:
+          TF_VAR_compartment_id: ${{ secrets.STAGING_COMPARTMENT_OCID }}
+          TF_VAR_ssh_public_key: ${{ secrets.TERRAFORM_SSH_PUBLIC_KEY }}
+          TF_VAR_ssh_allowed_cidrs: '["0.0.0.0/0"]'
+        run: |
+          terraform init -input=false
+          terraform plan -input=false -no-color

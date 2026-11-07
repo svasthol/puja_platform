@@ -233,10 +233,8 @@ async def update_category(
     p: Principal = Depends(require_admin_role),
     db: AsyncSession = Depends(get_db_txn),
 ):
-    if all(
-        v is None
-        for v in (payload.name, payload.description, payload.is_active, payload.image_media_id)
-    ):
+    writable = payload.model_fields_set - {"change_reason"}
+    if not writable:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "No fields to update.")
 
     cat = await _require_category(db, category_id)
@@ -253,7 +251,7 @@ async def update_category(
         cat.description = payload.description
     if payload.is_active is not None:
         cat.is_active = payload.is_active
-    if payload.image_media_id is not None:
+    if "image_media_id" in payload.model_fields_set:
         cat.image_media_id = payload.image_media_id
 
     try:
@@ -423,7 +421,7 @@ async def update_puja(
         if payload.is_active and not puja.is_active:
             await assert_puja_customer_launch_complete(db, puja_id)
         puja.is_active = payload.is_active
-    if payload.hero_media_id is not None:
+    if "hero_media_id" in payload.model_fields_set:
         puja.hero_media_id = payload.hero_media_id
     puja.updated_at = dt.datetime.now(dt.UTC)
 
@@ -1043,6 +1041,62 @@ async def confirm_media(
         db,
         actor_user_id=p.user_id,
         action="confirm",
+        entity_type="puja_media",
+        entity_id=str(media.id),
+        before=before,
+        after=_media_response(media).model_dump(mode="json"),
+        ip=_client_ip(request),
+    )
+    return _media_response(media)
+
+
+async def _clear_catalog_media_references(
+    db: AsyncSession, media_id: uuid.UUID
+) -> None:
+    """Drop FK pointers so customer APIs stop serving this media."""
+    await db.execute(
+        text("UPDATE pujas SET hero_media_id = NULL WHERE hero_media_id = :mid"),
+        {"mid": media_id},
+    )
+    await db.execute(
+        text(
+            "UPDATE puja_categories SET image_media_id = NULL "
+            "WHERE image_media_id = :mid"
+        ),
+        {"mid": media_id},
+    )
+    await db.execute(
+        text(
+            "UPDATE puja_addons SET image_media_id = NULL "
+            "WHERE image_media_id = :mid"
+        ),
+        {"mid": media_id},
+    )
+
+
+@router.delete("/media/{media_id}", response_model=MediaResponse)
+async def deactivate_catalog_media(
+    media_id: uuid.UUID,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Soft-remove catalogue media (is_active=false); clears hero/category/addon links."""
+    media = (
+        await db.execute(select(PujaMedia).where(PujaMedia.id == media_id))
+    ).scalar_one_or_none()
+    if media is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Media not found.")
+
+    before = _media_response(media).model_dump(mode="json")
+    media.is_active = False
+    await _clear_catalog_media_references(db, media_id)
+    await db.flush()
+
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="deactivate",
         entity_type="puja_media",
         entity_id=str(media.id),
         before=before,

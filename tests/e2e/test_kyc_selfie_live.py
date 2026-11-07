@@ -147,7 +147,7 @@ class TestSelfieLiveE2E:
         client, headers, _ = pujari_session()
         try:
             presign = presign_selfie(client, headers)
-            put_selfie(presign["upload_url"], MIN_JPEG)
+            put_selfie(client, headers, presign["document_id"], MIN_JPEG)
             confirm_selfie(client, headers, presign["document_id"])
             again = client.post(
                 f"{API_BASE}/v1/pujari/documents/{presign['document_id']}/confirm",

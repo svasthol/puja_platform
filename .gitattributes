@@ -1,0 +1,4 @@
+# Shell scripts must use LF on Linux deploy targets (stg-aio-1).
+scripts/linux/** text eol=lf
+deploy/**/*.sh text eol=lf
+scripts/*.sh text eol=lf

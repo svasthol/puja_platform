@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.api.v1.endpoints import admin_catalog as cat_ep
 from app.core.dependencies import Principal
-from app.schemas.catalog_admin import MediaPresignRequest, PujaCreate
+from app.schemas.catalog_admin import MediaPresignRequest, PujaCreate, PujaUpdate
 from app.services.catalog_media import CatalogMediaError
 
 
@@ -308,3 +308,65 @@ async def test_presign_addon_media(session):
     await session.commit()
 
     assert presign.s3_key.startswith("catalog/addon/")
+
+
+@pytest.mark.asyncio
+async def test_deactivate_media_clears_hero_link(session):
+    actor = await _mk_user(session, "+91966" + uuid.uuid4().hex[:7])
+    await session.commit()
+    cat_id = await _category_id(session)
+
+    puja = await cat_ep.create_puja(
+        PujaCreate(category_id=cat_id, name=f"P-{uuid.uuid4().hex[:6]}", default_price=500),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    await session.commit()
+
+    with patch(
+        "app.api.v1.endpoints.admin_catalog.presign_catalog_put",
+        return_value=("https://s3.example/upload", 600),
+    ):
+        presign = await cat_ep.presign_media(
+            MediaPresignRequest(
+                entity_type="puja",
+                entity_id=puja.id,
+                content_type="image/png",
+                content_length=512,
+            ),
+            _FakeRequest(),
+            p=_admin(actor),
+            db=session,
+        )
+    await session.commit()
+
+    with patch(
+        "app.api.v1.endpoints.admin_catalog.head_catalog_object",
+        return_value={"content_length": 512, "content_type": "image/png"},
+    ):
+        media = await cat_ep.confirm_media(
+            presign.media_id, _FakeRequest(), p=_admin(actor), db=session
+        )
+    await cat_ep.update_puja(
+        puja.id,
+        PujaUpdate(hero_media_id=media.id),
+        _FakeRequest(),
+        p=_admin(actor),
+        db=session,
+    )
+    await session.commit()
+
+    deactivated = await cat_ep.deactivate_catalog_media(
+        media.id, _FakeRequest(), p=_admin(actor), db=session
+    )
+    await session.commit()
+
+    assert deactivated.is_active is False
+    hero = (
+        await session.execute(
+            text("SELECT hero_media_id FROM pujas WHERE id = :id"),
+            {"id": str(puja.id)},
+        )
+    ).scalar_one()
+    assert hero is None

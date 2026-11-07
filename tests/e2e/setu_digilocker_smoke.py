@@ -281,12 +281,12 @@ def _selfie_upload(client: httpx.Client, base: str, headers: dict[str, str]) -> 
         return False
     body = presign.json()
     put = client.put(
-        body["upload_url"],
+        f"{base}/v1/pujari/documents/{body['document_id']}/upload",
+        headers={**headers, "Content-Type": "image/jpeg"},
         content=_MIN_JPEG,
-        headers={"Content-Type": "image/jpeg"},
     )
-    if put.status_code not in (200, 201):
-        print(f"ERROR: selfie PUT → {put.status_code} {put.text}", file=sys.stderr)
+    if put.status_code != 204:
+        print(f"ERROR: selfie upload → {put.status_code} {put.text}", file=sys.stderr)
         return False
     confirm = client.post(
         f"{base}/v1/pujari/documents/{body['document_id']}/confirm",

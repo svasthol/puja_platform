@@ -17,7 +17,9 @@ from app.core.config import get_settings
 
 settings = get_settings()
 config = context.config
-config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
+# Do not config.set_main_option("sqlalchemy.url", ...): ConfigParser treats % as
+# interpolation (breaks URL-encoded passwords, e.g. Mahadeva%40123). Use settings below.
+_migrate_url = str(settings.DATABASE_URL)
 
 if config.config_file_name:
     fileConfig(config.config_file_name)
@@ -30,15 +32,14 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
+    context.configure(url=_migrate_url, target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 
 
 async def run_migrations_online() -> None:
     connectable = create_async_engine(
-        str(settings.DATABASE_URL),
+        _migrate_url,
         poolclass=pool.NullPool,           # Alembic gets a single connection, not a pool
     )
     async with connectable.connect() as connection:

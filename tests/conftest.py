@@ -15,7 +15,11 @@ would prove nothing. Run:
          -f spec/db/migration_015.sql -f spec/db/migration_016.sql -f spec/db/migration_017.sql \
          -f spec/db/migration_018.sql -f spec/db/migration_019.sql -f spec/db/migration_020.sql \
          -f spec/db/migration_021.sql -f spec/db/migration_022.sql -f spec/db/migration_023.sql \
-         -f spec/db/migration_024.sql -f spec/db/migration_025.sql
+         -f spec/db/migration_024.sql -f spec/db/migration_025.sql \
+         -f spec/db/migration_026.sql -f spec/db/migration_027.sql \
+         -f spec/db/migration_028.sql -f spec/db/migration_029.sql -f spec/db/migration_030.sql \
+         -f spec/db/migration_031.sql -f spec/db/migration_032.sql -f spec/db/migration_033.sql \
+         -f spec/db/migration_034.sql -f spec/db/migration_035.sql -f spec/db/migration_036.sql
     export DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji
     pytest -q
 """
@@ -23,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sys
 import uuid
 from pathlib import Path
@@ -44,7 +49,7 @@ DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji"
 )
 
-_TDS_V3_MIGRATIONS = ("028", "029", "030", "031", "032", "033", "034")
+_TDS_V3_MIGRATIONS = ("028", "029", "030", "031", "032", "033", "034", "035", "036")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -53,6 +58,17 @@ def ensure_tds_v3_migration_chain(engine):
 
     async def _apply() -> None:
         mig_dir = Path(__file__).resolve().parents[1] / "spec" / "db"
+        triggers_path = mig_dir / "triggers.sql"
+        trigger_sql = None
+        if triggers_path.is_file():
+            text_body = triggers_path.read_text(encoding="utf-8")
+            match = re.search(
+                r"(CREATE OR REPLACE FUNCTION trg_set_booking_pujari_on_accept\(\).*?\$\$ LANGUAGE plpgsql;)",
+                text_body,
+                re.DOTALL,
+            )
+            if match:
+                trigger_sql = match.group(1)
         maker = async_sessionmaker(engine, expire_on_commit=False)
         async with maker() as session:
             async with session.begin():
@@ -60,6 +76,8 @@ def ensure_tds_v3_migration_chain(engine):
                     path = mig_dir / f"migration_{number}.sql"
                     if path.is_file():
                         await session.execute(text(path.read_text(encoding="utf-8")))
+                if trigger_sql and "035" in _TDS_V3_MIGRATIONS:
+                    await session.execute(text(trigger_sql))
 
     asyncio.run(_apply())
     yield

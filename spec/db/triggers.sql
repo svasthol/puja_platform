@@ -1,4 +1,4 @@
-﻿-- =============================================================================
+-- =============================================================================
 -- TRIGGER 1 â€” payment_splits.net_pujari_amount (computed, never written by app code)
 -- v2: refuses a negative payout â€” a fee/GST misconfiguration must fail loudly,
 -- never silently write a negative amount a payout worker would then act on.
@@ -151,10 +151,11 @@ BEGIN
             -- For direct bookings intended_pujari_id already equals the
             -- acceptor â€” the write is a no-op and cannot self-conflict.
             UPDATE bookings
-            SET pujari_id          = NEW.pujari_id,
-                intended_pujari_id = NEW.pujari_id,
-                status_id          = v_confirmed_status_id,
-                updated_at         = now()
+            SET pujari_id                  = NEW.pujari_id,
+                intended_pujari_id         = NEW.pujari_id,
+                status_id                  = v_confirmed_status_id,
+                pujari_assignment_version  = pujari_assignment_version + 1,
+                updated_at                 = now()
             WHERE id = NEW.booking_id;
 
             INSERT INTO booking_status_history (booking_id, status_id, changed_by)

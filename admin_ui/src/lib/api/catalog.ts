@@ -262,6 +262,14 @@ export async function confirmMedia(mediaId: string) {
   });
 }
 
+/** Soft-delete: is_active=false and clears hero/category/addon links. */
+export async function deactivateCatalogMedia(mediaId: string) {
+  return apiFetch(`/admin/catalog/media/${mediaId}`, {
+    method: "DELETE",
+    schema: mediaSchema,
+  });
+}
+
 /** Presign → API proxy upload → confirm (Wave 2). */
 export async function uploadCatalogImage(
   entityType: "puja" | "category" | "gallery" | "addon",

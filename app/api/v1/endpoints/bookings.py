@@ -40,6 +40,10 @@ from app.services.booking_gate import (
 from app.services.launch_policy import DIRECT_BOOKING_ENABLED, reject_direct_booking
 from app.services.relationship_manager import fetch_rm_public, status_exposes_rm
 from app.services.status import status_id
+from app.services.trust_card import (
+    customer_booking_pujari_payload,
+    load_feature_trust_card_enabled,
+)
 
 router = APIRouter(tags=["bookings"])
 log = structlog.get_logger()
@@ -259,7 +263,7 @@ async def get_booking(
                 "SELECT b.id, st.code AS status, b.booking_class, b.payment_mode, b.total_amount, "
                 "b.booking_fee, b.amount_due_online, b.amount_due_offline, "
                 "b.balance_collected_at, b.balance_collected_amount, "
-                "b.pujari_id, b.user_id, b.dispatch_mode, b.scheduled_date, "
+                "b.pujari_id, b.pujari_assignment_version, b.user_id, b.dispatch_mode, b.scheduled_date, "
                 "b.scheduled_time, b.duration_minutes, b.created_at, b.cancelled_at, "
                 "b.razorpay_order_id, "
                 "pj.name AS puja_name, "
@@ -279,6 +283,7 @@ async def get_booking(
         raise HTTPException(http.HTTP_403_FORBIDDEN, "Not your booking.")
 
     detail = dict(row)
+    detail["pujari_assignment_version"] = int(row.get("pujari_assignment_version") or 0)
     if row["payment_mode"] == "booking_fee":
         from app.services.pricing import BOOKING_FEE_LABEL
 
@@ -288,18 +293,13 @@ async def get_booking(
     else:
         detail["razorpay_amount"] = str(row["amount_due_online"])
 
-    pujari = None
-    if row["pujari_id"] is not None:
-        pujari = (
-            await db.execute(
-                text(
-                    "SELECT p.id, u.full_name, p.rating_avg, p.rating_count, p.years_experience "
-                    "FROM pujaris p JOIN users u ON u.id = p.user_id WHERE p.id = :pid"
-                ),
-                {"pid": str(row["pujari_id"])},
-            )
-        ).mappings().first()
-    detail["pujari"] = dict(pujari) if pujari else None
+    trust_enabled = await load_feature_trust_card_enabled(db)
+    detail["pujari"] = await customer_booking_pujari_payload(
+        db,
+        pujari_id=row["pujari_id"],
+        assignment_version=int(row.get("pujari_assignment_version") or 0),
+        trust_enabled=trust_enabled,
+    )
 
     history = (
         await db.execute(
@@ -331,6 +331,45 @@ async def get_booking(
         detail["relationship_manager"] = None
 
     return detail
+
+
+@router.get("/bookings/{booking_id}/status")
+async def get_booking_status(
+    booking_id: uuid.UUID,
+    p: Principal = Depends(require_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight poll for booking status + trust-card assignment version."""
+    row = (
+        await db.execute(
+            text(
+                "SELECT b.user_id, st.code AS status, b.pujari_id, "
+                "b.pujari_assignment_version "
+                "FROM bookings b "
+                "JOIN status_types st ON st.id = b.status_id "
+                "WHERE b.id = :bid"
+            ),
+            {"bid": str(booking_id)},
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(http.HTTP_404_NOT_FOUND, "Booking not found.")
+    if str(row["user_id"]) != str(p.user_id):
+        raise HTTPException(http.HTTP_403_FORBIDDEN, "Not your booking.")
+
+    trust_enabled = await load_feature_trust_card_enabled(db)
+    version = int(row.get("pujari_assignment_version") or 0)
+    pujari = await customer_booking_pujari_payload(
+        db,
+        pujari_id=row["pujari_id"],
+        assignment_version=version,
+        trust_enabled=trust_enabled,
+    )
+    return {
+        "status": row["status"],
+        "pujari_assignment_version": version,
+        "pujari": pujari,
+    }
 
 
 @router.post("/bookings/{booking_id}/dispatch-choice")

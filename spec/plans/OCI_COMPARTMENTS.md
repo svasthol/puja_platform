@@ -58,7 +58,7 @@ OCI Console → **Identity & Security** → **Compartments** → **Create compar
 
 | Compartment | Name | Terraform env | Status |
 |-------------|------|---------------|--------|
-| Staging | `mana-guruji-staging` | `infra/oci/terraform/environments/staging` | Created |
+| Staging | `mana-guruji-staging` | `infra/oci/terraform/environments/staging` | Created · TF apply **2026-10-16** |
 | Production | `mana-guruji-production` | *planned* `environments/production` | Pending |
 
 See also [`OCI_INFRA_STATUS.md`](./OCI_INFRA_STATUS.md).

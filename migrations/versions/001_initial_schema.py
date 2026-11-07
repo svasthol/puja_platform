@@ -20,7 +20,7 @@ DB_DIR = Path(__file__).parent.parent.parent / "spec" / "db"
 
 def upgrade() -> None:
     for filename in ("schema.sql", "triggers.sql", "seed.sql"):
-        sql = (DB_DIR / filename).read_text()
+        sql = (DB_DIR / filename).read_text(encoding="utf-8-sig")
         op.execute(sql)  # type: ignore[arg-type]
 
 

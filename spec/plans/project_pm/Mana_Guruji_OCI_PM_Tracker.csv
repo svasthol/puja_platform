@@ -1,0 +1,4 @@
+﻿Workstream,Task_ID,Phase,Task_Name,Environment,Priority,Status,Owner,Planned_Start,Completed_Date,Depends_On,Mode,Spec_Reference,Notes
+Index,,,Staging tasks — open Mana_Guruji_OCI_PM_Tracker_Staging.csv,Staging,,,,,,,Docs,PROJECT_PM_TRACKER.md,Full staging list updated 2026-10-17
+Index,,,Production tasks — open Mana_Guruji_OCI_PM_Tracker_Production.csv,Production,,,,,,,Docs,PROJECT_PM_TRACKER.md,
+Index,,,Pending detail — STAGING_PENDING_CHECKLIST.md,Staging,,,,,,,Docs,STAGING_PENDING_CHECKLIST.md,Backend frontend validation

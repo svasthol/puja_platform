@@ -102,6 +102,7 @@ Human tables below are derived from the machine block. Enforced by `mana_guruji_
 flutter_sdk: 3.44.8
 packages:
   dio: 5.11.0
+  cached_network_image: 3.4.1
   flutter_riverpod: 2.6.1
   go_router: 14.8.1
   firebase_core: 3.15.2
@@ -131,6 +132,7 @@ packages:
 | Package | pubspec constraint | Lockfile resolved |
 |---------|-------------------|-------------------|
 | `dio` | ^5.7.0 | **5.11.0** |
+| `cached_network_image` | ^3.4.1 | **3.4.1** |
 | `flutter_riverpod` | ^2.6.1 | **2.6.1** |
 | `go_router` | ^14.6.1 | **14.8.1** |
 | `firebase_core` | ^3.12.1 | **3.15.2** |

@@ -1,0 +1,56 @@
+# Strict schema check on staging DB; optional compare to dev (DEV_DATABASE_URL secret).
+name: DB verify
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Branch to checkout (for verify scripts)
+        default: dev
+      verify_staging:
+        description: Run spec verify on staging DB (self-hosted)
+        type: boolean
+        default: true
+      compare_dev:
+        description: Compare staging vs DEV_DATABASE_URL (optional secret)
+        type: boolean
+        default: false
+
+jobs:
+  verify-staging:
+    name: Verify staging schema
+    if: inputs.verify_staging
+    runs-on: [self-hosted, Linux, ARM64]
+    environment: staging
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Schema verify (spec/db vs live)
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          ENV_FILE=/etc/mana-guruji/api.env
+          test -f "$ENV_FILE" || { echo "Missing $ENV_FILE"; exit 1; }
+          set -a && source "$ENV_FILE" && set +a
+          export DATABASE_URL="${DATABASE_MIGRATE_URL:-${DATABASE_ADMIN_URL}}"
+          /opt/mana-guruji/venv/bin/python scripts/verify_database_schema.py --strict --label staging
+
+      - name: Compare dev vs staging
+        if: inputs.compare_dev
+        env:
+          DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          if [[ -z "${DEV_DATABASE_URL:-}" ]]; then
+            echo "Set Environment secret DEV_DATABASE_URL to compare (read-only URL is fine)."
+            exit 1
+          fi
+          set -a && source /etc/mana-guruji/api.env && set +a
+          STAGING_URL="${DATABASE_MIGRATE_URL:-${DATABASE_ADMIN_URL}}"
+          /opt/mana-guruji/venv/bin/python scripts/compare_database_schemas.py \
+            --left-url "$DEV_DATABASE_URL" --left-label dev \
+            --right-url "$STAGING_URL" --right-label staging \
+            --strict

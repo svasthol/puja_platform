@@ -141,7 +141,24 @@ def presign_selfie(
     return res.json()
 
 
-def put_selfie(upload_url: str, body: bytes, content_type: str = "image/jpeg") -> None:
+def put_selfie(
+    client: httpx.Client,
+    headers: dict[str, str],
+    document_id: str,
+    body: bytes,
+    content_type: str = "image/jpeg",
+) -> None:
+    res = client.put(
+        f"{API_BASE}/v1/pujari/documents/{document_id}/upload",
+        headers={**headers, "Content-Type": content_type},
+        content=body,
+    )
+    if res.status_code != 204:
+        raise RuntimeError(f"selfie upload → {res.status_code} {res.text}")
+
+
+def put_selfie_s3(upload_url: str, body: bytes, content_type: str = "image/jpeg") -> None:
+    """Direct presigned PUT (legacy / storage-only tests)."""
     with httpx.Client(timeout=60.0) as client:
         res = client.put(
             upload_url,
@@ -174,7 +191,7 @@ def selfie_upload_confirm(
     content_type: str = "image/jpeg",
 ) -> dict:
     presign = presign_selfie(client, headers, content_type=content_type, body=body)
-    put_selfie(presign["upload_url"], body, content_type=content_type)
+    put_selfie(client, headers, presign["document_id"], body, content_type=content_type)
     confirm = confirm_selfie(client, headers, presign["document_id"])
     return {**presign, **confirm}
 

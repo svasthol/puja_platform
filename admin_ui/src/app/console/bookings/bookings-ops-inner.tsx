@@ -81,7 +81,7 @@ export function BookingsOpsInner() {
             <Button
               key={q.id}
               type="button"
-              variant={activeQueue === q.id ? "default" : "secondary"}
+              variant={activeQueue === q.id ? "primary" : "secondary"}
               className="text-xs"
               onClick={() => setActiveQueue(q.id)}
             >

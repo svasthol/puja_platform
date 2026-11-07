@@ -1,0 +1,102 @@
+# Provision staging Redis E2 Micro (Docker) via Terraform. App REDIS_URL is manual in api.env.
+# Docs: spec/plans/STAGING_REDIS_MICRO.md
+name: Deploy Redis staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Branch (IaC + docs)
+        default: dev
+      terraform_action:
+        description: Terraform action
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+      enable_redis_micro:
+        description: Set enable_staging_redis_micro=true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-redis:
+    name: Terraform Redis micro
+    runs-on: ubuntu-latest
+    environment: staging
+    defaults:
+      run:
+        working-directory: infra/oci/terraform/environments/staging
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Require OCI secrets
+        run: |
+          test -n "${{ secrets.OCI_PRIVATE_KEY }}" || (echo "Missing OCI_PRIVATE_KEY" && exit 1)
+          test -n "${{ secrets.STAGING_COMPARTMENT_OCID }}" || (echo "Missing STAGING_COMPARTMENT_OCID" && exit 1)
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure OCI provider
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          echo "$OCI_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${OCI_USER_OCID}
+          fingerprint=${OCI_FINGERPRINT}
+          tenancy=${OCI_TENANCY_OCID}
+          region=ap-hyderabad-1
+          key_file=${HOME}/.oci/oci_api_key.pem
+          EOF
+
+      - name: Terraform init
+        env:
+          TF_VAR_compartment_id: ${{ secrets.STAGING_COMPARTMENT_OCID }}
+          TF_VAR_ssh_public_key: ${{ secrets.TERRAFORM_SSH_PUBLIC_KEY }}
+          TF_VAR_enable_staging_redis_micro: ${{ inputs.enable_redis_micro }}
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        if: inputs.terraform_action == 'plan'
+        env:
+          TF_VAR_compartment_id: ${{ secrets.STAGING_COMPARTMENT_OCID }}
+          TF_VAR_ssh_public_key: ${{ secrets.TERRAFORM_SSH_PUBLIC_KEY }}
+          TF_VAR_enable_staging_redis_micro: ${{ inputs.enable_redis_micro }}
+        run: terraform plan -input=false -no-color
+
+      - name: Terraform apply
+        if: inputs.terraform_action == 'apply'
+        env:
+          TF_VAR_compartment_id: ${{ secrets.STAGING_COMPARTMENT_OCID }}
+          TF_VAR_ssh_public_key: ${{ secrets.TERRAFORM_SSH_PUBLIC_KEY }}
+          TF_VAR_enable_staging_redis_micro: ${{ inputs.enable_redis_micro }}
+        run: terraform apply -input=false -auto-approve -no-color
+
+      - name: Redis endpoints (apply)
+        if: inputs.terraform_action == 'apply'
+        run: |
+          echo "=== stg-redis-1 (VM.Standard.E2.1.Micro) ==="
+          terraform output stg_redis_public_ip || true
+          terraform output stg_redis_private_ip || true
+          echo "REDIS_URL (cache DB 0):"
+          terraform output -raw stg_redis_url || true
+          echo "Celery DB 1 (phase 2):"
+          terraform output -raw stg_redis_url_celery || true
+          echo "Public URL (only if redis_extra_client_cidrs set):"
+          terraform output -raw stg_redis_url_public || true
+          echo "On stg-aio-1: set api.env, STAGING_SKIP_HOST_REDIS=true, restart API/worker/beat."

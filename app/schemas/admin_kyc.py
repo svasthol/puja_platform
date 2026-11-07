@@ -65,3 +65,29 @@ class KycReviewResponse(BaseModel):
     pujari_id: uuid.UUID
     pujari_verification_status: PujariVerificationStatus
     all_required_verified: bool
+
+
+class PublicNameQueueItem(BaseModel):
+    pujari_id: uuid.UUID
+    partner_name: str
+    phone: str
+    verification_status: PujariVerificationStatus
+    public_name_pending: str
+    public_name: str | None = None
+    proposed_at: dt.datetime | None = None
+
+
+class PublicNameQueueResponse(BaseModel):
+    items: list[PublicNameQueueItem]
+
+
+class PublicNameApproveRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    change_reason: str | None = Field(default=None, max_length=300)
+
+
+class PublicNameApproveResponse(BaseModel):
+    pujari_id: uuid.UUID
+    public_name: str
+    approved_at: dt.datetime

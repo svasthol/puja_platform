@@ -1,0 +1,17 @@
+[Unit]
+Description=Mana Guruji Celery beat (single instance)
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+WorkingDirectory=/opt/mana-guruji/src/puja_platform
+EnvironmentFile=/etc/mana-guruji/api.env
+Environment=PATH=/opt/mana-guruji/venv/bin:/usr/local/bin:/usr/bin
+ExecStart=/opt/mana-guruji/venv/bin/celery -A app.workers.celery_app beat -l info
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
