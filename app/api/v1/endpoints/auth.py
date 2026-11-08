@@ -331,6 +331,9 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db_txn
             )
             .values(revoked_at=now, revoked_reason="refresh_reuse")
         )
+        # Commit NOW: get_db_txn rolls the whole request back when the 401 below
+        # propagates, which would silently undo this revocation.
+        await db.commit()
         log.warning(
             "refresh_token_reuse_detected",
             user_id=str(sess.user_id),

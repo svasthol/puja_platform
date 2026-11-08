@@ -150,6 +150,48 @@ async def test_refresh_reuse_revokes_every_live_session(session):
 
 
 @pytest.mark.asyncio
+async def test_refresh_reuse_revocation_survives_real_txn_dependency(engine):
+    """Audit lead: the 401 must not roll back the reuse revocation.
+
+    Drives the real get_db_txn dependency (rollback on exception) instead of
+    committing manually, so a regression to rollback-on-401 is caught.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.db import engine as engine_mod
+
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as s:
+        uid = await _mk_user(s, _uniq_phone())
+        pair = await _issue(s, uid)
+        await s.commit()
+
+    async def call_refresh(token: str):
+        gen = engine_mod.get_db_txn()
+        db = await gen.__anext__()
+        try:
+            result = await auth_ep.refresh(RefreshRequest(refresh_token=token), db=db)
+        except HTTPException as exc:
+            try:
+                await gen.athrow(exc)
+            except HTTPException:
+                pass
+            raise
+        await gen.aclose()
+        return result
+
+    with patch.object(engine_mod, "AsyncSessionLocal", maker):
+        rotated = await call_refresh(pair.refresh_token)
+        with pytest.raises(HTTPException) as exc:
+            await call_refresh(pair.refresh_token)  # replay -> theft signal
+        assert exc.value.status_code == 401
+        # The rotated descendant must now be dead.
+        with pytest.raises(HTTPException) as exc2:
+            await call_refresh(rotated.refresh_token)
+        assert exc2.value.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_refresh_rejects_forged_token_with_stolen_jti(session):
     """jti matches a session but token bytes differ -> hash verify fails -> 401."""
     import jwt as pyjwt
