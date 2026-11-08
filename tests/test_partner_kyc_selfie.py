@@ -188,3 +188,46 @@ async def test_confirm_selfie_missing_s3_object(session):
                 document_id=doc_id,
             )
     assert exc.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_presign_replacing_verified_photo_demotes_cached_verification(session):
+    """Audit lead: replacing an approved current doc must not leave the cached
+    pujaris.verification_status='verified' (catalogue + dispatch trust it)."""
+    pid = await _seed_pujari(session)
+    for doc_type in ("identity_proof", "address_proof", "photo"):
+        await session.execute(
+            text(
+                "INSERT INTO pujari_documents "
+                "(id, pujari_id, doc_type, file_url, version, is_current, status) "
+                "VALUES (:id, :pid, :dt, :url, 1, true, 'verified')"
+            ),
+            {
+                "id": str(uuid.uuid4()),
+                "pid": str(pid),
+                "dt": doc_type,
+                "url": f"kyc/x/{doc_type}/{uuid.uuid4()}.jpg",
+            },
+        )
+    await session.execute(
+        text("UPDATE pujaris SET verification_status='verified' WHERE id = :pid"),
+        {"pid": str(pid)},
+    )
+    await session.commit()
+
+    with patch(
+        "app.services.partner_kyc_service.presign_kyc_put",
+        return_value=("https://s3.example/upload", 900),
+    ):
+        await kyc_svc.presign_selfie(
+            session, pujari_id=pid, content_type="image/jpeg", content_length=1024
+        )
+    await session.commit()
+
+    status = (
+        await session.execute(
+            text("SELECT verification_status FROM pujaris WHERE id = :pid"),
+            {"pid": str(pid)},
+        )
+    ).scalar_one()
+    assert status == "pending"
