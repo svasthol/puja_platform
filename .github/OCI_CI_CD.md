@@ -10,7 +10,7 @@
 | [`workflows/deploy-prod.yml`](./workflows/deploy-prod.yml) | Prod preflight (G1/G2); deploy placeholder | Targets **`app-1` / `app-2`** when SSH/OCIR rollout is wired; images **`linux/arm64`** |
 | [`workflows/ci.yml`](./workflows/ci.yml) | **linux-arm64-runtime** + G1/G2 preflight | `ubuntu-24.04-arm` |
 | [`workflows/deploy-staging.yml`](./workflows/deploy-staging.yml) | Manual SSH bootstrap | Secrets: [`STAGING_GITHUB_SETUP.md`](../spec/plans/STAGING_GITHUB_SETUP.md) |
-| [`workflows/infra-terraform-staging.yml`](./workflows/infra-terraform-staging.yml) | PR plan (optional) | Staging compute already applied locally |
+| [`workflows/infra-terraform-staging.yml`](./workflows/infra-terraform-staging.yml) | PR plan (optional); gated by the `staging-plan` environment (required reviewers; OCI secrets stored as environment secrets, not repo secrets) | Staging compute already applied locally |
 | `workflows/build-push.yml` | *Planned* — OCIR `hyd.ocir.io` | **`platforms: linux/arm64`** |
 
 ## Secrets / environments

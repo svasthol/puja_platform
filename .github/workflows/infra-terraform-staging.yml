@@ -1,5 +1,9 @@
 # Terraform plan for staging (optional CI drift check). Apply is manual from your laptop.
-# Set repository secrets OCI_* and STAGING_COMPARTMENT_OCID to enable plan in CI.
+# SECURITY: this job runs PR-controlled Terraform while the OCI private key is on disk.
+# It is gated by the `staging-plan` GitHub environment (required reviewers). Store the
+# OCI_* / STAGING_COMPARTMENT_OCID / TERRAFORM_SSH_PUBLIC_KEY secrets as *environment*
+# secrets of `staging-plan`, NOT repository secrets, and approve a run only after
+# reviewing the PR's infra/oci/terraform changes. See .github/OCI_CI_CD.md.
 name: Infra Terraform staging
 
 on:
@@ -16,6 +20,7 @@ jobs:
   terraform-plan:
     name: terraform plan (staging)
     runs-on: ubuntu-latest
+    environment: staging-plan
     defaults:
       run:
         working-directory: infra/oci/terraform/environments/staging

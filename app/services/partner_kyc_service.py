@@ -486,7 +486,7 @@ async def _upsert_document(
     if existing is not None:
         return existing.id
 
-    await db.execute(
+    superseded = await db.execute(
         text(
             """
             UPDATE pujari_documents
@@ -522,6 +522,17 @@ async def _upsert_document(
     )
     db.add(doc)
     await db.flush()
+    if superseded.rowcount:
+        # A verified partner just replaced an approved current document. The cached
+        # pujaris.verification_status is trusted by catalogue + dispatch, so
+        # re-derive it now (demotes to pending until the new doc is verified).
+        cached = (
+            await db.execute(
+                select(Pujari.verification_status).where(Pujari.id == pujari_id)
+            )
+        ).scalar_one_or_none()
+        if cached == "verified":
+            await recompute_pujari_verification(db, pujari_id)
     return doc.id
 
 
