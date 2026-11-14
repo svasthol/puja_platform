@@ -25,6 +25,10 @@ export function canEditTdsFacilitation(me: AdminMe | undefined): boolean {
   return hasAdminRole(me);
 }
 
+export function canEditDispatchPolicy(me: AdminMe | undefined): boolean {
+  return hasAdminRole(me);
+}
+
 export function canEditCatalog(me: AdminMe | undefined): boolean {
   return hasAdminRole(me);
 }

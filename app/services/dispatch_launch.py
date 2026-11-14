@@ -78,6 +78,9 @@ _DISPATCH_SETTING_KEYS = (
     "rm_escalation_t24_hours",
 )
 
+# Shared with admin dispatch-policy API — keep in sync with worker load_dispatch_settings().
+DISPATCH_PLATFORM_SETTING_KEYS: tuple[str, ...] = _DISPATCH_SETTING_KEYS
+
 
 def _settings_from_rows(rows: dict[str, Any]) -> LaunchDispatchSettings:
     return LaunchDispatchSettings(

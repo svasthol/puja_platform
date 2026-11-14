@@ -116,6 +116,7 @@ See `spec/plans/CATALOG_SYNC.md` for the full Admin ↔ Customer sync matrix.
 | Screen | API |
 |---|---|
 | **Partners** (`/console/partners`) | `GET /v1/admin/pujaris` — search directory |
+| **Dispatch policy** (`/console/settings/dispatch`) | `GET/PUT /v1/admin/settings/dispatch-policy` — launch windows, TTLs, `immediate_dispatch_on_payment` |
 | **Pricing** (`/console/partners/[id]`) | `GET/PUT /v1/admin/pujaris/{id}/pricing` — replace-all matrix |
 
 Writes require `admin` role. Prices flow through `pricing_resolver` for dispatch and customer quotes.
