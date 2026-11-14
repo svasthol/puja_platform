@@ -135,34 +135,42 @@ async def razorpay_webhook(
 
     payload = await request.json()
     event = payload.get("event", "")
-    if event not in ("payment.captured", "order.paid"):
+    if event == "order.paid":
+        log.info("webhook_order_paid_ignored", event=event)
+        return {"status": "already_processed", "event": event}
+    if event != "payment.captured":
         return {"status": "ignored", "event": event}
 
     payment_entity = (payload.get("payload") or {}).get("payment", {}).get("entity", {})
-    order_entity = (payload.get("payload") or {}).get("order", {}).get("entity", {})
-    entity = payment_entity or order_entity
+    if not payment_entity:
+        log.warning("webhook_payment_captured_missing_entity", event=event)
+        return {"status": "ignored", "event": event}
+
+    pay_id = str(payment_entity.get("id") or "")
+    if not pay_id.startswith("pay_"):
+        log.error("webhook_non_payment_id", gateway_id=pay_id, event=event)
+        return {"status": "ignored", "reason": "invalid_payment_id"}
 
     booking_id = await _resolve_booking_id(db, payload)
     if booking_id is None:
         log.error("webhook_missing_booking_id", event=event)
         return {"status": "no_booking_ref"}
 
-    if payment_entity:
-        tds_outcome = await _route_tds_payment_webhook(
-            db, booking_id=booking_id, payment_entity=payment_entity
-        )
-        if tds_outcome is not None:
-            return tds_outcome
+    tds_outcome = await _route_tds_payment_webhook(
+        db, booking_id=booking_id, payment_entity=payment_entity
+    )
+    if tds_outcome is not None:
+        return tds_outcome
 
     result = await webhook_service.handle_payment_captured(
         db,
         booking_id=booking_id,
-        gateway_txn_id=entity.get("id", ""),
-        idempotency_key=entity.get("id", ""),
-        amount_paise=int(entity.get("amount", 0)),
+        gateway_txn_id=pay_id,
+        idempotency_key=pay_id,
+        amount_paise=int(payment_entity.get("amount", 0)),
     )
 
-    # enqueue dispatch AFTER commit is handled by the app; expose the id here.
+    # Post-commit dispatch enqueue is PR2 (REL-002); tasks still sent before txn ends today.
     if result.get("enqueue_direct"):
         from app.workers.celery_app import celery_app
 

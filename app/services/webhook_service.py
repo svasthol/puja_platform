@@ -2,13 +2,13 @@
 Razorpay webhook handler (spec DISPATCH_FLOW step 4, API_CONTRACTS webhooks).
 
 ONE transaction:
-  a. INSERT payments (idempotency_key dedupes retries).
-  b. SELECT booking FOR UPDATE.
+  a. SELECT booking FOR UPDATE.
+  b. Check-then-insert payments (pay_… keys; duplicate_capture when booking already paid).
   c. payment_pending -> set paid_at, status 'requested', history row,
      convert hold (released_at = converted_at = now), enqueue broadcast.
      Does NOT write booking_dispatch_state — the worker owns that row (§21.6.C).
   d. abandoned / late / double-paid -> record payment + INSERT refunds row
-     (reason='late_payment'), notify, and STILL return 200 to Razorpay.
+     and STILL return 200 to Razorpay.
 
 Always returns 200 once the payment is recorded. The ex_bookings_intended_no_overlap
 exclusion is caught here (not the generic handler) so the auto-refund path runs.
@@ -42,12 +42,13 @@ def _refund_cap(booking: Booking) -> Decimal:
     )
 
 
-async def _insert_late_refund(
+async def _insert_refund(
     db: AsyncSession,
     *,
     payment: Payment,
     booking: Booking,
     amount: Decimal | None = None,
+    reason: str = "late_payment",
 ) -> None:
     """Auto-refund for late/double-paid/mismatched captures."""
     refund_amt = amount if amount is not None else _refund_cap(booking)
@@ -59,7 +60,7 @@ async def _insert_late_refund(
             payment_id=payment.id,
             booking_id=booking.id,
             amount=refund_amt,
-            reason="late_payment",
+            reason=reason,
             status="pending",
             attempt_count=0,
             next_attempt_at=dt.datetime.now(dt.UTC),
@@ -98,6 +99,7 @@ async def handle_payment_captured(
     amount_paise: int,
 ) -> dict:
     now = dt.datetime.now(dt.UTC)
+    pay_key = idempotency_key or gateway_txn_id
 
     booking_row = (
         await db.execute(select(Booking).where(Booking.id == booking_id).with_for_update())
@@ -106,36 +108,132 @@ async def handle_payment_captured(
         log.error("webhook_booking_missing", booking_id=str(booking_id))
         return {"status": "booking_missing"}
 
+    existing = (
+        await db.execute(
+            text(
+                """
+                SELECT id FROM payments
+                WHERE gateway_txn_id = :k OR idempotency_key = :k
+                LIMIT 1
+                """
+            ),
+            {"k": pay_key},
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        log.info("webhook_duplicate_ack", booking_id=str(booking_id), pay_key=pay_key)
+        return {"status": "already_processed"}
+
+    pending_id = await status_id(db, "booking", "payment_pending")
+    requested_id = await status_id(db, "booking", "requested")
+
+    has_success_payment = (
+        await db.execute(
+            text(
+                "SELECT 1 FROM payments WHERE booking_id = :bid AND status = 'success' LIMIT 1"
+            ),
+            {"bid": str(booking_id)},
+        )
+    ).scalar_one_or_none() is not None
+    booking_already_paid = (
+        booking_row.paid_at is not None or booking_row.status_id != pending_id
+    )
+
     expected_paise = int((_refund_cap(booking_row) * 100).quantize(Decimal("1")))
     captured = Decimal(amount_paise) / Decimal(100)
     amount_mismatch = expected_paise > 0 and amount_paise != expected_paise
 
-    payment = Payment(
-        id=uuid.uuid4(),
-        booking_id=booking_id,
-        amount=captured,
-        idempotency_key=idempotency_key,
-        gateway_txn_id=gateway_txn_id,
-        status="success",
-        created_at=now,
+    payment_status = (
+        "duplicate_capture"
+        if booking_already_paid and has_success_payment
+        else "success"
     )
-    db.add(payment)
-    try:
+
+    orphan_success_id = None
+    if (
+        not booking_already_paid
+        and has_success_payment
+        and payment_status == "success"
+    ):
+        orphan_success_id = (
+            await db.execute(
+                text(
+                    """
+                    SELECT id FROM payments
+                    WHERE booking_id = :bid AND status = 'success'
+                    LIMIT 1
+                    """
+                ),
+                {"bid": str(booking_id)},
+            )
+        ).scalar_one_or_none()
+
+    payment: Payment | None = None
+    if orphan_success_id is not None:
+        payment = (
+            await db.execute(select(Payment).where(Payment.id == orphan_success_id))
+        ).scalar_one()
+        payment.amount = captured
+        payment.gateway_txn_id = gateway_txn_id or pay_key
+        payment.idempotency_key = pay_key
         await db.flush()
-    except IntegrityError as exc:
-        diag = getattr(getattr(exc, "orig", None), "diag", None)
-        cname = getattr(diag, "constraint_name", "") if diag else ""
-        if cname in ("payments_idempotency_key_key", "ux_payments_one_success_per_booking"):
-            log.info("webhook_duplicate_ack", constraint=cname, booking_id=str(booking_id))
+        log.info(
+            "webhook_orphan_success_retry_confirm",
+            booking_id=str(booking_id),
+            payment_id=str(orphan_success_id),
+            new_pay_key=pay_key,
+        )
+    elif payment_status == "duplicate_capture":
+        payment = Payment(
+            id=uuid.uuid4(),
+            booking_id=booking_id,
+            amount=captured,
+            idempotency_key=pay_key,
+            gateway_txn_id=gateway_txn_id or pay_key,
+            status=payment_status,
+            created_at=now,
+        )
+        db.add(payment)
+        await db.flush()
+    else:
+        payment = Payment(
+            id=uuid.uuid4(),
+            booking_id=booking_id,
+            amount=captured,
+            idempotency_key=pay_key,
+            gateway_txn_id=gateway_txn_id or pay_key,
+            status=payment_status,
+            created_at=now,
+        )
+        db.add(payment)
+        try:
+            await db.flush()
+        except IntegrityError as exc:
+            diag = getattr(getattr(exc, "orig", None), "diag", None)
+            cname = getattr(diag, "constraint_name", "") if diag else ""
+            log.info(
+                "webhook_duplicate_ack_fallback",
+                constraint=cname,
+                booking_id=str(booking_id),
+            )
             return {"status": "already_processed"}
-        raise
 
     booking = booking_row
-    pending_id = await status_id(db, "booking", "payment_pending")
-    requested_id = await status_id(db, "booking", "requested")
+    assert payment is not None
+
+    if payment_status == "duplicate_capture":
+        await _insert_refund(
+            db,
+            payment=payment,
+            booking=booking,
+            amount=captured,
+            reason="duplicate_payment",
+        )
+        log.info("webhook_duplicate_capture_refund", booking_id=str(booking_id), pay_key=pay_key)
+        return {"status": "auto_refund_initiated", "reason": "duplicate_capture"}
 
     if amount_mismatch:
-        await _insert_late_refund(db, payment=payment, booking=booking, amount=captured)
+        await _insert_refund(db, payment=payment, booking=booking, amount=captured)
         log.warning(
             "webhook_amount_mismatch_autorefund",
             booking_id=str(booking_id),
@@ -145,7 +243,7 @@ async def handle_payment_captured(
         return {"status": "auto_refund_initiated", "reason": "amount_mismatch"}
 
     if booking.status_id != pending_id or booking.cancelled_at is not None:
-        await _insert_late_refund(db, payment=payment, booking=booking)
+        await _insert_refund(db, payment=payment, booking=booking)
         log.info("webhook_late_autorefund", booking_id=str(booking_id))
         return {"status": "auto_refund_initiated"}
 
@@ -158,7 +256,7 @@ async def handle_payment_captured(
             await _insert_payment_split(db, payment_id=payment.id, booking=booking)
     except IntegrityError as exc:
         if isinstance(getattr(exc, "orig", None), ExclusionViolation):
-            await _insert_late_refund(db, payment=payment, booking=booking)
+            await _insert_refund(db, payment=payment, booking=booking)
             log.info("webhook_overlap_autorefund", booking_id=str(booking_id))
             return {"status": "auto_refund_initiated"}
         raise

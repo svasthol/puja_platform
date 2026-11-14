@@ -20,7 +20,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.models.booking import BookingAssignment
+from app.models.booking import Booking, BookingAssignment
 from app.models.catalog import Pujari
 from app.services import booking_events
 from app.services.relationship_manager import assign_rm_on_confirm
@@ -85,15 +85,34 @@ async def accept_offer(
     db: AsyncSession, *, user_id: uuid.UUID, assignment_id: uuid.UUID
 ) -> dict:
     assignment = await _assignment_owned_by(db, assignment_id, user_id)
-    booking_row = (
+    booking = (
         await db.execute(
-            text("SELECT total_amount FROM bookings WHERE id = :bid"),
-            {"bid": str(assignment.booking_id)},
+            select(Booking).where(Booking.id == assignment.booking_id).with_for_update()
         )
-    ).mappings().first()
-    if booking_row is None:
+    ).scalar_one_or_none()
+    if booking is None:
         raise HTTPException(http.HTTP_404_NOT_FOUND, "Booking not found.")
-    projected = Decimal(str(booking_row["total_amount"])).quantize(Decimal("0.01"))
+
+    requested_id = await status_id(db, "booking", "requested")
+    confirmed_id = await status_id(db, "booking", "confirmed")
+    winner_retry = (
+        booking.pujari_id == assignment.pujari_id and booking.status_id == confirmed_id
+    )
+    if booking.paid_at is None and not winner_retry:
+        raise HTTPException(
+            http.HTTP_409_CONFLICT,
+            "This booking cannot be accepted until payment is confirmed.",
+        )
+    if (
+        booking.status_id not in (requested_id, confirmed_id)
+        and not winner_retry
+    ):
+        raise HTTPException(
+            http.HTTP_409_CONFLICT,
+            "This booking cannot be accepted in its current state.",
+        )
+
+    projected = Decimal(str(booking.total_amount)).quantize(Decimal("0.01"))
     await _assert_tax_profile_for_accept(db, assignment.pujari_id)
     await assert_fy_pan_gate_allowed(
         db,
