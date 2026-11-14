@@ -13,7 +13,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import httpx
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import exists, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -988,17 +988,19 @@ async def _photo_change_under_review(
     if published_id is not None and published_id != cur_id:
         return True
 
-    older_verified = (
+    legacy_verified_photo = (
         await db.execute(
-            select(PujariDocument.id).where(
-                PujariDocument.pujari_id == pujari_id,
-                PujariDocument.doc_type == "photo",
-                PujariDocument.is_current.is_(False),
-                PujariDocument.status == "verified",
+            select(
+                exists().where(
+                    PujariDocument.pujari_id == pujari_id,
+                    PujariDocument.doc_type == "photo",
+                    PujariDocument.is_current.is_(False),
+                    PujariDocument.status == "verified",
+                )
             )
         )
-    ).scalar_one_or_none()
-    return older_verified is not None
+    ).scalar()
+    return bool(legacy_verified_photo)
 
 
 async def get_partner_kyc_status(

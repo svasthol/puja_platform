@@ -123,6 +123,37 @@ async def test_recompute_verified_applies_readiness(session, seed):
     status = await recompute_pujari_verification(session, pid)
     assert status == "verified"
 
+    await session.execute(
+        text(
+            """
+            UPDATE pujari_documents
+            SET is_current = false
+            WHERE pujari_id = :pid AND doc_type = 'photo' AND is_current
+            """
+        ),
+        {"pid": str(pid)},
+    )
+    await session.execute(
+        text(
+            """
+            INSERT INTO pujari_documents
+            (id, pujari_id, doc_type, file_url, version, is_current, status, uploaded_at)
+            VALUES (gen_random_uuid(), :pid, 'photo', :url, 2, true, 'pending', now())
+            """
+        ),
+        {"pid": str(pid), "url": f"kyc/{pid}/photo_v2.jpg"},
+    )
+    await session.commit()
+    status_after_photo_change = await recompute_pujari_verification(session, pid)
+    assert status_after_photo_change == "verified"
+    row = (
+        await session.execute(
+            text("SELECT verification_status FROM pujaris WHERE id = :pid"),
+            {"pid": str(pid)},
+        )
+    ).scalar_one()
+    assert row == "verified"
+
     area_count = (
         await session.execute(
             text("SELECT count(*) FROM pujari_service_areas WHERE pujari_id = :pid"),
