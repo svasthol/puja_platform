@@ -103,7 +103,13 @@ def refundable_platform_amount(
     if not payment_captured or cap <= 0:
         return Decimal("0")
 
-    if reason in ("no_pujari", "platform_failure", "late_payment", "platform_terminate"):
+    if reason in (
+        "no_pujari",
+        "platform_failure",
+        "late_payment",
+        "duplicate_payment",
+        "platform_terminate",
+    ):
         return cap
     if reason == "pujari_cancel_rebroadcast":
         return Decimal("0")

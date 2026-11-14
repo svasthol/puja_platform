@@ -70,6 +70,9 @@ DECLARE
     v_superseded_status_id SMALLINT;
     v_current_pujari_id   UUID;
     v_cancelled_at        TIMESTAMPTZ;
+    v_paid_at             TIMESTAMPTZ;
+    v_booking_status_id   SMALLINT;
+    v_requested_status_id SMALLINT;
     v_pujari_user_id      UUID;
 BEGIN
     SELECT id INTO v_accepted_status_id
@@ -116,8 +119,9 @@ BEGIN
         -- Lock the booking row so two near-simultaneous accepts (two pujaris both tapping
         -- "accept" on the same broadcast offer) are serialized, not raced. The second
         -- transaction blocks here until the first commits, then sees the row is taken.
-        SELECT pujari_id, cancelled_at INTO v_current_pujari_id, v_cancelled_at
-        FROM bookings WHERE id = NEW.booking_id FOR UPDATE;
+        SELECT b.pujari_id, b.cancelled_at, b.paid_at, b.status_id
+        INTO v_current_pujari_id, v_cancelled_at, v_paid_at, v_booking_status_id
+        FROM bookings b WHERE b.id = NEW.booking_id FOR UPDATE;
 
         -- Guard 2: the customer may have cancelled while offers were pending.
         IF v_cancelled_at IS NOT NULL THEN
@@ -137,6 +141,23 @@ BEGIN
             FROM status_types WHERE domain = 'booking' AND code = 'confirmed';
             IF v_confirmed_status_id IS NULL THEN
                 RAISE EXCEPTION 'Seed data missing: status_types(domain=booking, code=confirmed) not found.';
+            END IF;
+
+            SELECT id INTO v_requested_status_id
+            FROM status_types WHERE domain = 'booking' AND code = 'requested';
+            IF v_requested_status_id IS NULL THEN
+                RAISE EXCEPTION 'Seed data missing: status_types(domain=booking, code=requested) not found.';
+            END IF;
+
+            IF v_paid_at IS NULL THEN
+                RAISE EXCEPTION 'Booking % is not acceptable (not paid).', NEW.booking_id;
+            END IF;
+
+            IF v_booking_status_id IS DISTINCT FROM v_requested_status_id THEN
+                IF NOT (TG_OP = 'INSERT' AND v_booking_status_id = v_confirmed_status_id) THEN
+                    RAISE EXCEPTION 'Booking % is not acceptable (status=%, paid=set).',
+                        NEW.booking_id, v_booking_status_id;
+                END IF;
             END IF;
 
             SELECT user_id INTO v_pujari_user_id FROM pujaris WHERE id = NEW.pujari_id;

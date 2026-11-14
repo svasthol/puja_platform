@@ -19,7 +19,8 @@ would prove nothing. Run:
          -f spec/db/migration_026.sql -f spec/db/migration_027.sql \
          -f spec/db/migration_028.sql -f spec/db/migration_029.sql -f spec/db/migration_030.sql \
          -f spec/db/migration_031.sql -f spec/db/migration_032.sql -f spec/db/migration_033.sql \
-         -f spec/db/migration_034.sql -f spec/db/migration_035.sql -f spec/db/migration_036.sql
+         -f spec/db/migration_034.sql -f spec/db/migration_035.sql -f spec/db/migration_036.sql \
+         -f spec/db/migration_037.sql
     export DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji
     pytest -q
 """
@@ -49,7 +50,7 @@ DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://postgres@127.0.0.1:5433/Mana_Guruji"
 )
 
-_TDS_V3_MIGRATIONS = ("028", "029", "030", "031", "032", "033", "034", "035", "036")
+_TDS_V3_MIGRATIONS = ("028", "029", "030", "031", "032", "033", "034", "035", "036", "037")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -70,9 +71,49 @@ def ensure_tds_v3_migration_chain(engine):
             if match:
                 trigger_sql = match.group(1)
         maker = async_sessionmaker(engine, expire_on_commit=False)
+        async def _refunds_check_includes_duplicate_payment(session) -> bool:
+            row = (
+                await session.execute(
+                    text(
+                        """
+                        SELECT 1 FROM pg_constraint c
+                        JOIN pg_class t ON t.oid = c.conrelid
+                        WHERE t.relname = 'refunds'
+                          AND c.conname = 'refunds_reason_check'
+                          AND pg_get_constraintdef(c.oid) LIKE '%duplicate_payment%'
+                        """
+                    )
+                )
+            ).scalar_one_or_none()
+            return row is not None
+
+        async def _payments_check_includes_duplicate_capture(session) -> bool:
+            row = (
+                await session.execute(
+                    text(
+                        """
+                        SELECT 1 FROM pg_constraint c
+                        JOIN pg_class t ON t.oid = c.conrelid
+                        WHERE t.relname = 'payments'
+                          AND c.conname = 'payments_status_check'
+                          AND pg_get_constraintdef(c.oid) LIKE '%duplicate_capture%'
+                        """
+                    )
+                )
+            ).scalar_one_or_none()
+            return row is not None
+
         async with maker() as session:
             async with session.begin():
                 for number in _TDS_V3_MIGRATIONS:
+                    if number == "034" and await _refunds_check_includes_duplicate_payment(
+                        session
+                    ):
+                        continue
+                    if number == "037" and await _payments_check_includes_duplicate_capture(
+                        session
+                    ):
+                        continue
                     path = mig_dir / f"migration_{number}.sql"
                     if path.is_file():
                         await session.execute(text(path.read_text(encoding="utf-8")))

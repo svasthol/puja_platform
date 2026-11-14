@@ -134,6 +134,10 @@ def map_db_error(pg_exc: BaseException, path: str) -> Response:
             return _json(410, "This offer is no longer available.")
         if "cancelled by the customer" in msg_l:
             return _json(410, "The customer cancelled this booking.")
+        if "not acceptable" in msg_l and "not paid" in msg_l:
+            return _json(409, "This booking cannot be accepted until payment is confirmed.")
+        if "not acceptable" in msg_l:
+            return _json(409, "This booking cannot be accepted in its current state.")
         if "cannot be cancelled from its current state" in msg_l:
             return _json(409, "This booking can no longer be cancelled — contact support.")
         if "usage limit exceeded" in msg_l:

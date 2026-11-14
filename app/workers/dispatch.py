@@ -57,6 +57,42 @@ def _ensure_dispatch_state(cur, booking_id: str) -> None:
     )
 
 
+def _dispatchable_row(cur, booking_id: str, *, for_share: bool) -> tuple | None:
+    lock = " FOR SHARE OF b" if for_share else ""
+    cur.execute(
+        f"""
+        SELECT st.code, b.paid_at, b.pujari_id, b.cancelled_at
+        FROM bookings b
+        JOIN status_types st ON st.id = b.status_id
+        WHERE b.id = %s{lock}
+        """,
+        (booking_id,),
+    )
+    return cur.fetchone()
+
+
+def _skip_if_not_dispatchable(cur, booking_id: str, *, for_share: bool = False) -> dict | None:
+    row = _dispatchable_row(cur, booking_id, for_share=for_share)
+    if row is None:
+        log.info("dispatch_skipped_missing_booking", booking_id=booking_id)
+        return {"skipped": "booking_missing"}
+    code, paid_at, pujari_id, cancelled_at = row
+    if (
+        code != "requested"
+        or paid_at is None
+        or pujari_id is not None
+        or cancelled_at is not None
+    ):
+        log.info(
+            "dispatch_skipped_not_dispatchable",
+            booking_id=booking_id,
+            status=code,
+            paid=bool(paid_at),
+        )
+        return {"skipped": "not_dispatchable"}
+    return None
+
+
 def _reset_dispatch_state_if_fresh(cur, booking_id: str, *, fresh: bool) -> None:
     if not fresh:
         return
@@ -137,6 +173,10 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            skip = _skip_if_not_dispatchable(cur, booking_id)
+            if skip:
+                conn.rollback()
+                return skip
             settings = load_dispatch_settings(cur)
             _ensure_dispatch_state(cur, booking_id)
             _reset_dispatch_state_if_fresh(cur, booking_id, fresh=fresh)
@@ -231,6 +271,11 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                         hint="no pujari heartbeat keys in Redis at dispatch time",
                     )
 
+            skip = _skip_if_not_dispatchable(cur, booking_id, for_share=True)
+            if skip:
+                conn.rollback()
+                return skip
+
             inserted = 0
             offer_ttl = offer_expires_interval(booking_class, settings)
             for pujari_id in live:
@@ -281,6 +326,10 @@ def _direct_dispatch(booking_id: str) -> dict:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            skip = _skip_if_not_dispatchable(cur, booking_id)
+            if skip:
+                conn.rollback()
+                return skip
             cur.execute(
                 """
                 SELECT b.intended_pujari_id, b.puja_id, pj.verification_status

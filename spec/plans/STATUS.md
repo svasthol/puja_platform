@@ -9,7 +9,7 @@ gates: [`MASTER.md`](./MASTER.md).
 this file on every task). Status changes happen here and only here; track files own
 Spec / Files / Acceptance / Depends-on.
 
-**Last audited:** 2026-11-01 (Setu sandbox laptop sign-off + identity PR #7 → `dev`)
+**Last audited:** 2026-11-14 (PR1 `bug/dispatch-payment-guards` in progress — no merge without approval)
 
 ---
 
@@ -52,6 +52,20 @@ Policy: `spec/plans/LAUNCH_POLICY.md`.
 
 **§21 backend in this repo:** all rows above through `P-LAUNCH-RECONFIRM` are **COMPLETED**.
 Mobile clients tracked separately below (`mana_guruji_mobile` — partner **IN_PROGRESS**, customer **IN_PROGRESS**).
+
+### Production reliability hardening (REL)
+
+[`PRODUCTION_RELIABILITY_LAUNCH_STATUS.md`](./PRODUCTION_RELIABILITY_LAUNCH_STATUS.md) · [`PRODUCTION_RELIABILITY_DEFECT_REGISTER.md`](./PRODUCTION_RELIABILITY_DEFECT_REGISTER.md)
+
+| ID | Status | Notes |
+|---|---|---|
+| REL-REGISTER | COMPLETED | Register + launch status (2026-11-14) |
+| REL-PREFLIGHT | PENDING | `order_%` SQL before PR1 merge |
+| REL-PR1 | IN_PROGRESS | Branch `bug/dispatch-payment-guards` — REL-001/003/016/004 + migration_037 |
+| REL-PR2 | PENDING | Post-commit, payment-verify, reconcile |
+| REL-PR3 | PENDING | Celery / RedBeat |
+| REL-PR4 | PENDING | Two-phase create_order, accept idempotency |
+| REL-STAGING-GATE | PENDING | Matrix + go/no-go §H |
 
 ### Puja MVP launch — TDS (Sprint 2, s.393 ex-194-O)
 
