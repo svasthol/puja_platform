@@ -188,3 +188,38 @@ async def test_confirm_selfie_missing_s3_object(session):
                 document_id=doc_id,
             )
     assert exc.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_kyc_status_photo_change_with_multiple_legacy_verified_photos(session):
+<<<<<<< Updated upstream
+    """Regression: many non-current verified selfies must not 500 KYC status."""
+=======
+    """Regression QA-KYC-006: multiple legacy verified selfies must not 500 KYC status."""
+>>>>>>> Stashed changes
+    pid = await _seed_pujari(session)
+    pending_id = await _insert_photo_doc(session, pid)
+    await session.execute(
+        text("UPDATE pujari_documents SET status = 'pending' WHERE id = :id"),
+        {"id": str(pending_id)},
+    )
+    for suffix in ("a", "b"):
+        legacy_id = uuid.uuid4()
+        await session.execute(
+            text(
+                "INSERT INTO pujari_documents "
+                "(id, pujari_id, doc_type, file_url, version, is_current, status) "
+                "VALUES (:id, :pid, 'photo', :url, 1, false, 'verified')"
+            ),
+            {
+                "id": str(legacy_id),
+                "pid": str(pid),
+                "url": f"kyc/test/photo/legacy_{suffix}.jpg",
+            },
+        )
+    await session.commit()
+
+    _verification, _required, _live, photo_change = await kyc_svc.get_partner_kyc_status(
+        session, pid
+    )
+    assert photo_change is True
