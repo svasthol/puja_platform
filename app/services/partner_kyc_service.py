@@ -988,17 +988,6 @@ async def _photo_change_under_review(
     if published_id is not None and published_id != cur_id:
         return True
 
-<<<<<<< Updated upstream
-    # Multiple legacy verified rows are valid after re-uploads; existence only.
-    older_verified = (
-        await db.execute(
-            select(PujariDocument.id)
-            .where(
-                PujariDocument.pujari_id == pujari_id,
-                PujariDocument.doc_type == "photo",
-                PujariDocument.is_current.is_(False),
-                PujariDocument.status == "verified",
-=======
     legacy_verified_photo = (
         await db.execute(
             select(
@@ -1008,9 +997,7 @@ async def _photo_change_under_review(
                     PujariDocument.is_current.is_(False),
                     PujariDocument.status == "verified",
                 )
->>>>>>> Stashed changes
             )
-            .limit(1)
         )
     ).scalar()
     return bool(legacy_verified_photo)

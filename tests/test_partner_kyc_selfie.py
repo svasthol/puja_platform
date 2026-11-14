@@ -192,11 +192,7 @@ async def test_confirm_selfie_missing_s3_object(session):
 
 @pytest.mark.asyncio
 async def test_kyc_status_photo_change_with_multiple_legacy_verified_photos(session):
-<<<<<<< Updated upstream
-    """Regression: many non-current verified selfies must not 500 KYC status."""
-=======
     """Regression QA-KYC-006: multiple legacy verified selfies must not 500 KYC status."""
->>>>>>> Stashed changes
     pid = await _seed_pujari(session)
     pending_id = await _insert_photo_doc(session, pid)
     await session.execute(
