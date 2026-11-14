@@ -52,6 +52,46 @@ class TdsFacilitationUpdate(BaseModel):
     change_reason: str | None = Field(default=None, max_length=300)
 
 
+class DispatchPolicyResponse(BaseModel):
+    """Launch dispatch + booking-gate keys from platform_settings (migrations 012/014)."""
+
+    instant_lead_hours: int
+    instant_dispatch_minutes: int
+    advance_dispatch_start_hours: int
+    advance_dispatch_fail_hours: int
+    reoffer_cooldown_minutes: int
+    dispatch_buffer_minutes: int
+    immediate_dispatch_on_payment: bool
+    instant_offer_ttl_seconds: int
+    advance_offer_ttl_hours: int
+    max_live_advance_offers_per_pujari: int
+    rm_escalation_hours_no_accept: int
+    rm_escalation_t24_hours: int
+    night_bookings_enabled: bool
+    reconfirm_quiet_hours_start: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
+    reconfirm_quiet_hours_end: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
+    updated_at: str | None = None
+
+
+class DispatchPolicyUpdate(BaseModel):
+    instant_lead_hours: int = Field(ge=1, le=48)
+    instant_dispatch_minutes: int = Field(ge=5, le=180)
+    advance_dispatch_start_hours: int = Field(ge=1, le=48)
+    advance_dispatch_fail_hours: int = Field(ge=1, le=24)
+    reoffer_cooldown_minutes: int = Field(ge=0, le=240)
+    dispatch_buffer_minutes: int = Field(ge=0, le=180)
+    immediate_dispatch_on_payment: bool
+    instant_offer_ttl_seconds: int = Field(ge=30, le=900)
+    advance_offer_ttl_hours: int = Field(ge=1, le=72)
+    max_live_advance_offers_per_pujari: int = Field(ge=1, le=50)
+    rm_escalation_hours_no_accept: int = Field(ge=1, le=72)
+    rm_escalation_t24_hours: int = Field(ge=1, le=72)
+    night_bookings_enabled: bool
+    reconfirm_quiet_hours_start: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
+    reconfirm_quiet_hours_end: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
+    change_reason: str | None = Field(default=None, max_length=300)
+
+
 # ---- Role management (P-ADMIN-SEED) ---------------------------------------
 class RoleAssignRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)

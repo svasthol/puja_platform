@@ -6,6 +6,9 @@ import {
   bookingFeeUpdateSchema,
   tdsFacilitationSchema,
   tdsFacilitationUpdateSchema,
+  dispatchPolicySchema,
+  dispatchPolicyUpdateSchema,
+  type DispatchPolicy,
   credentialProvisionSchema,
   roleAssignSchema,
   userRolesSchema,
@@ -71,6 +74,23 @@ export async function updateBookingFee(input: {
 export async function fetchTdsFacilitation(): Promise<TdsFacilitation> {
   return apiFetch("/admin/settings/tds-facilitation", {
     schema: tdsFacilitationSchema,
+  });
+}
+
+export async function fetchDispatchPolicy(): Promise<DispatchPolicy> {
+  return apiFetch("/admin/settings/dispatch-policy", {
+    schema: dispatchPolicySchema,
+  });
+}
+
+export async function updateDispatchPolicy(
+  input: Parameters<typeof dispatchPolicyUpdateSchema.parse>[0],
+): Promise<DispatchPolicy> {
+  const body = dispatchPolicyUpdateSchema.parse(input);
+  return apiFetch("/admin/settings/dispatch-policy", {
+    method: "PUT",
+    body: JSON.stringify(body),
+    schema: dispatchPolicySchema,
   });
 }
 

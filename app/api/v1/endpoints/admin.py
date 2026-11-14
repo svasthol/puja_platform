@@ -40,10 +40,18 @@ from app.schemas.admin import (
     BookingFeeUpdate,
     AdminMeResponse,
     CredentialProvisionResponse,
+    DispatchPolicyResponse,
+    DispatchPolicyUpdate,
     RoleAssignRequest,
     TdsFacilitationResponse,
     TdsFacilitationUpdate,
     UserRolesResponse,
+)
+from app.services.admin_dispatch_policy import (
+    AUDIT_ENTITY_ID,
+    DispatchPolicyView,
+    fetch_dispatch_policy,
+    persist_dispatch_policy,
 )
 from app.services.pricing import (
     ALLOWED_ENTITY_TYPES,
@@ -305,6 +313,84 @@ async def set_tds_facilitation(
         ip=request.client.host if request.client else None,
     )
     return _tds_facilitation_response(cfg)
+
+
+def _dispatch_policy_response(view: DispatchPolicyView) -> DispatchPolicyResponse:
+    return DispatchPolicyResponse(
+        instant_lead_hours=view.instant_lead_hours,
+        instant_dispatch_minutes=view.instant_dispatch_minutes,
+        advance_dispatch_start_hours=view.advance_dispatch_start_hours,
+        advance_dispatch_fail_hours=view.advance_dispatch_fail_hours,
+        reoffer_cooldown_minutes=view.reoffer_cooldown_minutes,
+        dispatch_buffer_minutes=view.dispatch_buffer_minutes,
+        immediate_dispatch_on_payment=view.immediate_dispatch_on_payment,
+        instant_offer_ttl_seconds=view.instant_offer_ttl_seconds,
+        advance_offer_ttl_hours=view.advance_offer_ttl_hours,
+        max_live_advance_offers_per_pujari=view.max_live_advance_offers_per_pujari,
+        rm_escalation_hours_no_accept=view.rm_escalation_hours_no_accept,
+        rm_escalation_t24_hours=view.rm_escalation_t24_hours,
+        night_bookings_enabled=view.night_bookings_enabled,
+        reconfirm_quiet_hours_start=view.reconfirm_quiet_hours_start,
+        reconfirm_quiet_hours_end=view.reconfirm_quiet_hours_end,
+        updated_at=view.updated_at,
+    )
+
+
+def _dispatch_view_from_update(payload: DispatchPolicyUpdate) -> DispatchPolicyView:
+    return DispatchPolicyView(
+        instant_lead_hours=payload.instant_lead_hours,
+        instant_dispatch_minutes=payload.instant_dispatch_minutes,
+        advance_dispatch_start_hours=payload.advance_dispatch_start_hours,
+        advance_dispatch_fail_hours=payload.advance_dispatch_fail_hours,
+        reoffer_cooldown_minutes=payload.reoffer_cooldown_minutes,
+        dispatch_buffer_minutes=payload.dispatch_buffer_minutes,
+        immediate_dispatch_on_payment=payload.immediate_dispatch_on_payment,
+        instant_offer_ttl_seconds=payload.instant_offer_ttl_seconds,
+        advance_offer_ttl_hours=payload.advance_offer_ttl_hours,
+        max_live_advance_offers_per_pujari=payload.max_live_advance_offers_per_pujari,
+        rm_escalation_hours_no_accept=payload.rm_escalation_hours_no_accept,
+        rm_escalation_t24_hours=payload.rm_escalation_t24_hours,
+        night_bookings_enabled=payload.night_bookings_enabled,
+        reconfirm_quiet_hours_start=payload.reconfirm_quiet_hours_start,
+        reconfirm_quiet_hours_end=payload.reconfirm_quiet_hours_end,
+    )
+
+
+@router.get("/settings/dispatch-policy", response_model=DispatchPolicyResponse)
+async def get_dispatch_policy(
+    _p: Principal = Depends(require_admin), db: AsyncSession = Depends(get_db)
+):
+    """Read launch dispatch policy keys (support may view; admin writes)."""
+    view = await fetch_dispatch_policy(db)
+    return _dispatch_policy_response(view)
+
+
+@router.put("/settings/dispatch-policy", response_model=DispatchPolicyResponse)
+async def set_dispatch_policy(
+    payload: DispatchPolicyUpdate,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Replace launch dispatch platform_settings (audited). Does not retro-edit booking_dispatch_state rows."""
+    before_view = await fetch_dispatch_policy(db)
+    before = _dispatch_policy_response(before_view).model_dump()
+    after_view = await persist_dispatch_policy(
+        db, _dispatch_view_from_update(payload)
+    )
+    after = _dispatch_policy_response(after_view).model_dump()
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="update",
+        entity_type="platform_settings",
+        entity_id=AUDIT_ENTITY_ID,
+        before=before,
+        after=after,
+        change_reason=payload.change_reason,
+        ip=request.client.host if request.client else None,
+    )
+    return _dispatch_policy_response(after_view)
 
 
 # --------------------------------------------------------------------------- #
