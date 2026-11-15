@@ -75,6 +75,20 @@ class BookingCreateResponse(BaseModel):
     idempotent: bool = False
 
 
+class PaymentVerifyRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    razorpay_payment_id: str
+    razorpay_order_id: str
+    razorpay_signature: str
+
+
+class PaymentVerifyResponse(BaseModel):
+    status: str
+    booking_id: uuid.UUID
+    booking_status: str | None = None
+    message: str | None = None
+
+
 class CancelResponse(BaseModel):
     booking_id: uuid.UUID
     status: str

@@ -409,7 +409,12 @@ async def create_booking(
     await db.execute(
         update(Booking)
         .where(Booking.id == booking_id)
-        .values(razorpay_order_id=order_id, updated_at=now)
+        .values(
+            razorpay_order_id=order_id,
+            reconcile_next_at=now + dt.timedelta(minutes=20),
+            reconcile_attempts=0,
+            updated_at=now,
+        )
     )
 
     hold.expires_at = now + dt.timedelta(minutes=15)

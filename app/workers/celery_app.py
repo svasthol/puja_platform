@@ -48,6 +48,7 @@ celery_app = Celery(
         "app.workers.panchangam",
         "app.workers.kyc",
         "app.workers.tds_accrual",
+        "app.workers.payment_reconcile",
     ],
 )
 
@@ -76,6 +77,7 @@ celery_app.conf.update(
         "app.workers.rm_escalation.*": {"queue": "sweep"},
         "app.workers.dispatch.*": {"queue": "dispatch"},
         "app.workers.refund.*": {"queue": "refund"},
+        "app.workers.payment_reconcile.*": {"queue": "refund"},
         "app.workers.notifications.*": {"queue": "notifications"},
         "app.workers.panchangam.*": {"queue": "sweep"},
         "app.workers.kyc.*": {"queue": "sweep"},
@@ -104,6 +106,11 @@ celery_app.conf.update(
         "process-refunds-every-60s": {
             "task": "app.workers.refund.process_refunds",
             "schedule": 60.0,
+            "options": {"queue": "refund"},
+        },
+        "reconcile-payments-every-2m": {
+            "task": "app.workers.payment_reconcile.reconcile_payments",
+            "schedule": 120.0,
             "options": {"queue": "refund"},
         },
         "refresh-panchangam-daily": {

@@ -24,12 +24,13 @@ from app.schemas.booking import (
     CheckoutQuote,
     DispatchChoice,
     GateWarning,
+    PaymentVerifyRequest,
     QuotePaymentOption,
     SlotHoldRequest,
     SlotHoldResponse,
 )
 from app.schemas.common import decode_cursor, encode_cursor
-from app.services import booking_service, cancellation_service
+from app.services import booking_service, cancellation_service, payment_verify_service
 from app.services.razorpay_client import RazorpayError
 from app.services.booking_gate import (
     evaluate_booking_gate,
@@ -189,6 +190,25 @@ async def create_booking(
             http.HTTP_503_SERVICE_UNAVAILABLE,
             "Payment gateway is temporarily unavailable. Please try again.",
         ) from exc
+
+
+@router.post("/bookings/{booking_id}/payment-verify")
+async def payment_verify(
+    booking_id: uuid.UUID,
+    payload: PaymentVerifyRequest,
+    p: Principal = Depends(require_customer),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Client-side confirm after Razorpay Checkout (REL-015). Webhook remains primary."""
+    body, status = await payment_verify_service.verify_booking_payment(
+        db,
+        user_id=p.user_id,
+        booking_id=booking_id,
+        razorpay_payment_id=payload.razorpay_payment_id,
+        razorpay_order_id=payload.razorpay_order_id,
+        razorpay_signature=payload.razorpay_signature,
+    )
+    return ORJSONResponse(status_code=status, content=body)
 
 
 @router.post("/bookings/{booking_id}/cancel")
