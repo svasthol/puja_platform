@@ -30,6 +30,15 @@ def check_g1_sweep() -> None:
         raise SystemExit("G1 FAIL: sweep.get_connection() missing prepare_threshold=None")
 
 
+def check_g3_sql_migrate_manifest() -> None:
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from sql_migrate_manifest import build_sql_migrate_steps, verify
+
+    verify()
+    if not build_sql_migrate_steps():
+        raise SystemExit("G3 FAIL: empty sql migrate step list")
+
+
 def check_g2_bootstrap() -> None:
     bootstrap = ROOT / "scripts/bootstrap.sh"
     if not bootstrap.is_file():
@@ -49,7 +58,8 @@ def main() -> int:
     check_g1_engine()
     check_g1_sweep()
     check_g2_bootstrap()
-    print("deploy_preflight_repo: G1 + G2 OK")
+    check_g3_sql_migrate_manifest()
+    print("deploy_preflight_repo: G1 + G2 + G3 OK")
     return 0
 
 
