@@ -33,18 +33,8 @@ export DATABASE_URL="$MIGRATE_URL"
 echo "migrate.sh: alembic upgrade head"
 alembic upgrade head
 
-for n in 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027; do
-  echo "migrate.sh: apply_migration_${n}.py"
-  python "scripts/apply_migration_${n}.py"
-done
-
-echo "migrate.sh: apply_migrations_028_032.py"
-python scripts/apply_migrations_028_032.py
-
-for n in 035 036; do
-  echo "migrate.sh: apply_migration_${n}.py"
-  python "scripts/apply_migration_${n}.py"
-done
+echo "migrate.sh: run_sql_migrations.py (manifest — all apply_migration_*.py)"
+python scripts/run_sql_migrations.py
 
 export DATABASE_URL="$ADMIN_URL"
 echo "migrate.sh: apply_grants.py"

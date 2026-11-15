@@ -195,6 +195,8 @@ def _enable_legacy_payment_modes_in_tests(request, monkeypatch):
     """Legacy integration tests predate booking_fee launch; Sprint 1 tests opt out."""
     if request.node.get_closest_marker("booking_fee_launch"):
         return
+    if request.node.get_closest_marker("repo_gate_only"):
+        return
     from app.core.config import get_settings
 
     settings = get_settings()
@@ -206,6 +208,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "booking_fee_launch: Sprint 1 tests with FULL_ONLINE_ENABLED=false",
+    )
+    config.addinivalue_line(
+        "markers",
+        "repo_gate_only: skip app/db autouse fixtures (deploy preflight / manifest)",
     )
 
 

@@ -147,7 +147,7 @@ Or use **Actions → Deploy staging → Run workflow** with:
 | [`install_data_services_ol9.sh`](../../scripts/linux/install_data_services_ol9.sh) | Once: PG16 + PostGIS + Redis |
 | [`bootstrap_python_runtime.sh`](../../scripts/linux/bootstrap_python_runtime.sh) | Every deploy (idempotent pip) |
 | [`bootstrap.sh`](../../scripts/bootstrap.sh) | Once per DB (roles) |
-| [`migrate.sh`](../../scripts/migrate.sh) | Every deploy |
+| [`migrate.sh`](../../scripts/migrate.sh) | Every deploy — `run_sql_migrations.py` (manifest; G3 preflight) |
 | [`remote_staging_deploy.sh`](../../scripts/linux/remote_staging_deploy.sh) | Called by GitHub SSH |
 | [`install_admin.sh`](../../deploy/staging/install_admin.sh) | Admin UI build + `mana-guruji-admin` — [`STAGING_ADMIN_UI.md`](./STAGING_ADMIN_UI.md) |
 
