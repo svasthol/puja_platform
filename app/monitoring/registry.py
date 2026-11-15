@@ -12,6 +12,7 @@ class AlertType(StrEnum):
     REFUND_FAILED_PERMANENT = "refund_failed_permanent"
     DISPATCH_EXHAUSTED = "dispatch_exhausted"
     WEBHOOK_SIGNATURE_INVALID = "webhook_signature_invalid"
+    PAYMENT_RECONCILE_RECOVERED = "payment_reconcile_recovered"
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +73,14 @@ _ALERT_SPECS: dict[AlertType, AlertSpec] = {
         component="webhook",
         subject_type="webhook",
         description="Razorpay webhook HMAC verification failed",
+    ),
+    AlertType.PAYMENT_RECONCILE_RECOVERED: AlertSpec(
+        alert_type=AlertType.PAYMENT_RECONCILE_RECOVERED,
+        severity="info",
+        layer="worker",
+        component="payment",
+        subject_type="booking",
+        description="reconcile worker applied a captured payment after webhook loss",
     ),
 }
 
