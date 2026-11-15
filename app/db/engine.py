@@ -55,7 +55,17 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def get_db_txn() -> AsyncGenerator[AsyncSession, None]:
     """Transactional session — the whole request runs in one transaction.
     Commits on success, rolls back on any exception (so DB errors surface to
-    the shared handler instead of leaving a half-applied write)."""
+    the shared handler instead of leaving a half-applied write).
+
+    After a successful commit, runs REL-002 post_commit Celery flushes."""
+    from app.db import post_commit
+
     async with AsyncSessionLocal() as session:
-        async with session.begin():
-            yield session
+        try:
+            async with session.begin():
+                yield session
+        except Exception:
+            post_commit.discard_post_commit(session)
+            raise
+        else:
+            await post_commit.flush_post_commit(session)

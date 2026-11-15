@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import verify_razorpay_signature
+from app.db import post_commit
 from app.db.engine import get_db_txn
 from app.monitoring import AlertType, emit_instant_alert
 from app.services import webhook_service
@@ -170,17 +171,16 @@ async def razorpay_webhook(
         amount_paise=int(payment_entity.get("amount", 0)),
     )
 
-    # Post-commit dispatch enqueue is PR2 (REL-002); tasks still sent before txn ends today.
     if result.get("enqueue_direct"):
-        from app.workers.celery_app import celery_app
-
-        celery_app.send_task(
-            "app.workers.dispatch.direct_dispatch", args=[result["enqueue_direct"]]
+        post_commit.enqueue_celery_task(
+            db,
+            task_name="app.workers.dispatch.direct_dispatch",
+            args=[result["enqueue_direct"]],
         )
     elif result.get("enqueue_broadcast"):
-        from app.workers.celery_app import celery_app
-
-        celery_app.send_task(
-            "app.workers.dispatch.broadcast_booking", args=[result["enqueue_broadcast"]]
+        post_commit.enqueue_celery_task(
+            db,
+            task_name="app.workers.dispatch.broadcast_booking",
+            args=[result["enqueue_broadcast"]],
         )
     return {"status": "ok", "result": result.get("status")}

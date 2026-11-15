@@ -1,10 +1,10 @@
 # Production reliability launch status
 
-**Branch (PR1):** `bug/dispatch-payment-guards` (from `dev`) — **do not merge without approval**  
-**Tracker:** [`PRODUCTION_RELIABILITY_DEFECT_REGISTER.md`](./PRODUCTION_RELIABILITY_DEFECT_REGISTER.md) · [`STATUS.md`](./STATUS.md)
+**Branch (PR2):** `bug/post-commit-payment-verify` (from `dev`)  
+**Tracker:** [`PRODUCTION_RELIABILITY_DEFECT_REGISTER.md`](./PRODUCTION_RELIABILITY_DEFECT_REGISTER.md) · [`PRODUCTION_RELIABILITY_PR2_CHECKLIST.md`](./PRODUCTION_RELIABILITY_PR2_CHECKLIST.md)
 
-**Last updated:** 2026-11-14  
-**Train:** **PR1 IN PROGRESS** on branch above (not pushed by default).
+**Last updated:** 2026-11-15  
+**Train:** **PR1 merged on `dev`** (PR #14). **PR2 in progress** on branch above.
 
 ## PR1 scope (this branch)
 

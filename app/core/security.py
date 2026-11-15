@@ -119,6 +119,22 @@ def decode_token(token: str, *, verify_exp: bool = True) -> dict:
     )
 
 
+# ---- Razorpay Checkout verify (REL-015) -------------------------------------
+def verify_razorpay_checkout_signature(
+    *,
+    order_id: str,
+    payment_id: str,
+    signature: str,
+) -> bool:
+    """HMAC SHA256 of ``order_id|payment_id`` with key secret (Checkout success)."""
+    secret = settings.RAZORPAY_KEY_SECRET
+    if not secret:
+        return False
+    payload = f"{order_id}|{payment_id}".encode()
+    expected = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature or "")
+
+
 # ---- Razorpay webhook signature (constant-time compare) --------------------
 def verify_razorpay_signature(body: bytes, signature: str) -> bool:
     if not settings.RAZORPAY_WEBHOOK_SECRET:

@@ -3,14 +3,24 @@
 **Status workflow:** `Open` → `In PR` → `On staging` → `Verified` → `Closed`  
 **Launch:** [`PRODUCTION_RELIABILITY_LAUNCH_STATUS.md`](./PRODUCTION_RELIABILITY_LAUNCH_STATUS.md)
 
-## PR1 (`bug/dispatch-payment-guards`) — In PR
+## PR1 (`bug/dispatch-payment-guards`) — **Merged on `dev`** (PR #14)
 
 | ID | Status | Tests |
 |----|--------|-------|
-| REL-001 | In PR | `tests/test_rel_pr1_dispatch_payment.py` |
-| REL-003 | In PR | trigger + `offer_service` |
-| REL-016 | In PR | `webhooks.py` |
-| REL-004 | In PR | duplicate capture + refund |
+| REL-001 | Merged (`dev`) | `tests/test_rel_pr1_dispatch_payment.py` |
+| REL-003 | Merged (`dev`) | trigger + `offer_service` |
+| REL-016 | Merged (`dev`) | `webhooks.py` |
+| REL-004 | Merged (`dev`) | duplicate capture + refund |
+
+## PR2 (`bug/post-commit-payment-verify`) — **Next**
+
+**Checklist (file-level, connectivity):** [`PRODUCTION_RELIABILITY_PR2_CHECKLIST.md`](./PRODUCTION_RELIABILITY_PR2_CHECKLIST.md)
+
+| ID | Status | Tests |
+|----|--------|-------|
+| REL-002 | Open → In PR | `tests/test_rel_pr2_post_commit.py` + staging rollback proof |
+| REL-005 | Open → In PR | `tests/test_rel_pr2_integration.py` + migration_038 |
+| REL-015 | Open → In PR | verify API + `payment_verify_service` |
 
 Full backlog: see plan `prod_hardening_launch_7e4484af` (remaining rows **Open** until their PR).
 

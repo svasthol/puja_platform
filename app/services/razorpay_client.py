@@ -109,3 +109,33 @@ def create_refund_sync(*, payment_gateway_id: str, amount_paise: int, idempotenc
     if 400 <= code < 500:
         raise RazorpayRefundPermanentError(detail)
     raise RazorpayRefundRetryableError(detail)
+
+
+async def fetch_payment(payment_id: str) -> dict:
+    """GET /v1/payments/{id} for client payment-verify (REL-015)."""
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.get(f"{_BASE}/payments/{payment_id}", auth=_auth())
+        resp.raise_for_status()
+        body = resp.json()
+        if not isinstance(body, dict):
+            raise RazorpayError("invalid payment response")
+        return body
+    except httpx.HTTPError as exc:
+        log.warning("razorpay_fetch_payment_failed", payment_id=payment_id, error=str(exc))
+        raise RazorpayError(str(exc)) from exc
+
+
+def fetch_order_payments_sync(order_id: str) -> list[dict]:
+    """GET /v1/orders/{id}/payments for reconcile worker (REL-005)."""
+    try:
+        with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
+            resp = client.get(f"{_BASE}/orders/{order_id}/payments", auth=_auth())
+        resp.raise_for_status()
+        payload = resp.json()
+        items = payload.get("items") if isinstance(payload, dict) else None
+        if not isinstance(items, list):
+            return []
+        return [p for p in items if isinstance(p, dict)]
+    except httpx.HTTPError as exc:
+        raise RazorpayError(str(exc)) from exc

@@ -62,7 +62,7 @@ Mobile clients tracked separately below (`mana_guruji_mobile` — partner **IN_P
 | REL-REGISTER | COMPLETED | Register + launch status (2026-11-14) |
 | REL-PREFLIGHT | PENDING | `order_%` SQL before PR1 merge |
 | REL-PR1 | IN_PROGRESS | Branch `bug/dispatch-payment-guards` — REL-001/003/016/004 + migration_037 |
-| REL-PR2 | PENDING | Post-commit, payment-verify, reconcile |
+| REL-PR2 | IN PROGRESS | Post-commit, payment-verify, reconcile — [`PRODUCTION_RELIABILITY_PR2_CHECKLIST.md`](./PRODUCTION_RELIABILITY_PR2_CHECKLIST.md) |
 | REL-PR3 | PENDING | Celery / RedBeat |
 | REL-PR4 | PENDING | Two-phase create_order, accept idempotency |
 | REL-STAGING-GATE | PENDING | Matrix + go/no-go §H |

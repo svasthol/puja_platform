@@ -60,6 +60,9 @@ class Booking(Base):
     tds_snapshot_pan_on_file: Mapped[bool | None] = mapped_column(Boolean)
     # migration 004 — set at checkout; returned on idempotent duplicate submit
     razorpay_order_id: Mapped[str | None] = mapped_column(String(100))
+    # migration 038 — lost-webhook reconcile schedule (REL-005)
+    reconcile_next_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    reconcile_attempts: Mapped[int] = mapped_column(SmallInteger, default=0)
     # migration 014 — frozen at POST /v1/bookings; no column default
     booking_class: Mapped[str] = mapped_column(String(10))
     relationship_manager_id: Mapped[uuid.UUID | None] = mapped_column(
