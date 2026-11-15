@@ -48,6 +48,7 @@ dependencies = [
 
     # Async job queue
     "celery[redis]==5.6.3",
+    "celery-redbeat==2.4.2",
     "kombu==5.6.1",
     "redis==5.3.1",
 

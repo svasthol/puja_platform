@@ -27,7 +27,7 @@ python -c "import asyncio; asyncio.set_event_loop_policy(asyncio.WindowsSelector
 python tests/e2e_ui/serve.py *>&1 | Tee-Object -FilePath logs/e2e-ui.log -Append
 
 # Celery worker (your queue + solo pool)
-celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,notifications --pool=solo *>&1 | Tee-Object -FilePath logs/celery-workers.log -Append
+celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,reconcile,notifications --pool=solo *>&1 | Tee-Object -FilePath logs/celery-workers.log -Append
 
 # Celery beat
 celery -A app.workers.celery_app beat --loglevel=info *>&1 | Tee-Object -FilePath logs/beat.log -Append

@@ -186,7 +186,7 @@ if (-not $SkipWorker) {
 Set-Location -LiteralPath '$platEsc'
 New-Item -ItemType Directory -Force -Path 'logs' | Out-Null
 if (Test-Path -LiteralPath '.venv\Scripts\Activate.ps1') { . '.venv\Scripts\Activate.ps1' }
-& '$celEsc' -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,notifications --pool=solo *>&1 | Tee-Object -FilePath 'logs/celery-workers.log' -Append
+& '$celEsc' -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,reconcile,notifications --pool=solo *>&1 | Tee-Object -FilePath 'logs/celery-workers.log' -Append
 "@
         Start-LoggedWindow "Celery worker" $wCmd $PlatformRoot
     }

@@ -1,5 +1,7 @@
+# Dev / small staging: all queues in one process. Production uses
+# mana-guruji-celery-worker-{critical,money,notify}.service (REL-018).
 [Unit]
-Description=Mana Guruji Celery worker
+Description=Mana Guruji Celery worker (all queues — dev/small staging)
 After=network.target redis.service mana-guruji-api.service
 
 [Service]
@@ -9,7 +11,8 @@ Group=opc
 WorkingDirectory=/opt/mana-guruji/src/puja_platform
 EnvironmentFile=/etc/mana-guruji/api.env
 Environment=PATH=/opt/mana-guruji/venv/bin:/usr/local/bin:/usr/bin
-ExecStart=/opt/mana-guruji/venv/bin/celery -A app.workers.celery_app worker -l info -Q sweep,dispatch,refund,notifications
+ExecStart=/opt/mana-guruji/venv/bin/celery -A app.workers.celery_app worker -l info -Q sweep,dispatch,refund,reconcile,notifications
+TimeoutStopSec=330
 Restart=always
 RestartSec=10
 

@@ -55,15 +55,16 @@ Mobile clients tracked separately below (`mana_guruji_mobile` — partner **IN_P
 
 ### Production reliability hardening (REL)
 
-[`PRODUCTION_RELIABILITY_LAUNCH_STATUS.md`](./PRODUCTION_RELIABILITY_LAUNCH_STATUS.md) · [`PRODUCTION_RELIABILITY_DEFECT_REGISTER.md`](./PRODUCTION_RELIABILITY_DEFECT_REGISTER.md)
+[`PRODUCTION_RELIABILITY_LAUNCH_STATUS.md`](./PRODUCTION_RELIABILITY_LAUNCH_STATUS.md) · [`PRODUCTION_RELIABILITY_DEFECT_REGISTER.md`](./PRODUCTION_RELIABILITY_DEFECT_REGISTER.md) · [`PRODUCTION_RELIABILITY_CEO_BRIEF.md`](./PRODUCTION_RELIABILITY_CEO_BRIEF.md) (PDF-ready layman brief)
 
 | ID | Status | Notes |
 |---|---|---|
 | REL-REGISTER | COMPLETED | Register + launch status (2026-11-14) |
 | REL-PREFLIGHT | PENDING | `order_%` SQL before PR1 merge |
 | REL-PR1 | IN_PROGRESS | Branch `bug/dispatch-payment-guards` — REL-001/003/016/004 + migration_037 |
-| REL-PR2 | IN PROGRESS | Post-commit, payment-verify, reconcile — [`PRODUCTION_RELIABILITY_PR2_CHECKLIST.md`](./PRODUCTION_RELIABILITY_PR2_CHECKLIST.md) |
-| REL-PR3 | PENDING | Celery / RedBeat |
+| REL-PR2 | MERGED (`dev`) | Post-commit, payment-verify, reconcile — [`PRODUCTION_RELIABILITY_PR2_CHECKLIST.md`](./PRODUCTION_RELIABILITY_PR2_CHECKLIST.md) |
+| REL-PR3 | IN PROGRESS | `bug/celery-ops` — slice 1 merged pending; slice 2 RedBeat + worker split |
+| MOB-REL-015 | IN PROGRESS | Branch `feature/customer-payment-verify` (Flutter repo) |
 | REL-PR4 | PENDING | Two-phase create_order, accept idempotency |
 | REL-STAGING-GATE | PENDING | Matrix + go/no-go §H |
 
