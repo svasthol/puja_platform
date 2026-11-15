@@ -1,8 +1,10 @@
 """
 Central Celery application — the single entry point for all workers and beat.
 
-Start workers:
-    celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,notifications
+Start workers (dev / single unit):
+    celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,reconcile,notifications
+
+Prod split (REL-018): see deploy/systemd/mana-guruji-celery-worker-*.service
 Start scheduler:
     celery -A app.workers.celery_app beat --loglevel=info
 
@@ -14,6 +16,14 @@ from celery.signals import setup_logging, worker_process_init
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.workers.celery_ops import (  # noqa: F401 — registers task_failure
+    BROKER_VISIBILITY_TIMEOUT_S,
+    DEFAULT_HARD_TIME_LIMIT_S,
+    DEFAULT_SOFT_TIME_LIMIT_S,
+    SWEEP_HARD_TIME_LIMIT_S,
+    SWEEP_SOFT_TIME_LIMIT_S,
+    sweep_task_time_limits,
+)
 
 settings = get_settings()
 
@@ -60,10 +70,13 @@ celery_app.conf.update(
     enable_utc=True,
     task_acks_late=True,               # redeliver on worker crash (tasks are idempotent)
     task_reject_on_worker_lost=True,
+    task_ignore_result=True,
+    task_soft_time_limit=DEFAULT_SOFT_TIME_LIMIT_S,
+    task_time_limit=DEFAULT_HARD_TIME_LIMIT_S,
     worker_prefetch_multiplier=1,      # fair dispatch for long-ish tasks
     broker_connection_retry_on_startup=True,
     broker_transport_options={
-        "visibility_timeout": 3600,
+        "visibility_timeout": BROKER_VISIBILITY_TIMEOUT_S,
         "socket_timeout": 30,
         "socket_connect_timeout": 5,
         "retry_on_timeout": True,
@@ -77,7 +90,7 @@ celery_app.conf.update(
         "app.workers.rm_escalation.*": {"queue": "sweep"},
         "app.workers.dispatch.*": {"queue": "dispatch"},
         "app.workers.refund.*": {"queue": "refund"},
-        "app.workers.payment_reconcile.*": {"queue": "refund"},
+        "app.workers.payment_reconcile.*": {"queue": "reconcile"},
         "app.workers.notifications.*": {"queue": "notifications"},
         "app.workers.panchangam.*": {"queue": "sweep"},
         "app.workers.kyc.*": {"queue": "sweep"},
@@ -111,7 +124,7 @@ celery_app.conf.update(
         "reconcile-payments-every-2m": {
             "task": "app.workers.payment_reconcile.reconcile_payments",
             "schedule": 120.0,
-            "options": {"queue": "refund"},
+            "options": {"queue": "reconcile"},
         },
         "refresh-panchangam-daily": {
             "task": "app.workers.panchangam.refresh_panchangam_cache_task",
@@ -133,5 +146,8 @@ celery_app.conf.update(
             "schedule": 21600.0,
             "options": {"queue": "sweep"},
         },
+    },
+    task_annotations={
+        "app.workers.sweep.sweep_task": sweep_task_time_limits(),
     },
 )

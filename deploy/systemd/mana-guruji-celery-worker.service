@@ -9,7 +9,8 @@ Group=opc
 WorkingDirectory=/opt/mana-guruji/src/puja_platform
 EnvironmentFile=/etc/mana-guruji/api.env
 Environment=PATH=/opt/mana-guruji/venv/bin:/usr/local/bin:/usr/bin
-ExecStart=/opt/mana-guruji/venv/bin/celery -A app.workers.celery_app worker -l info -Q sweep,dispatch,refund,notifications
+ExecStart=/opt/mana-guruji/venv/bin/celery -A app.workers.celery_app worker -l info -Q sweep,dispatch,refund,reconcile,notifications
+TimeoutStopSec=330
 Restart=always
 RestartSec=10
 

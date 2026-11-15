@@ -12,15 +12,23 @@
 | REL-016 | Merged (`dev`) | `webhooks.py` |
 | REL-004 | Merged (`dev`) | duplicate capture + refund |
 
-## PR2 (`bug/post-commit-payment-verify`) — **Next**
+## PR2 (`bug/post-commit-payment-verify`) — **Merged on `dev`**
 
-**Checklist (file-level, connectivity):** [`PRODUCTION_RELIABILITY_PR2_CHECKLIST.md`](./PRODUCTION_RELIABILITY_PR2_CHECKLIST.md)
+**Checklist:** [`PRODUCTION_RELIABILITY_PR2_CHECKLIST.md`](./PRODUCTION_RELIABILITY_PR2_CHECKLIST.md)
 
 | ID | Status | Tests |
 |----|--------|-------|
-| REL-002 | Open → In PR | `tests/test_rel_pr2_post_commit.py` + staging rollback proof |
-| REL-005 | Open → In PR | `tests/test_rel_pr2_integration.py` + migration_038 |
-| REL-015 | Open → In PR | verify API + `payment_verify_service` |
+| REL-002 | Merged (`dev`) | `tests/test_rel_pr2_post_commit.py` |
+| REL-005 | Merged (`dev`) | `tests/test_rel_pr2_integration.py` + migration_038 |
+| REL-015 | Merged (`dev`) | verify API + MOB-REL-015 in `feature/customer-payment-verify` |
+
+## PR3 (`bug/celery-ops`) — **In progress**
+
+| ID | Status | Notes |
+|----|--------|-------|
+| REL-007 | In PR | time limits, `task_ignore_result`, `celery_task_failed` log |
+| REL-018 | In PR (slice) | `reconcile` queue; prod worker split follow-up |
+| REL-008 | Open | RedBeat + `celery-redbeat` — next slice |
 
 Full backlog: see plan `prod_hardening_launch_7e4484af` (remaining rows **Open** until their PR).
 

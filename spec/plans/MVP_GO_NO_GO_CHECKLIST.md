@@ -34,7 +34,7 @@
 | B4 | **Redis** reachable; `REDIS_URL` set | P0 | ☐ | Presence, Celery, sweep locks (`APP_ENV:` prefix) |
 | B5 | **HTTPS** LB → API; Razorpay + Setu callbacks are **public** URLs | P0 | ☐ | Webhooks |
 | B6 | API: `uvicorn` (or gunicorn+uvicorn workers), **not** `--reload`; bind `0.0.0.0` behind LB | P0 | ☐ | |
-| B7 | Celery **worker**: `-Q sweep,dispatch,refund,notifications` (no `--pool=solo`) | P0 | ☐ | `app/workers/celery_app.py` |
+| B7 | Celery **worker**: `-Q sweep,dispatch,refund,reconcile,notifications` (no `--pool=solo`) | P0 | ☐ | `app/workers/celery_app.py` |
 | B8 | Celery **beat** running (30s sweep + DV2 beats + refunds + panchangam + TDS intent tick) | P0 | ☐ | Same module `beat_schedule` |
 | B9 | `GET /health` → DB + Redis OK; `sweep_age_seconds` sane | P0 | ☐ | `app/main.py`; migration **024** `worker_heartbeats` |
 | B10 | **S3-compatible** storage (`S3_ENDPOINT_URL`, buckets) for KYC + catalog | P0 | ☐ | OCI Object Storage OK via S3 API |
