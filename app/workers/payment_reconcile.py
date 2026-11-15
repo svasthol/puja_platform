@@ -86,6 +86,20 @@ async def _apply_capture_hit(
             )
 
 
+def _record_reconcile_recovery(conn, *, booking_id: uuid.UUID, pay_id: str) -> None:
+    from app.monitoring.emit import AlertCandidate, record_ops_alert_sync
+    from app.monitoring.registry import AlertType
+
+    record_ops_alert_sync(
+        conn,
+        AlertCandidate(
+            alert_type=AlertType.PAYMENT_RECONCILE_RECOVERED,
+            subject_id=str(booking_id),
+            payload={"pay_id": pay_id, "source": "payment_reconcile"},
+        ),
+    )
+
+
 def _enqueue_dispatch(result: dict) -> None:
     bid = result.get("enqueue_broadcast") or result.get("enqueue_direct")
     if not bid:
@@ -142,6 +156,7 @@ def reconcile_payments() -> dict:
                     booking_id=str(booking_id),
                     pay_id=pay_id,
                 )
+                _record_reconcile_recovery(conn, booking_id=booking_id, pay_id=pay_id)
                 _enqueue_dispatch(result)
                 break
             if result.get("status") in ("already_processed", "auto_refund_initiated"):

@@ -22,14 +22,21 @@
 | REL-005 | Merged (`dev`) | `tests/test_rel_pr2_integration.py` + migration_038 |
 | REL-015 | Merged (`dev`) | verify API + MOB-REL-015 in `feature/customer-payment-verify` |
 
-## PR3 (`bug/celery-ops`) — **In progress**
+## PR3 — **Slices 1–2 merged on `dev` (PR #18)**
 
 | ID | Status | Notes |
 |----|--------|-------|
-| REL-007 | In PR | time limits, `task_ignore_result`, `celery_task_failed` log |
-| REL-018 | In PR (slice 2) | prod systemd split critical/money/notify; dev all-in-one OK |
-| REL-008 | In PR (slice 2) | RedBeat scheduler + lock 90s; staging failover test pending |
-| REL-021 | In PR (slice) | notifications `acks_late=False` |
+| REL-007 | Merged (`dev`) | time limits, `task_ignore_result`, `celery_task_failed` log |
+| REL-018 | Merged (slice 2) | prod systemd split; staging may keep all-in-one |
+| REL-008 | Merged (slice 2) | RedBeat; **staging failover test** still pending |
+| REL-021 | Merged (slice) | notifications `acks_late=False` |
+
+## PR3 slice 3 (`bug/celery-ops-slice3`) — **In progress**
+
+| ID | Status | Notes |
+|----|--------|-------|
+| REL-010 | In PR | `payment_reconcile_recovered` ops alert on worker recovery |
+| OPS-RM-SMS | In PR | invalid RM phone must not fail Celery task |
 
 Full backlog: see plan `prod_hardening_launch_7e4484af` (remaining rows **Open** until their PR).
 

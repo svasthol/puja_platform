@@ -20,6 +20,7 @@ import structlog
 
 from app.core.config import get_settings
 from app.services import fast2sms_client, msg91_client
+from app.services.sms_phone import InvalidIndiaPhoneError
 from app.services.sms_types import SmsSendResult
 
 log = structlog.get_logger()
@@ -78,11 +79,17 @@ async def send_otp_sms(phone: str, otp: str) -> SmsSendResult:
 
 
 def send_transactional_sms_sync(phone: str, message: str) -> bool:
-    for provider in _provider_chain():
-        result = _try_txn(provider, phone, message)
-        if result.sent:
-            log.info("sms_txn_sent", provider=provider)
-            return True
-        log.warning("sms_txn_provider_failed", provider=provider, error=result.error)
-    log.error("sms_txn_all_providers_failed", phone_tail=phone[-4:])
+    """Best-effort txn SMS. Invalid RM/placeholder phones log and return False (no task crash)."""
+    try:
+        for provider in _provider_chain():
+            result = _try_txn(provider, phone, message)
+            if result.sent:
+                log.info("sms_txn_sent", provider=provider)
+                return True
+            log.warning("sms_txn_provider_failed", provider=provider, error=result.error)
+    except InvalidIndiaPhoneError as exc:
+        tail = (phone or "")[-4:] if len(phone or "") >= 4 else ""
+        log.warning("sms_txn_invalid_phone", error=str(exc), phone_tail=tail)
+        return False
+    log.error("sms_txn_all_providers_failed", phone_tail=(phone or "")[-4:])
     return False
