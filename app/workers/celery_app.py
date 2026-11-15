@@ -5,7 +5,7 @@ Start workers (dev / single unit):
     celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,reconcile,notifications
 
 Prod split (REL-018): see deploy/systemd/mana-guruji-celery-worker-*.service
-Start scheduler:
+Start scheduler (RedBeat — REL-008; single beat leader in prod):
     celery -A app.workers.celery_app beat --loglevel=info
 
 Task modules are registered via `include` below. Every task lives under
@@ -22,6 +22,8 @@ from app.workers.celery_ops import (  # noqa: F401 — registers task_failure
     DEFAULT_SOFT_TIME_LIMIT_S,
     SWEEP_HARD_TIME_LIMIT_S,
     SWEEP_SOFT_TIME_LIMIT_S,
+    notification_task_annotations,
+    redbeat_conf,
     sweep_task_time_limits,
 )
 
@@ -149,5 +151,7 @@ celery_app.conf.update(
     },
     task_annotations={
         "app.workers.sweep.sweep_task": sweep_task_time_limits(),
+        **notification_task_annotations(),
     },
+    **redbeat_conf(app_env=settings.APP_ENV, redis_url=settings.redis_celery_url),
 )

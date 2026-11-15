@@ -27,8 +27,9 @@
 | ID | Status | Notes |
 |----|--------|-------|
 | REL-007 | In PR | time limits, `task_ignore_result`, `celery_task_failed` log |
-| REL-018 | In PR (slice) | `reconcile` queue; prod worker split follow-up |
-| REL-008 | Open | RedBeat + `celery-redbeat` — next slice |
+| REL-018 | In PR (slice 2) | prod systemd split critical/money/notify; dev all-in-one OK |
+| REL-008 | In PR (slice 2) | RedBeat scheduler + lock 90s; staging failover test pending |
+| REL-021 | In PR (slice) | notifications `acks_late=False` |
 
 Full backlog: see plan `prod_hardening_launch_7e4484af` (remaining rows **Open** until their PR).
 

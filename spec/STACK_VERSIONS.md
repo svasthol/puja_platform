@@ -49,6 +49,7 @@ Every choice is justified. Cursor reads this before suggesting upgrades.
 | `celery[redis]` | **5.6.3** | Latest stable. Native Pydantic v2 task args/returns. Fixed Redis disconnection bug (Kombu 5.4+). `[redis]` bundles redis-py. |
 | `kombu` | **5.6.1** | Celery 5.6.x requires `kombu>=5.6.0`. Transport layer for the Redis broker. |
 | `redis` | **5.3.1** | redis-py 5.x. Use **>=5.3.1** with `pyjwt==2.10.1` (5.3.0 pins PyJWT &lt;2.10). Adds `GETDEL` (WS tickets) and `mget` (dispatch presence). |
+| `celery-redbeat` | **2.4.2** | Beat HA (REL-008): Redis schedule + short lock TTL; pairs with Celery **5.6.3**. |
 
 ---
 

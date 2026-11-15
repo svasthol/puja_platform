@@ -1,5 +1,7 @@
+# Dev / small staging: all queues in one process. Production uses
+# mana-guruji-celery-worker-{critical,money,notify}.service (REL-018).
 [Unit]
-Description=Mana Guruji Celery worker
+Description=Mana Guruji Celery worker (all queues — dev/small staging)
 After=network.target redis.service mana-guruji-api.service
 
 [Service]

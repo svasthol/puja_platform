@@ -1,5 +1,6 @@
+# Schedule in Redis via RedBeat (REL-008); run exactly one beat instance per fleet.
 [Unit]
-Description=Mana Guruji Celery beat (single instance)
+Description=Mana Guruji Celery beat (RedBeat — single leader)
 After=network.target redis.service
 
 [Service]
@@ -10,6 +11,7 @@ WorkingDirectory=/opt/mana-guruji/src/puja_platform
 EnvironmentFile=/etc/mana-guruji/api.env
 Environment=PATH=/opt/mana-guruji/venv/bin:/usr/local/bin:/usr/bin
 ExecStart=/opt/mana-guruji/venv/bin/celery -A app.workers.celery_app beat -l info
+TimeoutStopSec=60
 Restart=always
 RestartSec=10
 

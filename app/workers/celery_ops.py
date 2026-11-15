@@ -26,6 +26,43 @@ def sweep_task_time_limits() -> dict[str, int]:
     }
 
 
+# Push tasks: early ack — sweep/dispatch backstops; avoids duplicate FCM on redelivery (REL-021).
+NOTIFICATION_TASK_NAMES = (
+    "notify_accept_ack",
+    "notify_offers",
+    "notify_offer_instant",
+    "notify_rm_dispatch_escalation",
+    "notify_no_pujari",
+    "alert_refund_failed",
+    "notify_reconfirm_ping",
+    "notify_reconfirm_escalation",
+    "notify_offer_withdrawn",
+)
+
+
+def notification_task_annotations() -> dict[str, dict[str, bool]]:
+    return {
+        f"app.workers.notifications.{name}": {"acks_late": False}
+        for name in NOTIFICATION_TASK_NAMES
+    }
+
+
+REDBEAT_LOCK_TIMEOUT_S = 90
+REDBEAT_MAX_LOOP_INTERVAL_S = 15
+
+
+def redbeat_conf(*, app_env: str, redis_url: str) -> dict:
+    """REL-008 — Redis-backed beat schedule (HA failover)."""
+    prefix = (app_env or "development").strip().lower()
+    return {
+        "beat_scheduler": "redbeat.RedBeatScheduler",
+        "redbeat_redis_url": redis_url,
+        "redbeat_key_prefix": f"{prefix}:redbeat:",
+        "redbeat_lock_timeout": REDBEAT_LOCK_TIMEOUT_S,
+        "beat_max_loop_interval": REDBEAT_MAX_LOOP_INTERVAL_S,
+    }
+
+
 @task_failure.connect
 def _log_task_failure(
     sender=None,
