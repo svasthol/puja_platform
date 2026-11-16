@@ -1,23 +1,18 @@
 """
-Booking creation — the one-transaction checkout flow (spec DISPATCH_FLOW step 2,
-API_CONTRACTS POST /v1/bookings).
+Booking checkout — REL-013 two-phase (API commits booking before Razorpay).
 
-Order of operations (all in ONE transaction; caller uses get_db_txn):
-  a. SELECT hold FOR UPDATE — owner + unexpired, else 410.
-  b. Compute total_amount (puja + addons), snapshot booking_fee split.
-  c. INSERT booking row BEFORE the Razorpay call so ux_bookings_no_duplicate_submit
-     fires early (idempotent create) and we never mint an orphan order for a dup.
-     Uses PostgreSQL ON CONFLICT DO NOTHING on the partial unique index (same
-     guarantee as SAVEPOINT flush, without aborting the outer transaction).
-  d. Create Razorpay order for booking_fee ONLY. Failure -> full rollback.
-  e. Persist razorpay_order_id on the booking; EXTEND hold to now()+15min.
+Phase 1: lock hold, INSERT payment_pending, extend hold (no gateway call).
+Phase 2: Razorpay create_order (outside DB txn on API path).
+Phase 3: attach razorpay_order_id + reconcile schedule.
 
 NEVER writes bookings.pujari_id (trigger-managed). NEVER inserts assignments here.
+Dispatch runs only after paid_at — payment_pending without order does not enqueue dispatch.
 """
 from __future__ import annotations
 
 import datetime as dt
 import uuid
+from dataclasses import dataclass
 from decimal import Decimal
 
 import structlog
@@ -27,12 +22,13 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.exceptions import DuplicateBookingSubmit
+from app.core.exceptions import BookingPaymentGatewayUnavailable, DuplicateBookingSubmit
 from app.models.booking import Booking, BookingAddon, SlotHold
 from app.models.catalog import Puja, PujaAddon
 from app.models.lookups import CancellationPolicy
 from app.schemas.booking import BookingCreate, BookingCreateResponse
 from app.services import razorpay_client
+from app.services.razorpay_client import RazorpayError
 from app.services.booking_gate import assert_booking_gate, load_booking_gate_settings
 from app.services.dispatch_supply import assert_dispatch_supply
 from app.services.pricing import (
@@ -231,7 +227,44 @@ async def _lookup_duplicate_response(
     )
 
 
-async def create_booking(
+@dataclass(frozen=True, slots=True)
+class PreparedCheckout:
+    """Booking row committed in phase 1 — waiting for Razorpay order id."""
+
+    booking_id: uuid.UUID
+    booking_class: str
+    amount_due_online: Decimal
+    amount_due_offline: Decimal
+    total_amount: Decimal
+    booking_fee: Decimal
+    razorpay_charge: Decimal
+    payment_mode: str
+    hold_expires_at: dt.datetime
+    idempotent: bool = False
+
+
+def _prepared_from_booking(
+    booking: Booking,
+    *,
+    hold_expires_at: dt.datetime,
+    razorpay_charge: Decimal,
+    idempotent: bool,
+) -> PreparedCheckout:
+    return PreparedCheckout(
+        booking_id=booking.id,
+        booking_class=str(booking.booking_class),
+        amount_due_online=Decimal(str(booking.amount_due_online)),
+        amount_due_offline=Decimal(str(booking.amount_due_offline)),
+        total_amount=Decimal(str(booking.total_amount)),
+        booking_fee=Decimal(str(booking.booking_fee or 0)),
+        razorpay_charge=razorpay_charge,
+        payment_mode=str(booking.payment_mode),
+        hold_expires_at=hold_expires_at,
+        idempotent=idempotent,
+    )
+
+
+async def prepare_booking_checkout(
     db: AsyncSession, *, user_id: uuid.UUID, payload: BookingCreate
 ) -> BookingCreateResponse:
     now = dt.datetime.now(dt.UTC)
@@ -374,12 +407,29 @@ async def create_booking(
             raise RuntimeError(
                 "ux_bookings_no_duplicate_submit blocked insert but no active row found"
             )
+        if dup.razorpay_order_id:
+            log.info(
+                "booking_duplicate_submit",
+                existing_booking_id=str(dup.booking_id),
+                user_id=str(user_id),
+            )
+            raise DuplicateBookingSubmit(dup)
+        existing = (
+            await db.execute(select(Booking).where(Booking.id == dup.booking_id))
+        ).scalar_one()
+        hold.expires_at = now + dt.timedelta(minutes=15)
+        await db.flush()
         log.info(
-            "booking_duplicate_submit",
-            existing_booking_id=str(dup.booking_id),
+            "booking_resume_without_order",
+            booking_id=str(existing.id),
             user_id=str(user_id),
         )
-        raise DuplicateBookingSubmit(dup)
+        return _prepared_from_booking(
+            existing,
+            hold_expires_at=hold.expires_at,
+            razorpay_charge=razorpay_charge,
+            idempotent=True,
+        )
 
     if promo_code_id is not None:
         await _redeem_promo(
@@ -401,14 +451,36 @@ async def create_booking(
             )
         )
 
-    order_id = await razorpay_client.create_order(
-        amount_paise=int((razorpay_charge * 100).quantize(Decimal("1"))),
-        receipt=str(booking_id),
-        notes={"booking_id": str(booking_id), "payment_mode": payment_mode},
+    hold.expires_at = now + dt.timedelta(minutes=15)
+    await db.flush()
+
+    log.info(
+        "booking_prepared",
+        booking_id=str(booking_id),
+        payment_mode=payment_mode,
+        booking_fee=str(booking_fee),
     )
-    await db.execute(
+    return PreparedCheckout(
+        booking_id=booking_id,
+        booking_class=gate.booking_class,
+        amount_due_online=online,
+        amount_due_offline=offline,
+        total_amount=total,
+        booking_fee=booking_fee,
+        razorpay_charge=razorpay_charge,
+        payment_mode=payment_mode,
+        hold_expires_at=hold.expires_at,
+        idempotent=False,
+    )
+
+
+async def attach_razorpay_order(
+    db: AsyncSession, *, prep: PreparedCheckout, order_id: str
+) -> BookingCreateResponse:
+    now = dt.datetime.now(dt.UTC)
+    result = await db.execute(
         update(Booking)
-        .where(Booking.id == booking_id)
+        .where(Booking.id == prep.booking_id, Booking.razorpay_order_id.is_(None))
         .values(
             razorpay_order_id=order_id,
             reconcile_next_at=now + dt.timedelta(minutes=20),
@@ -416,26 +488,52 @@ async def create_booking(
             updated_at=now,
         )
     )
-
-    hold.expires_at = now + dt.timedelta(minutes=15)
-    await db.flush()
+    final_order_id = order_id
+    if result.rowcount == 0:
+        existing_order = (
+            await db.execute(
+                select(Booking.razorpay_order_id).where(Booking.id == prep.booking_id)
+            )
+        ).scalar_one_or_none()
+        if existing_order is None:
+            raise HTTPException(http.HTTP_404_NOT_FOUND, "Booking not found.")
+        if not existing_order:
+            raise BookingPaymentGatewayUnavailable(booking_id=prep.booking_id)
+        final_order_id = str(existing_order)
 
     log.info(
         "booking_created",
-        booking_id=str(booking_id),
-        payment_mode=payment_mode,
-        booking_fee=str(booking_fee),
+        booking_id=str(prep.booking_id),
+        payment_mode=prep.payment_mode,
+        razorpay_order_id=final_order_id,
     )
     return BookingCreateResponse(
-        booking_id=booking_id,
-        booking_class=gate.booking_class,
-        razorpay_order_id=order_id,
-        amount_due_online=online,
-        amount_due_offline=offline,
-        total_amount=total,
-        booking_fee=booking_fee,
-        booking_fee_label=BOOKING_FEE_LABEL if payment_mode == _LAUNCH_MODE else None,
-        razorpay_amount=razorpay_charge,
-        payment_mode=payment_mode,
-        hold_expires_at=hold.expires_at,
+        booking_id=prep.booking_id,
+        booking_class=prep.booking_class,  # type: ignore[arg-type]
+        razorpay_order_id=final_order_id,
+        amount_due_online=prep.amount_due_online,
+        amount_due_offline=prep.amount_due_offline,
+        total_amount=prep.total_amount,
+        booking_fee=prep.booking_fee,
+        booking_fee_label=BOOKING_FEE_LABEL if prep.payment_mode == _LAUNCH_MODE else None,
+        razorpay_amount=prep.razorpay_charge,
+        payment_mode=prep.payment_mode,
+        hold_expires_at=prep.hold_expires_at,
+        idempotent=prep.idempotent,
     )
+
+
+async def create_booking(
+    db: AsyncSession, *, user_id: uuid.UUID, payload: BookingCreate
+) -> BookingCreateResponse:
+    """Tests: all phases in one caller transaction (fast mocked Razorpay)."""
+    prep = await prepare_booking_checkout(db, user_id=user_id, payload=payload)
+    try:
+        order_id = await razorpay_client.create_order(
+            amount_paise=int((prep.razorpay_charge * 100).quantize(Decimal("1"))),
+            receipt=str(prep.booking_id),
+            notes={"booking_id": str(prep.booking_id), "payment_mode": prep.payment_mode},
+        )
+    except RazorpayError as exc:
+        raise BookingPaymentGatewayUnavailable(booking_id=prep.booking_id) from exc
+    return await attach_razorpay_order(db, prep=prep, order_id=order_id)
