@@ -17,6 +17,7 @@ never by fragile isinstance chains alone.
 from __future__ import annotations
 
 import re
+import uuid
 
 import orjson
 import structlog
@@ -24,8 +25,11 @@ from fastapi import HTTPException, Request, status
 from fastapi.responses import Response
 from psycopg.errors import (
     CheckViolation,
+    DeadlockDetected,
     ExclusionViolation,
     ForeignKeyViolation,
+    LockNotAvailable,
+    QueryCanceled,
     RaiseException,
     UniqueViolation,
 )
@@ -159,6 +163,20 @@ def map_db_error(pg_exc: BaseException, path: str) -> Response:
     if isinstance(pg_exc, ForeignKeyViolation):
         return _json(422, "Referenced record does not exist.")
 
+    # ---- Operational (REL-020) — retryable infra / lock timeouts ----------------
+    if isinstance(pg_exc, (LockNotAvailable, DeadlockDetected)):
+        return _json(
+            503,
+            "Database busy. Please try again.",
+            code="DB_RETRY",
+        )
+    if isinstance(pg_exc, QueryCanceled):
+        return _json(
+            503,
+            "Request timed out. Please try again.",
+            code="DB_TIMEOUT",
+        )
+
     log.error("unhandled_db_error", exc=str(pg_exc), constraint=constraint)
     return _json(500, "Database error.")
 
@@ -191,8 +209,19 @@ EXCEPTION_HANDLERS = {
     RaiseException: raw_psycopg_exception_handler,
     CheckViolation: raw_psycopg_exception_handler,
     ForeignKeyViolation: raw_psycopg_exception_handler,
+    LockNotAvailable: raw_psycopg_exception_handler,
+    DeadlockDetected: raw_psycopg_exception_handler,
+    QueryCanceled: raw_psycopg_exception_handler,
     RedisUnavailable: redis_unavailable_handler,
 }
+
+
+class BookingPaymentGatewayUnavailable(Exception):
+    """Razorpay order creation failed after booking row committed (REL-013)."""
+
+    def __init__(self, *, booking_id: uuid.UUID) -> None:
+        self.booking_id = booking_id
+        super().__init__("payment gateway unavailable")
 
 
 class DuplicateBookingSubmit(Exception):

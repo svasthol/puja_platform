@@ -56,6 +56,16 @@ def main() -> int:
 
     _ping_app_url(_normalize(app_url))
 
+    with psycopg.connect(_normalize(app_url), prepare_threshold=None) as conn:
+        tz = conn.execute("SHOW timezone").fetchone()
+        tz_name = tz[0] if tz else ""
+        if tz_name not in ("Asia/Kolkata", "IST"):
+            print(
+                f"live: WARN SHOW timezone={tz_name!r} (expected Asia/Kolkata or IST — REL-019)"
+            )
+        else:
+            print(f"live: DB timezone OK ({tz_name})")
+
     if not admin_url:
         print(
             "live: WARN DATABASE_ADMIN_URL unset — skipping pg_roles check "

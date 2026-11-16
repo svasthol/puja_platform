@@ -12,8 +12,12 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import Principal, require_customer
-from app.core.exceptions import DuplicateBookingSubmit, StaleBookingState
-from app.db.engine import get_db, get_db_txn
+from app.core.exceptions import (
+    BookingPaymentGatewayUnavailable,
+    DuplicateBookingSubmit,
+    StaleBookingState,
+)
+from app.db.engine import AsyncSessionLocal, get_db, get_db_txn
 from app.models.booking import SlotHold
 from app.models.catalog import Puja, PujaAddon
 from app.models.lookups import PlatformSetting
@@ -30,7 +34,7 @@ from app.schemas.booking import (
     SlotHoldResponse,
 )
 from app.schemas.common import decode_cursor, encode_cursor
-from app.services import booking_service, cancellation_service, payment_verify_service
+from app.services import booking_service, cancellation_service, payment_verify_service, razorpay_client
 from app.services.razorpay_client import RazorpayError
 from app.services.booking_gate import (
     evaluate_booking_gate,
@@ -174,22 +178,50 @@ async def create_slot_hold(
 async def create_booking(
     payload: BookingCreate,
     p: Principal = Depends(require_customer),
-    db: AsyncSession = Depends(get_db_txn),
 ):
+    """REL-013: commit booking before Razorpay; 503 includes booking_id for same-hold retry."""
     try:
-        return await booking_service.create_booking(db, user_id=p.user_id, payload=payload)
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+                prep = await booking_service.prepare_booking_checkout(
+                    session, user_id=p.user_id, payload=payload
+                )
     except DuplicateBookingSubmit as dup:
-        # idempotent create per API_CONTRACTS: 409 + existing checkout payload
         return ORJSONResponse(
             status_code=http.HTTP_409_CONFLICT,
             content=dup.response.model_dump(mode="json"),
         )
-    except RazorpayError as exc:
-        log.error("booking_razorpay_order_failed", error=str(exc))
-        raise HTTPException(
-            http.HTTP_503_SERVICE_UNAVAILABLE,
-            "Payment gateway is temporarily unavailable. Please try again.",
-        ) from exc
+
+    try:
+        order_id = await razorpay_client.create_order(
+            amount_paise=int((prep.razorpay_charge * 100).quantize(Decimal("1"))),
+            receipt=str(prep.booking_id),
+            notes={
+                "booking_id": str(prep.booking_id),
+                "payment_mode": prep.payment_mode,
+            },
+        )
+    except (RazorpayError, BookingPaymentGatewayUnavailable) as exc:
+        bid = (
+            exc.booking_id
+            if isinstance(exc, BookingPaymentGatewayUnavailable)
+            else prep.booking_id
+        )
+        log.error("booking_razorpay_order_failed", booking_id=str(bid), error=str(exc))
+        return ORJSONResponse(
+            status_code=http.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "detail": "Payment gateway is temporarily unavailable. Please try again.",
+                "booking_id": str(bid),
+                "code": "PAYMENT_GATEWAY_UNAVAILABLE",
+            },
+        )
+
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            return await booking_service.attach_razorpay_order(
+                session, prep=prep, order_id=order_id
+            )
 
 
 @router.post("/bookings/{booking_id}/payment-verify")

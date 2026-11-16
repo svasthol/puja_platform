@@ -124,13 +124,49 @@ async def accept_offer(
     await assert_accept_travel_buffer_ok(
         db, pujari_id=assignment.pujari_id, booking_id=assignment.booking_id
     )
-    await db.execute(
+    upd = await db.execute(
         text(
             "UPDATE booking_assignments SET status_id = :sid, responded_at = now() "
-            "WHERE id = :aid"
+            "WHERE id = :aid AND responded_at IS NULL"
         ),
         {"sid": accepted_id, "aid": str(assignment_id)},
     )
+    if getattr(upd, "rowcount", 0) == 0:
+        row = (
+            await db.execute(
+                text(
+                    """
+                    SELECT ba.status_id, ba.responded_at, b.pujari_id, b.status_id AS booking_status_id
+                    FROM booking_assignments ba
+                    JOIN bookings b ON b.id = ba.booking_id
+                    WHERE ba.id = :aid
+                    """
+                ),
+                {"aid": str(assignment_id)},
+            )
+        ).mappings().one_or_none()
+        if row is None:
+            raise HTTPException(http.HTTP_404_NOT_FOUND, "Offer not found.")
+        if (
+            row["status_id"] == accepted_id
+            and row["pujari_id"] == assignment.pujari_id
+            and row["booking_status_id"] == confirmed_id
+        ):
+            log.info(
+                "offer_accept_idempotent",
+                assignment_id=str(assignment_id),
+                booking_id=str(assignment.booking_id),
+            )
+            return {
+                "status": "accepted",
+                "booking_id": str(assignment.booking_id),
+                "idempotent": True,
+            }
+        raise HTTPException(
+            http.HTTP_409_CONFLICT,
+            "This offer is no longer available.",
+        )
+
     from app.services.tds_v3_accept_service import apply_tds_at_booking_confirmation
 
     tds_result = await apply_tds_at_booking_confirmation(
