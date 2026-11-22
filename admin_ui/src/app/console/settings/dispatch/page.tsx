@@ -104,6 +104,7 @@ export default function DispatchPolicySettingsPage() {
       max_live_advance_offers_per_pujari: String(data.max_live_advance_offers_per_pujari),
       rm_escalation_hours_no_accept: String(data.rm_escalation_hours_no_accept),
       rm_escalation_t24_hours: String(data.rm_escalation_t24_hours),
+      max_offer_rounds: String(data.max_offer_rounds),
       reconfirm_quiet_hours_start: data.reconfirm_quiet_hours_start,
       reconfirm_quiet_hours_end: data.reconfirm_quiet_hours_end,
     });
@@ -124,6 +125,7 @@ export default function DispatchPolicySettingsPage() {
         max_live_advance_offers_per_pujari: Number(form.max_live_advance_offers_per_pujari),
         rm_escalation_hours_no_accept: Number(form.rm_escalation_hours_no_accept),
         rm_escalation_t24_hours: Number(form.rm_escalation_t24_hours),
+        max_offer_rounds: Number(form.max_offer_rounds),
         night_bookings_enabled: night,
         reconfirm_quiet_hours_start: form.reconfirm_quiet_hours_start,
         reconfirm_quiet_hours_end: form.reconfirm_quiet_hours_end,
@@ -237,6 +239,19 @@ export default function DispatchPolicySettingsPage() {
                   min={0}
                   max={240}
                 />
+                <NumRow
+                  label="Max offer rounds per booking (0 = keep retrying until deadline)"
+                  value={form.max_offer_rounds ?? ""}
+                  onChange={(v) => setNum("max_offer_rounds", v)}
+                  disabled={!canEdit}
+                  min={0}
+                  max={100}
+                />
+                <p className="text-xs text-ink-muted sm:col-span-2">
+                  Only rounds that actually sent an offer count. Sweeps with no online eligible
+                  pujari keep retrying for free. When the limit is reached and no offer is live,
+                  the booking fails with a refund.
+                </p>
               </section>
 
               <section className="grid gap-4 sm:grid-cols-2">

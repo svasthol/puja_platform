@@ -51,6 +51,7 @@ class DispatchPolicyView:
   max_live_advance_offers_per_pujari: int
   rm_escalation_hours_no_accept: int
   rm_escalation_t24_hours: int
+  max_offer_rounds: int
   night_bookings_enabled: bool
   reconfirm_quiet_hours_start: str
   reconfirm_quiet_hours_end: str
@@ -133,6 +134,7 @@ async def fetch_dispatch_policy(db: AsyncSession) -> DispatchPolicyView:
         max_live_advance_offers_per_pujari=launch.max_live_advance_offers_per_pujari,
         rm_escalation_hours_no_accept=launch.rm_escalation_hours_no_accept,
         rm_escalation_t24_hours=launch.rm_escalation_t24_hours,
+        max_offer_rounds=launch.max_offer_rounds,
         night_bookings_enabled=_bool_setting(by_key.get("night_bookings_enabled"), False),
         reconfirm_quiet_hours_start=_hhmm_from_row(
             by_key.get("reconfirm_quiet_hours_start"), dt.time(22, 0)

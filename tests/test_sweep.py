@@ -14,6 +14,7 @@ from app.workers.sweep import (
 
 from tests.test_inbox_cap import (
     _clear_presence,
+    _clear_pujari_live_offers,
     _ensure_pujari_dispatch_ready,
     _insert_broadcast_target,
     _pujari_ids,
@@ -240,6 +241,7 @@ async def test_zero_offer_round_retries_when_pujari_comes_online(session, seed, 
     await _require_migration_014(session)
     pujari1, pujari2 = await _pujari_ids(session)
     pujari1, pujari2 = await _ensure_pujari_dispatch_ready(session)
+    await _clear_pujari_live_offers(session, pujari1, pujari2)
 
     bid = uniq.id()
     slot_time = _unique_slot_time(uniq)

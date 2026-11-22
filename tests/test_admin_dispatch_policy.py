@@ -1,10 +1,12 @@
 """Admin dispatch policy settings (A-DISPATCH-POLICY)."""
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import text
 
 from app.api.v1.endpoints import admin as admin_ep
@@ -112,6 +114,71 @@ async def test_admin_updates_immediate_dispatch(session, seed):
     ).first()
     assert audit is not None
     assert audit[0] == "update"
+
+
+def _update_from(current, **overrides) -> DispatchPolicyUpdate:
+    fields = {
+        "instant_lead_hours": current.instant_lead_hours,
+        "instant_dispatch_minutes": current.instant_dispatch_minutes,
+        "advance_dispatch_start_hours": current.advance_dispatch_start_hours,
+        "advance_dispatch_fail_hours": current.advance_dispatch_fail_hours,
+        "reoffer_cooldown_minutes": current.reoffer_cooldown_minutes,
+        "dispatch_buffer_minutes": current.dispatch_buffer_minutes,
+        "immediate_dispatch_on_payment": current.immediate_dispatch_on_payment,
+        "instant_offer_ttl_seconds": current.instant_offer_ttl_seconds,
+        "advance_offer_ttl_hours": current.advance_offer_ttl_hours,
+        "max_live_advance_offers_per_pujari": current.max_live_advance_offers_per_pujari,
+        "rm_escalation_hours_no_accept": current.rm_escalation_hours_no_accept,
+        "rm_escalation_t24_hours": current.rm_escalation_t24_hours,
+        "night_bookings_enabled": current.night_bookings_enabled,
+        "reconfirm_quiet_hours_start": current.reconfirm_quiet_hours_start,
+        "reconfirm_quiet_hours_end": current.reconfirm_quiet_hours_end,
+    }
+    fields.update(overrides)
+    return DispatchPolicyUpdate(**fields)
+
+
+@pytest.mark.asyncio
+async def test_admin_sets_max_offer_rounds_and_omission_keeps_it(session, seed):
+    actor = await _mk_admin(session)
+    await session.commit()
+    original = (
+        await session.execute(
+            text("SELECT value_json FROM platform_settings WHERE key = 'max_offer_rounds'")
+        )
+    ).scalar_one_or_none()
+    try:
+        current = await admin_ep.get_dispatch_policy(_admin(actor), session)
+        updated = await admin_ep.set_dispatch_policy(
+            _update_from(current, max_offer_rounds=3), _FakeRequest(), _admin(actor), session
+        )
+        await session.commit()
+        assert updated.max_offer_rounds == 3
+        assert (await load_dispatch_settings_async(session)).max_offer_rounds == 3
+
+        kept = await admin_ep.set_dispatch_policy(
+            _update_from(updated), _FakeRequest(), _admin(actor), session
+        )
+        await session.commit()
+        assert kept.max_offer_rounds == 3
+    finally:
+        if original is None:
+            await session.execute(text("DELETE FROM platform_settings WHERE key = 'max_offer_rounds'"))
+        else:
+            await session.execute(
+                text("UPDATE platform_settings SET value_json = CAST(:v AS jsonb) WHERE key = 'max_offer_rounds'"),
+                {"v": json.dumps(original)},
+            )
+        await session.commit()
+
+
+def test_max_offer_rounds_rejects_negative():
+    with pytest.raises(ValidationError) as exc:
+        DispatchPolicyUpdate.model_validate({"max_offer_rounds": -1})
+    assert any(
+        err["loc"] == ("max_offer_rounds",) and err["type"] == "greater_than_equal"
+        for err in exc.value.errors()
+    )
 
 
 @pytest.mark.asyncio

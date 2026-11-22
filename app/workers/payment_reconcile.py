@@ -5,12 +5,12 @@ Three phases: claim rows (short txn), fetch order payments outside DB, apply cap
 """
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
 import uuid
 
 import structlog
 
+from app.workers.async_bridge import run_async
 from app.workers.celery_app import celery_app
 from app.workers.sweep import get_connection
 
@@ -146,7 +146,7 @@ def reconcile_payments() -> dict:
         for pay in captured:
             pay_id = str(pay["id"])
             amount_paise = int(pay.get("amount", 0))
-            result = asyncio.run(
+            result = run_async(
                 _apply_capture_hit(booking_id, pay_id=pay_id, amount_paise=amount_paise)
             )
             if result.get("status") == "confirmed":
