@@ -1,4 +1,4 @@
-"""Partner KYC onboarding orchestration (Setu DigiLocker v1, vendor-agnostic)."""
+"""Partner KYC onboarding orchestration (DigiLocker, vendor-agnostic)."""
 from __future__ import annotations
 
 import base64
@@ -25,10 +25,11 @@ from app.core.kyc_config import (
     REQUIRED_DOC_TYPES,
     SCOPE_TO_DOC_TYPES,
 )
-from app.core.redis_client import redis_delete, redis_set_nx
+from app.core.redis_client import redis_delete, redis_get, redis_set, redis_set_nx
 from app.models.catalog import Pujari, PujariDocument
 from app.models.identity import User
 from app.models.kyc import KycConsent, KycIdentityRegistry, KycVerificationRequest
+from app.services.apisathi_kyc_client import storage_vendor_request_id
 from app.services.kyc_storage import (
     KycStorageError,
     KycStorageNotConfigured,
@@ -38,8 +39,8 @@ from app.services.kyc_storage import (
     presign_kyc_put,
     store_kyc_bytes,
 )
-from app.services.kyc_types import KycVendorError
-from app.services.kyc_vendor import get_kyc_vendor
+from app.services.kyc_types import KycAadhaarAddress, KycIdentity, KycVendorError
+from app.services.kyc_vendor import active_kyc_vendor_name, get_kyc_vendor
 from app.services.kyc_verification import recompute_pujari_verification
 from app.services.profile_photo_publish import clear_customer_profile_photo_if_reference_stale
 
@@ -49,6 +50,12 @@ settings = get_settings()
 _TERMINAL_STATUSES = frozenset({"success", "failed", "expired"})
 _NON_TERMINAL_STATUSES = frozenset({"created", "authenticated"})
 _FINALIZE_LOCK_SECONDS = 180
+_DOB_FORMATS = ("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y")
+# Namespaced so a demographic key can never collide with a vendor DigiLocker id hash.
+_AADHAAR_DEMOGRAPHIC_KEY_PREFIX = "aadhaar-demographic-v1"
+
+# Identity review flags are admin-only; a blocked person must not learn they matched.
+PARTNER_VISIBLE_REVIEW_FLAGS = frozenset({"name_mismatch", "age_under_18"})
 
 
 class PartnerKycError(Exception):
@@ -116,19 +123,44 @@ def _names_mismatch(registered: str | None, digilocker: str | None) -> bool:
     return True
 
 
-def _age_from_dob(dob: str | None) -> int | None:
+def _parse_dob(dob: str | None) -> dt.date | None:
     if not dob:
         return None
-    for fmt in ("%d-%m-%Y", "%Y-%m-%d"):
+    for fmt in _DOB_FORMATS:
         try:
-            born = dt.datetime.strptime(dob, fmt).date()
-            today = _now().date()
-            return today.year - born.year - (
-                (today.month, today.day) < (born.month, born.day)
-            )
+            return dt.datetime.strptime(dob.strip(), fmt).date()
         except ValueError:
             continue
     return None
+
+
+def _age_from_dob(dob: str | None) -> int | None:
+    born = _parse_dob(dob)
+    if born is None:
+        return None
+    today = _now().date()
+    return today.year - born.year - (
+        (today.month, today.day) < (born.month, born.day)
+    )
+
+
+def _aadhaar_demographic_key(identity: KycIdentity) -> str | None:
+    """Stable identity key for vendors that return no DigiLocker id.
+
+    Name + DOB + Aadhaar last-4 from the UIDAI record; same Aadhaar ⇒ same key.
+    """
+    name = _normalize_name(identity.name)
+    born = _parse_dob(identity.date_of_birth)
+    last4 = re.sub(r"\D", "", identity.masked_number or "")[-4:]
+    if not name or born is None or len(last4) != 4:
+        return None
+    return f"{_AADHAAR_DEMOGRAPHIC_KEY_PREFIX}|{name}|{born.isoformat()}|{last4}"
+
+
+def partner_visible_review_flags(flags: object) -> list[str]:
+    if not isinstance(flags, list):
+        return []
+    return [f for f in flags if f in PARTNER_VISIBLE_REVIEW_FLAGS]
 
 
 def _strip_jpeg_exif(data: bytes) -> bytes:
@@ -227,6 +259,46 @@ async def _get_live_request(
     ).scalar_one_or_none()
 
 
+def _consent_url_redis_key(request_id: uuid.UUID) -> str:
+    return f"kyc:consent_url:{request_id}"
+
+
+async def _store_consent_url(
+    request_id: uuid.UUID, url: str, *, expires_at: dt.datetime
+) -> None:
+    if not url:
+        return
+    ttl = max(60, int((expires_at - _now()).total_seconds()))
+    try:
+        await redis_set(_consent_url_redis_key(request_id), url, ex=ttl)
+    except Exception:
+        log.warning("kyc_consent_url_cache_failed", request_id=str(request_id))
+
+
+async def _load_consent_url(request_id: uuid.UUID) -> str | None:
+    try:
+        return await redis_get(_consent_url_redis_key(request_id))
+    except Exception:
+        log.warning("kyc_consent_url_load_failed", request_id=str(request_id))
+        return None
+
+
+def _vendor_poll_redis_key(vendor: str, vendor_request_id: str) -> str:
+    """Stable Redis key for per-request vendor status poll throttling."""
+    tail = vendor_request_id[-64:] if len(vendor_request_id) > 64 else vendor_request_id
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", tail)
+    return f"kyc:vendor_poll:{vendor}:{safe}"
+
+
+async def _acquire_vendor_status_poll(*, vendor: str, vendor_request_id: str) -> bool:
+    """Return True if this worker may call the vendor status API now."""
+    interval = settings.KYC_VENDOR_STATUS_POLL_MIN_SECONDS
+    if interval <= 0:
+        return True
+    key = _vendor_poll_redis_key(vendor, vendor_request_id)
+    return await redis_set_nx(key, "1", ex=interval)
+
+
 async def _expire_request(db: AsyncSession, request_id: uuid.UUID) -> None:
     await db.execute(
         text(
@@ -247,21 +319,47 @@ async def _resume_or_clear_live(
     if live.vendor_request_id.startswith("local:"):
         await _expire_request(db, live.id)
         return None
-    vendor = get_kyc_vendor()
+    vendor = get_kyc_vendor(live.vendor)
+    if not await _acquire_vendor_status_poll(
+        vendor=live.vendor, vendor_request_id=live.vendor_request_id
+    ):
+        log.debug(
+            "kyc_resume_poll_throttled",
+            request_id=str(live.id),
+            vendor=live.vendor,
+        )
+        return live, ""
     try:
         vendor_status = await vendor.get_request_status(live.vendor_request_id)
     except KycVendorError as exc:
         if exc.code == "request_not_found":
             await _expire_request(db, live.id)
             return None
+        if exc.retryable:
+            log.warning(
+                "kyc_resume_vendor_deferred",
+                request_id=str(live.id),
+                error_code=exc.code,
+            )
+            return live, ""
         raise PartnerKycError("KYC vendor unavailable.", status_code=502) from exc
     if vendor_status.url:
         return live, vendor_status.url
     if vendor_status.status == "authenticated":
         return live, ""
-    if live.expires_at < _now():
+    if vendor_status.status in ("failed", "expired") or live.expires_at < _now():
         await _expire_request(db, live.id)
         return None
+    if vendor_status.status == "created":
+        if not vendor_status.url and not vendor.supports_resume_url:
+            # API Sathi (and similar): ``created`` + 422 fetch is normal until the user
+            # finishes DigiLocker — poll-only resume, do not bill another init.
+            cached_url = await _load_consent_url(live.id) or ""
+            return live, cached_url
+        if not vendor_status.url:
+            # Setu-style: consent link expired and vendor cannot return a URL — new session.
+            await _expire_request(db, live.id)
+            return None
     return live, ""
 
 
@@ -293,11 +391,12 @@ async def start_digilocker(
     nonce_hash = _hash_nonce(nonce)
     placeholder_vendor_id = f"local:{request_id}"
     expires_at = now + dt.timedelta(minutes=settings.KYC_REQUEST_TTL_MINUTES)
+    vendor_name = await active_kyc_vendor_name(db)
 
     row = KycVerificationRequest(
         id=request_id,
         pujari_id=pujari_id,
-        vendor=settings.KYC_VENDOR,
+        vendor=vendor_name,
         kind="digilocker",
         vendor_request_id=placeholder_vendor_id,
         status="created",
@@ -328,10 +427,21 @@ async def start_digilocker(
         settings.KYC_REDIRECT_URL,
         {"kyc_nonce": nonce},
     )
+    phone = (
+        await db.execute(
+            select(User.phone)
+            .join(Pujari, Pujari.user_id == User.id)
+            .where(Pujari.id == pujari_id)
+        )
+    ).scalar_one_or_none()
 
-    vendor = get_kyc_vendor()
+    vendor = get_kyc_vendor(vendor_name)
     try:
-        started = await vendor.start_digilocker(redirect_url=redirect_with_nonce)
+        started = await vendor.start_digilocker(
+            redirect_url=redirect_with_nonce,
+            reference=str(request_id),
+            mobile=phone,
+        )
     except KycVendorError as exc:
         log.error(
             "kyc_vendor_error",
@@ -339,10 +449,18 @@ async def start_digilocker(
             error_code=exc.code,
             pujari_id=str(pujari_id),
         )
-        if exc.code == "vendor_auth":
+        if exc.code in ("vendor_auth", "vendor_config"):
             log.error("kyc_vendor_auth_misconfig", pujari_id=str(pujari_id))
             raise PartnerKycError("KYC vendor misconfigured.", status_code=500) from exc
+        if exc.code == "invalid_mobile":
+            raise PartnerKycError(str(exc), status_code=422) from exc
         raise PartnerKycError("KYC vendor unavailable.", status_code=502) from exc
+
+    stored_vendor_id = started.vendor_request_id
+    if vendor.vendor_name == "apisathi":
+        stored_vendor_id = storage_vendor_request_id(
+            started.vendor_request_id, request_id=request_id
+        )
 
     updated = (
         await db.execute(
@@ -357,7 +475,7 @@ async def start_digilocker(
                 """
             ),
             {
-                "vid": started.vendor_request_id,
+                "vid": stored_vendor_id,
                 "exp": started.expires_at,
                 "id": str(request_id),
                 "placeholder": placeholder_vendor_id,
@@ -368,7 +486,7 @@ async def start_digilocker(
         raise PartnerKycError("Failed to bind vendor request.", status_code=409)
 
     await db.refresh(row)
-    row.vendor_request_id = started.vendor_request_id
+    row.vendor_request_id = stored_vendor_id
     row.expires_at = started.expires_at
     log.info(
         "kyc_request_started",
@@ -377,17 +495,37 @@ async def start_digilocker(
         status="created",
         pujari_id=str(pujari_id),
     )
+    if started.url:
+        await _store_consent_url(request_id, started.url, expires_at=row.expires_at)
     return row, started.url
 
 
 async def _request_by_vendor_id(
     db: AsyncSession, vendor_request_id: str
 ) -> KycVerificationRequest | None:
-    return (
+    """Resolve a KYC row; API Sathi redirects use bare txn while DB may store ``txn::uuid``."""
+    row = (
         await db.execute(
             select(KycVerificationRequest).where(
                 KycVerificationRequest.vendor_request_id == vendor_request_id
             )
+        )
+    ).scalar_one_or_none()
+    if row is not None:
+        return row
+    if "::" in vendor_request_id:
+        return None
+    return (
+        await db.execute(
+            select(KycVerificationRequest)
+            .where(
+                KycVerificationRequest.vendor == "apisathi",
+                KycVerificationRequest.vendor_request_id.like(
+                    f"{vendor_request_id}::%"
+                ),
+            )
+            .order_by(KycVerificationRequest.created_at.desc())
+            .limit(1)
         )
     ).scalar_one_or_none()
 
@@ -405,7 +543,9 @@ async def handle_callback(
     row = await _request_by_vendor_id(db, vendor_request_id)
     if row is None:
         raise PartnerKycError("KYC request not found.", status_code=404)
-    if not nonce or _hash_nonce(nonce) != row.nonce_hash:
+    if not nonce:
+        raise PartnerKycError("Invalid or missing nonce.", status_code=403)
+    if not hmac.compare_digest(_hash_nonce(nonce), row.nonce_hash):
         raise PartnerKycError("Invalid or missing nonce.", status_code=403)
 
     if not success:
@@ -457,11 +597,45 @@ async def handle_callback(
     return row
 
 
+_PRIVATE_V4_RE = re.compile(
+    r"^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+    r"192\.168\.\d{1,3}\.\d{1,3}|"
+    r"172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})$"
+)
+
+
+def _vendor_doc_download_allowed(hostname: str | None) -> bool:
+    """HTTPS vendor document links only; block loopback and private IPs (SSRF guard)."""
+    if not hostname:
+        return False
+    host = hostname.lower().strip(".")
+    if host in ("localhost", "127.0.0.1", "::1") or host.endswith(".local"):
+        return False
+    if _PRIVATE_V4_RE.match(host):
+        return False
+    return True
+
+
 async def _download_url(url: str) -> bytes:
-    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        return resp.content
+    parsed = urlparse((url or "").strip())
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError("KYC vendor document URL must use HTTPS")
+    if not _vendor_doc_download_allowed(parsed.hostname):
+        raise ValueError("KYC vendor document URL host not allowed")
+
+    max_bytes = settings.S3_KYC_MAX_BYTES
+    timeout = httpx.Timeout(15.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        async with client.stream("GET", url) as resp:
+            resp.raise_for_status()
+            chunks: list[bytes] = []
+            total = 0
+            async for chunk in resp.aiter_bytes():
+                total += len(chunk)
+                if total > max_bytes:
+                    raise ValueError("KYC vendor document exceeds size limit")
+                chunks.append(chunk)
+            return b"".join(chunks)
 
 
 async def _upsert_document(
@@ -529,75 +703,270 @@ async def _register_identity(
     db: AsyncSession,
     *,
     pujari_id: uuid.UUID,
-    digilocker_id: str,
-) -> None:
-    digest = _hash_digilocker_id(digilocker_id)
-    denied = (
-        await db.execute(
-            select(KycIdentityRegistry).where(
-                KycIdentityRegistry.digilocker_id_hash == digest,
-                KycIdentityRegistry.state == "denied",
-            )
-        )
-    ).scalar_one_or_none()
-    if denied is not None:
-        raise PartnerKycError(
-            "This identity is blocked from registration.",
-            status_code=409,
-        )
+    identity_key: str,
+) -> list[str]:
+    """Record the identity fingerprint; return admin review flags on a match.
 
-    active_other = (
+    Matches never block onboarding — admins decide on flagged partners.
+    """
+    digest = _hash_digilocker_id(identity_key)
+    existing = (
         await db.execute(
             select(KycIdentityRegistry).where(
-                KycIdentityRegistry.digilocker_id_hash == digest,
-                KycIdentityRegistry.state == "active",
-                KycIdentityRegistry.pujari_id != pujari_id,
+                KycIdentityRegistry.digilocker_id_hash == digest
             )
         )
     ).scalar_one_or_none()
-    if active_other is not None:
-        raise PartnerKycError(
-            "This DigiLocker identity is already linked to another account.",
-            status_code=409,
-        )
-
-    existing_same = (
-        await db.execute(
-            select(KycIdentityRegistry).where(
-                KycIdentityRegistry.digilocker_id_hash == digest,
-                KycIdentityRegistry.pujari_id == pujari_id,
+    if existing is not None:
+        if existing.state == "denied":
+            log.warning(
+                "kyc_identity_blocked_match",
+                pujari_id=str(pujari_id),
+                registry_id=str(existing.id),
             )
-        )
-    ).scalar_one_or_none()
-    if existing_same is not None:
-        return
+            return ["identity_blocked"]
+        if existing.pujari_id != pujari_id:
+            log.warning(
+                "kyc_identity_duplicate",
+                pujari_id=str(pujari_id),
+                other_pujari_id=str(existing.pujari_id),
+            )
+            return ["duplicate_identity"]
+        return []
 
     now = _now()
     try:
-        db.add(
-            KycIdentityRegistry(
-                id=uuid.uuid4(),
-                digilocker_id_hash=digest,
-                pujari_id=pujari_id,
-                state="active",
-                created_at=now,
-                updated_at=now,
-            )
-        )
-        await db.flush()
-    except IntegrityError:
-        conflict = (
-            await db.execute(
-                select(KycIdentityRegistry).where(
-                    KycIdentityRegistry.digilocker_id_hash == digest
+        async with db.begin_nested():
+            db.add(
+                KycIdentityRegistry(
+                    id=uuid.uuid4(),
+                    digilocker_id_hash=digest,
+                    pujari_id=pujari_id,
+                    state="active",
+                    created_at=now,
+                    updated_at=now,
                 )
             )
-        ).scalar_one_or_none()
-        if conflict is not None and conflict.pujari_id != pujari_id:
-            raise PartnerKycError(
-                "This DigiLocker identity is already linked to another account.",
-                status_code=409,
+    except IntegrityError:
+        log.warning("kyc_identity_duplicate_race", pujari_id=str(pujari_id))
+        return ["duplicate_identity"]
+    return []
+
+
+def _address_has_content(address: KycAadhaarAddress | None) -> bool:
+    if address is None:
+        return False
+    return bool(
+        address.pin
+        or address.state
+        or address.district
+        or address.locality
+        or address.house
+        or address.street
+    )
+
+
+def _address_snapshot_dict(address: KycAadhaarAddress) -> dict[str, str | None]:
+    return {
+        "care_of": address.care_of,
+        "country": address.country,
+        "district": address.district,
+        "house": address.house,
+        "landmark": address.landmark,
+        "locality": address.locality,
+        "pin": address.pin,
+        "state": address.state,
+        "street": address.street,
+        "sub_district": address.sub_district,
+        "vtc": address.vtc,
+    }
+
+
+async def _ingest_aadhaar_demographic_snapshots(
+    db: AsyncSession,
+    *,
+    identity: KycIdentity,
+    pujari_id: uuid.UUID,
+    vendor_prefix: str,
+    partner_folder: str,
+    skip_types: frozenset[str],
+) -> list[str]:
+    """When vendor fetch has demographics but no downloadable files (common in TEST keys)."""
+    created: list[str] = []
+    if (
+        "identity_proof" not in skip_types
+        and (identity.name or identity.masked_number)
+    ):
+        payload = {
+            "source": "vendor_demographic_snapshot_v1",
+            "name": identity.name,
+            "masked_aadhaar": identity.masked_number,
+            "dob": identity.date_of_birth,
+            "gender": identity.gender,
+        }
+        key = (
+            f"kyc/{partner_folder}/identity_proof/{vendor_prefix}/demographic.json"
+        )
+        store_kyc_bytes(
+            s3_key=key,
+            body=json.dumps(payload, separators=(",", ":")).encode(),
+            content_type="application/json",
+        )
+        await _upsert_document(
+            db,
+            pujari_id=pujari_id,
+            doc_type="identity_proof",
+            file_url=key,
+            vendor_request_id=vendor_prefix,
+        )
+        created.append("identity_proof")
+
+    if "address_proof" not in skip_types and _address_has_content(identity.address):
+        assert identity.address is not None
+        payload = {
+            "source": "vendor_address_snapshot_v1",
+            **_address_snapshot_dict(identity.address),
+        }
+        key = (
+            f"kyc/{partner_folder}/address_proof/{vendor_prefix}/address_snapshot.json"
+        )
+        store_kyc_bytes(
+            s3_key=key,
+            body=json.dumps(payload, separators=(",", ":")).encode(),
+            content_type="application/json",
+        )
+        await _upsert_document(
+            db,
+            pujari_id=pujari_id,
+            doc_type="address_proof",
+            file_url=key,
+            vendor_request_id=vendor_prefix,
+        )
+        created.append("address_proof")
+    return created
+
+
+async def _ingest_aadhaar_vendor_files(
+    db: AsyncSession,
+    *,
+    identity: KycIdentity,
+    pujari_id: uuid.UUID,
+    vendor_prefix: str,
+    partner_folder: str,
+) -> list[str]:
+    created: list[str] = []
+    if identity.photo_base64:
+        try:
+            photo_bytes = base64.b64decode(identity.photo_base64)
+        except (ValueError, TypeError):
+            log.warning("kyc_photo_base64_invalid", pujari_id=str(pujari_id))
+        else:
+            key = (
+                f"kyc/{partner_folder}/identity_proof/{vendor_prefix}/aadhaar_photo.jpg"
             )
+            store_kyc_bytes(
+                s3_key=key, body=photo_bytes, content_type="image/jpeg"
+            )
+            await _upsert_document(
+                db,
+                pujari_id=pujari_id,
+                doc_type="identity_proof",
+                file_url=key,
+                vendor_request_id=vendor_prefix,
+            )
+            created.append("identity_proof")
+
+    if identity.xml_file_url:
+        try:
+            xml_bytes = await _download_url(identity.xml_file_url)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning(
+                "kyc_xml_download_failed",
+                pujari_id=str(pujari_id),
+                error=str(exc),
+            )
+        else:
+            key = (
+                f"kyc/{partner_folder}/address_proof/{vendor_prefix}/aadhaar.xml"
+            )
+            store_kyc_bytes(
+                s3_key=key, body=xml_bytes, content_type="application/xml"
+            )
+            await _upsert_document(
+                db,
+                pujari_id=pujari_id,
+                doc_type="address_proof",
+                file_url=key,
+                vendor_request_id=vendor_prefix,
+            )
+            created.append("address_proof")
+
+    created.extend(
+        await _ingest_aadhaar_demographic_snapshots(
+            db,
+            identity=identity,
+            pujari_id=pujari_id,
+            vendor_prefix=vendor_prefix,
+            partner_folder=partner_folder,
+            skip_types=frozenset(created),
+        )
+    )
+    return created
+
+
+async def _missing_digilocker_doc_types(
+    db: AsyncSession, pujari_id: uuid.UUID
+) -> set[str]:
+    rows = (
+        await db.execute(
+            select(PujariDocument.doc_type).where(
+                PujariDocument.pujari_id == pujari_id,
+                PujariDocument.is_current.is_(True),
+                PujariDocument.doc_type.in_(("identity_proof", "address_proof")),
+                PujariDocument.status.in_(("pending", "verified")),
+            )
+        )
+    ).scalars().all()
+    have = set(rows)
+    return {"identity_proof", "address_proof"} - have
+
+
+async def _backfill_digilocker_docs(
+    db: AsyncSession, row: KycVerificationRequest
+) -> list[str]:
+    missing = await _missing_digilocker_doc_types(db, row.pujari_id)
+    if not missing:
+        return []
+    vendor = get_kyc_vendor(row.vendor)
+    try:
+        identity = await vendor.fetch_aadhaar(row.vendor_request_id)
+    except KycVendorError as exc:
+        log.warning(
+            "kyc_backfill_fetch_failed",
+            request_id=str(row.id),
+            error_code=exc.code,
+        )
+        return []
+    user = (
+        await db.execute(
+            select(User.phone)
+            .join(Pujari, Pujari.user_id == User.id)
+            .where(Pujari.id == row.pujari_id)
+        )
+    ).scalar_one_or_none()
+    partner_folder = kyc_partner_folder(user or "", row.pujari_id)
+    try:
+        created = await _ingest_aadhaar_vendor_files(
+            db,
+            identity=identity,
+            pujari_id=row.pujari_id,
+            vendor_prefix=row.vendor_request_id,
+            partner_folder=partner_folder,
+        )
+    except (KycStorageNotConfigured, KycStorageError) as exc:
+        log.warning("kyc_backfill_storage_failed", request_id=str(row.id), error=str(exc))
+        return []
+    return [doc_type for doc_type in created if doc_type in missing]
 
 
 async def _finalize_locked(
@@ -607,10 +976,29 @@ async def _finalize_locked(
     if row.status == "success":
         return list(SCOPE_TO_DOC_TYPES.get("ADHAR", ()))
 
-    vendor = get_kyc_vendor()
+    vendor = get_kyc_vendor(row.vendor)
+    if not await _acquire_vendor_status_poll(
+        vendor=row.vendor, vendor_request_id=row.vendor_request_id
+    ):
+        log.debug(
+            "kyc_status_poll_throttled",
+            request_id=str(row.id),
+            vendor=row.vendor,
+        )
+        await db.refresh(row)
+        return []
     try:
         vendor_status = await vendor.get_request_status(row.vendor_request_id)
     except KycVendorError as exc:
+        if exc.retryable:
+            log.warning(
+                "kyc_vendor_poll_deferred",
+                request_id=str(row.id),
+                vendor=vendor.vendor_name,
+                error_code=exc.code,
+            )
+            await db.refresh(row)
+            return []
         log.error(
             "kyc_vendor_error",
             request_id=str(row.id),
@@ -624,11 +1012,21 @@ async def _finalize_locked(
             text(
                 """
                 UPDATE kyc_verification_requests
-                SET status = :st, scope = :scope, updated_at = now()
+                SET status = :st,
+                    scope = :scope,
+                    error_code = COALESCE(:ec, error_code),
+                    error_message = COALESCE(:em, error_message),
+                    updated_at = now()
                 WHERE id = :id AND status IN ('created', 'authenticated')
                 """
             ),
-            {"st": vendor_status.status, "scope": vendor_status.scope, "id": str(row.id)},
+            {
+                "st": vendor_status.status,
+                "scope": vendor_status.scope,
+                "ec": vendor_status.error_code,
+                "em": vendor_status.error_message,
+                "id": str(row.id),
+            },
         )
         await db.refresh(row)
         return []
@@ -658,10 +1056,6 @@ async def _finalize_locked(
     if row.status != "authenticated":
         return []
 
-    digilocker_id = vendor_status.digilocker_id
-    if digilocker_id:
-        await _register_identity(db, pujari_id=row.pujari_id, digilocker_id=digilocker_id)
-
     try:
         identity = await vendor.fetch_aadhaar(row.vendor_request_id)
     except KycVendorError as exc:
@@ -676,6 +1070,17 @@ async def _finalize_locked(
     ).scalar_one()
 
     flags: list[str] = []
+    identity_key = (
+        vendor_status.digilocker_id
+        or identity.digilocker_id
+        or _aadhaar_demographic_key(identity)
+    )
+    if identity_key:
+        flags.extend(
+            await _register_identity(db, pujari_id=row.pujari_id, identity_key=identity_key)
+        )
+    else:
+        flags.append("identity_check_unavailable")
     age = _age_from_dob(identity.date_of_birth)
     if age is not None and age < 18:
         flags.append("age_under_18")
@@ -693,33 +1098,15 @@ async def _finalize_locked(
     partner_folder = kyc_partner_folder(user.phone, row.pujari_id)
 
     try:
-        if identity.photo_base64:
-            photo_bytes = base64.b64decode(identity.photo_base64)
-            key = (
-                f"kyc/{partner_folder}/identity_proof/{vendor_prefix}/aadhaar_photo.jpg"
-            )
-            store_kyc_bytes(s3_key=key, body=photo_bytes, content_type="image/jpeg")
-            await _upsert_document(
+        created_types.extend(
+            await _ingest_aadhaar_vendor_files(
                 db,
+                identity=identity,
                 pujari_id=row.pujari_id,
-                doc_type="identity_proof",
-                file_url=key,
-                vendor_request_id=vendor_prefix,
+                vendor_prefix=vendor_prefix,
+                partner_folder=partner_folder,
             )
-            created_types.append("identity_proof")
-
-        if identity.xml_file_url:
-            xml_bytes = await _download_url(identity.xml_file_url)
-            key = f"kyc/{partner_folder}/address_proof/{vendor_prefix}/aadhaar.xml"
-            store_kyc_bytes(s3_key=key, body=xml_bytes, content_type="application/xml")
-            await _upsert_document(
-                db,
-                pujari_id=row.pujari_id,
-                doc_type="address_proof",
-                file_url=key,
-                vendor_request_id=vendor_prefix,
-            )
-            created_types.append("address_proof")
+        )
     except KycStorageNotConfigured as exc:
         raise PartnerKycError(
             "KYC document storage not configured. Set S3_BUCKET_KYC and credentials or IAM role.",
@@ -761,6 +1148,10 @@ async def _finalize_locked(
         status="success",
         pujari_id=str(row.pujari_id),
     )
+    try:
+        await redis_delete(_consent_url_redis_key(row.id))
+    except Exception:
+        pass
     return created_types
 
 
@@ -783,6 +1174,10 @@ async def poll_and_finalize(
         raise PartnerKycError("KYC request not found.", status_code=404)
 
     if row.status in _TERMINAL_STATUSES:
+        if row.status == "success" and row.kind == "digilocker":
+            created = await _backfill_digilocker_docs(db, row)
+            if created:
+                return row, created
         return row, []
 
     if row.status not in _NON_TERMINAL_STATUSES:
@@ -1045,7 +1440,16 @@ async def digilocker_resume_url(live: KycVerificationRequest) -> str | None:
     """Best-effort vendor URL for an in-flight `created` request (service-layer vendor call)."""
     if live.status != "created" or live.vendor_request_id.startswith("local:"):
         return None
-    vendor = get_kyc_vendor()
+    cached = await _load_consent_url(live.id)
+    if cached:
+        return cached
+    vendor = get_kyc_vendor(live.vendor)
+    if not vendor.supports_resume_url:
+        return None
+    if not await _acquire_vendor_status_poll(
+        vendor=live.vendor, vendor_request_id=live.vendor_request_id
+    ):
+        return None
     try:
         vendor_status = await vendor.get_request_status(live.vendor_request_id)
     except KycVendorError:

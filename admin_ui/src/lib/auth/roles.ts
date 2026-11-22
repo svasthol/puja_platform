@@ -37,6 +37,10 @@ export function canEditPartnerPricing(me: AdminMe | undefined): boolean {
   return hasAdminRole(me);
 }
 
+export function canEditKycVendor(me: AdminMe | undefined): boolean {
+  return hasAdminRole(me);
+}
+
 export function canApproveKyc(me: AdminMe | undefined): boolean {
   return hasAdminRole(me);
 }

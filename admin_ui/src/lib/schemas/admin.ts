@@ -76,6 +76,7 @@ export const dispatchPolicySchema = z.object({
   max_live_advance_offers_per_pujari: z.number(),
   rm_escalation_hours_no_accept: z.number(),
   rm_escalation_t24_hours: z.number(),
+  max_offer_rounds: z.number(),
   night_bookings_enabled: z.boolean(),
   reconfirm_quiet_hours_start: z.string(),
   reconfirm_quiet_hours_end: z.string(),
@@ -95,12 +96,33 @@ export const dispatchPolicyUpdateSchema = z.object({
   max_live_advance_offers_per_pujari: z.coerce.number().min(1).max(50),
   rm_escalation_hours_no_accept: z.coerce.number().min(1).max(72),
   rm_escalation_t24_hours: z.coerce.number().min(1).max(72),
+  max_offer_rounds: z.coerce.number().int().min(0).max(100),
   night_bookings_enabled: z.boolean(),
   reconfirm_quiet_hours_start: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/),
   reconfirm_quiet_hours_end: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/),
   change_reason: z.string().max(300).optional().nullable(),
 });
 
+export const kycVendorSchema = z.object({
+  active_vendor: z.string(),
+  source: z.enum(["console", "env"]),
+  env_default: z.string(),
+  vendors: z.array(
+    z.object({
+      name: z.string(),
+      label: z.string(),
+      configured: z.boolean(),
+    }),
+  ),
+  updated_at: z.string().nullable().optional(),
+});
+
+export const kycVendorUpdateSchema = z.object({
+  vendor: z.string().min(1).max(40),
+  change_reason: z.string().max(300).optional().nullable(),
+});
+
+export type KycVendorSetting = z.infer<typeof kycVendorSchema>;
 export type TdsFacilitation = z.infer<typeof tdsFacilitationSchema>;
 export type DispatchPolicy = z.infer<typeof dispatchPolicySchema>;
 export type UserRoles = z.infer<typeof userRolesSchema>;

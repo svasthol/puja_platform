@@ -8,7 +8,10 @@ import {
   tdsFacilitationUpdateSchema,
   dispatchPolicySchema,
   dispatchPolicyUpdateSchema,
+  kycVendorSchema,
+  kycVendorUpdateSchema,
   type DispatchPolicy,
+  type KycVendorSetting,
   credentialProvisionSchema,
   roleAssignSchema,
   userRolesSchema,
@@ -68,6 +71,22 @@ export async function updateBookingFee(input: {
     method: "PUT",
     body: JSON.stringify(body),
     schema: bookingFeeSchema,
+  });
+}
+
+export async function fetchKycVendor(): Promise<KycVendorSetting> {
+  return apiFetch("/admin/settings/kyc-vendor", { schema: kycVendorSchema });
+}
+
+export async function updateKycVendor(input: {
+  vendor: string;
+  change_reason?: string;
+}): Promise<KycVendorSetting> {
+  const body = kycVendorUpdateSchema.parse(input);
+  return apiFetch("/admin/settings/kyc-vendor", {
+    method: "PUT",
+    body: JSON.stringify(body),
+    schema: kycVendorSchema,
   });
 }
 

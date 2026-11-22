@@ -104,6 +104,7 @@ def normalize_setu_pan_reason(reason: str) -> str:
 
 class SetuDigiLockerClient:
     vendor_name = "setu_digilocker"
+    supports_resume_url = True
 
     async def _request(
         self,
@@ -185,7 +186,9 @@ class SetuDigiLockerClient:
 
         return body
 
-    async def start_digilocker(self, *, redirect_url: str) -> KycStartResult:
+    async def start_digilocker(
+        self, *, redirect_url: str, reference: str, mobile: str | None = None
+    ) -> KycStartResult:
         body = await self._request(
             "POST",
             "/api/digilocker/",
@@ -256,6 +259,9 @@ class SetuDigiLockerClient:
                 )
                 return
             raise
+
+    def pan_verification_enabled(self) -> bool:
+        return bool((get_settings().KYC_SETU_PAN_PRODUCT_ID or "").strip())
 
     async def verify_pan(
         self, *, pan: str, consent: bool, reason: str

@@ -186,6 +186,13 @@ async def redis_ttl(key: str) -> int:
     return await redis_execute(_op)
 
 
+async def redis_get(key: str) -> str | None:
+    async def _op(r: aioredis.Redis) -> str | None:
+        return await r.get(key)
+
+    return await redis_execute(_op)
+
+
 async def redis_getdel(key: str) -> str | None:
     async def _op(r: aioredis.Redis) -> str | None:
         return await r.getdel(key)

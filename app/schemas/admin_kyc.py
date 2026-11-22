@@ -30,6 +30,7 @@ class KycPendingItem(BaseModel):
     uploaded_at: dt.datetime
     view_url: str | None = None
     view_url_expires_in: int | None = None
+    review_flags: list[str] = Field(default_factory=list)
 
 
 class KycPendingListResponse(BaseModel):

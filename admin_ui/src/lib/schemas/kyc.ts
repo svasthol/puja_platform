@@ -16,6 +16,7 @@ export const kycPendingItemSchema = z.object({
   uploaded_at: z.string(),
   view_url: z.string().nullable().optional(),
   view_url_expires_in: z.number().nullable().optional(),
+  review_flags: z.array(z.string()).optional(),
 });
 
 export const kycPendingListSchema = z.object({

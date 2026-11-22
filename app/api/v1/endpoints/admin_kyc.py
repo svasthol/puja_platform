@@ -98,10 +98,18 @@ async def list_pending_kyc(
                 """
                 SELECT pd.id, pd.pujari_id, pd.doc_type, pd.version, pd.uploaded_at,
                        pd.file_url, u.full_name AS pujari_name, u.phone AS pujari_phone,
-                       pj.verification_status AS pujari_verification_status
+                       pj.verification_status AS pujari_verification_status,
+                       lf.review_flags
                 FROM pujari_documents pd
                 JOIN pujaris pj ON pj.id = pd.pujari_id
                 JOIN users u ON u.id = pj.user_id
+                LEFT JOIN LATERAL (
+                    SELECT kvr.review_flags
+                    FROM kyc_verification_requests kvr
+                    WHERE kvr.pujari_id = pd.pujari_id AND kvr.kind = 'digilocker'
+                    ORDER BY kvr.updated_at DESC
+                    LIMIT 1
+                ) lf ON true
                 """
                 + filters
                 + cursor_pred
@@ -134,6 +142,9 @@ async def list_pending_kyc(
                 uploaded_at=r["uploaded_at"],
                 view_url=view_url,
                 view_url_expires_in=expires,
+                review_flags=(
+                    r.get("review_flags") if isinstance(r.get("review_flags"), list) else []
+                ),
             )
         )
 

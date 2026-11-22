@@ -32,6 +32,25 @@ class BookingFeeUpdate(BaseModel):
     change_reason: str | None = Field(default=None, max_length=300)
 
 
+class KycVendorOption(BaseModel):
+    name: str
+    label: str
+    configured: bool
+
+
+class KycVendorResponse(BaseModel):
+    active_vendor: str
+    source: Literal["console", "env"]
+    env_default: str
+    vendors: list[KycVendorOption]
+    updated_at: str | None = None
+
+
+class KycVendorUpdate(BaseModel):
+    vendor: str = Field(min_length=1, max_length=40)
+    change_reason: str | None = Field(default=None, max_length=300)
+
+
 class TdsFacilitationResponse(BaseModel):
     no_pan_rate_pct: Decimal
     pan_entity_rate_pct: Decimal
@@ -67,6 +86,7 @@ class DispatchPolicyResponse(BaseModel):
     max_live_advance_offers_per_pujari: int
     rm_escalation_hours_no_accept: int
     rm_escalation_t24_hours: int
+    max_offer_rounds: int
     night_bookings_enabled: bool
     reconfirm_quiet_hours_start: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
     reconfirm_quiet_hours_end: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
@@ -86,6 +106,8 @@ class DispatchPolicyUpdate(BaseModel):
     max_live_advance_offers_per_pujari: int = Field(ge=1, le=50)
     rm_escalation_hours_no_accept: int = Field(ge=1, le=72)
     rm_escalation_t24_hours: int = Field(ge=1, le=72)
+    # Omitted by older clients -> keep the stored value. 0 = retry until dispatch_deadline.
+    max_offer_rounds: int | None = Field(default=None, ge=0, le=100)
     night_bookings_enabled: bool
     reconfirm_quiet_hours_start: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
     reconfirm_quiet_hours_end: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")

@@ -254,6 +254,12 @@ no duplicated ingest logic.
 | Request expiry | `expires_at`; expired requests rejected on poll; a sweep/worker may mark `expired` (Phase 2) |
 | Vendor lock-in | Protocol + registry; DTOs hide Setu shapes; swap = new file + `KYC_VENDOR` env |
 | Consent (PAN) | PAN calls require explicit `consent=Y` + ≥20-char `reason` (Setu contract); capture consent in UI + audit |
+| API Sathi poll storm | `KYC_VENDOR_STATUS_POLL_MIN_SECONDS` + mobile poll interval; service-layer Redis throttle before `get_request_status` |
+| DigiLocker callback nonce | `handle_callback` uses `hmac.compare_digest` on peppered nonce hash |
+| Vendor XML/PDF fetch (SSRF) | `_download_url`: HTTPS only, block private/loopback hosts, stream with `S3_KYC_MAX_BYTES` cap |
+| Partner consent URL (mobile) | DigiLocker resume URL in `flutter_secure_storage` (`KycConsentUrlStore`); migrate once from legacy SharedPreferences |
+
+**Branch `feature/kyc-vendor-apisathi`:** vendor impl `apisathi_kyc_client.py`, admin `KYC_VENDOR` switch, QA reset `scripts/reset_partner_kyc_by_phone.py` (requires `DATABASE_URL`, no embedded password).
 
 ---
 
