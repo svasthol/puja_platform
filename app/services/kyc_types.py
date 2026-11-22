@@ -74,7 +74,7 @@ class KycWebhookEvent:
 
 @dataclass(frozen=True)
 class KycPanVerifyResult:
-    """Setu POST /api/verify/pan — normalized (no raw PAN in logs)."""
+    """Vendor PAN verification — normalized (no raw PAN in logs)."""
 
     verification: str  # success | failed
     message: str
@@ -90,14 +90,24 @@ class KycPanVerifyResult:
 @runtime_checkable
 class KycVendor(Protocol):
     vendor_name: str
+    # False when the vendor cannot return a resumable consent URL for an in-flight request.
+    supports_resume_url: bool
 
-    async def start_digilocker(self, *, redirect_url: str) -> KycStartResult: ...
+    async def start_digilocker(
+        self, *, redirect_url: str, reference: str, mobile: str | None = None
+    ) -> KycStartResult: ...
 
     async def get_request_status(self, vendor_request_id: str) -> KycStatusResult: ...
 
     async def fetch_aadhaar(self, vendor_request_id: str) -> KycIdentity: ...
 
     async def revoke(self, vendor_request_id: str) -> None: ...
+
+    def pan_verification_enabled(self) -> bool: ...
+
+    async def verify_pan(
+        self, *, pan: str, consent: bool, reason: str
+    ) -> KycPanVerifyResult: ...
 
     def verify_webhook_signature(self, body: bytes, signature: str) -> bool:
         """Optional — dormant until a push vendor is wired."""

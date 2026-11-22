@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { href: "/console", label: "Overview", section: "Main" },
   { href: "/console/settings/advance", label: "Booking fee", section: "Settings" },
   { href: "/console/settings/dispatch", label: "Dispatch policy", section: "Settings" },
+  { href: "/console/settings/kyc-vendor", label: "KYC vendor", section: "Settings" },
   { href: "/console/tds", label: "TDS hub", section: "TDS & compliance" },
   { href: "/console/settings/tds", label: "TDS policy slabs", section: "TDS & compliance" },
   { href: "/console/tds/backlog", label: "TDS accrual backlog", section: "TDS & compliance" },

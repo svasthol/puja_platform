@@ -103,9 +103,9 @@ class Settings(BaseSettings):
     S3_CATALOG_MAX_BYTES: int = 5_242_880     # 5 MiB — catalogue images only
     S3_KYC_MAX_BYTES: int = 5_242_880         # 5 MiB — selfie upload cap
 
-    # ---- Partner KYC (Setu DigiLocker — vendor-agnostic via KYC_VENDOR) --------
-    KYC_VENDOR: str = "setu_digilocker"
-    KYC_REDIRECT_URL: str = ""                # public callback base (Setu redirect landing)
+    # ---- Partner KYC (DigiLocker + PAN — vendor-agnostic via KYC_VENDOR) -------
+    KYC_VENDOR: str = "setu_digilocker"       # setu_digilocker | apisathi
+    KYC_REDIRECT_URL: str = ""                # public callback base (vendor redirect landing)
     KYC_APP_RETURN_URL: str = "managuruji://kyc/complete"
     KYC_REQUEST_TTL_MINUTES: int = 30
     KYC_RETENTION_DAYS: int = 365
@@ -116,8 +116,15 @@ class Settings(BaseSettings):
     KYC_SETU_DIGILOCKER_PRODUCT_ID: str = ""
     KYC_SETU_PAN_PRODUCT_ID: str = ""
     KYC_SETU_READ_TIMEOUT: float = 25.0  # sandbox can be slow; connect stays 3s
+    KYC_APISATHI_BASE_URL: str = "https://apisathi.in/gw/v1"
+    KYC_APISATHI_API_KEY: str = ""            # test_… (mock data) or live_… (wallet-billed)
+    KYC_APISATHI_READ_TIMEOUT: float = 25.0
     KYC_CALLBACK_RATE_LIMIT_PER_HOUR: int = 60
     KYC_START_RATE_LIMIT_PER_HOUR: int = 10
+    # Min seconds between vendor DigiLocker status polls per in-flight request (Setu, API Sathi, …).
+    KYC_VENDOR_STATUS_POLL_MIN_SECONDS: int = 15
+    # Min seconds between PAN verification vendor calls per partner (any KYC vendor).
+    KYC_VENDOR_PAN_MIN_INTERVAL_SECONDS: int = 30
 
     # ---- Maps ----------------------------------------------------------------
     GOOGLE_MAPS_API_KEY: str = ""

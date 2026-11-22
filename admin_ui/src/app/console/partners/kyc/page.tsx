@@ -24,6 +24,23 @@ const STATUS_TONE = {
   rejected: "warning",
 } as const;
 
+const REVIEW_FLAGS: Record<string, { label: string; tone: "warning" | "error" }> = {
+  identity_blocked: {
+    label: "Matches a blocked identity — do not approve without checking",
+    tone: "error",
+  },
+  duplicate_identity: {
+    label: "Same Aadhaar as another partner account — possible duplicate",
+    tone: "error",
+  },
+  identity_check_unavailable: {
+    label: "Duplicate check could not run (Aadhaar details incomplete)",
+    tone: "warning",
+  },
+  name_mismatch: { label: "Registered name differs from Aadhaar", tone: "warning" },
+  age_under_18: { label: "Aadhaar age under 18", tone: "warning" },
+};
+
 function formatUploadedAt(iso: string) {
   try {
     return new Date(iso).toLocaleString();
@@ -71,6 +88,7 @@ function KycRow({
   });
 
   const busy = approveMutation.isPending || rejectMutation.isPending;
+  const reviewFlags = item.review_flags ?? [];
 
   return (
     <li className="px-5 py-4">
@@ -83,6 +101,18 @@ function KycRow({
             </Badge>
           </div>
           <p className="text-sm text-ink-muted">{item.pujari_phone}</p>
+          {reviewFlags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {reviewFlags.map((flag) => {
+                const meta = REVIEW_FLAGS[flag] ?? { label: flag, tone: "warning" as const };
+                return (
+                  <Badge key={flag} tone={meta.tone} className="normal-case tracking-normal">
+                    {meta.label}
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
           <p className="text-sm text-ink">
             <span className="font-medium">{item.doc_type_label}</span>
             <span className="text-ink-faint"> · v{item.version} · {formatUploadedAt(item.uploaded_at)}</span>

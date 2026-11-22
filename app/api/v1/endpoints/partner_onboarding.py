@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import text
@@ -32,6 +33,7 @@ from app.services.pujari_compliance import submit_partner_pan
 router = APIRouter(prefix="/pujari", tags=["pujari-onboarding"])
 callback_router = APIRouter(tags=["pujari-kyc-callback"])
 settings = get_settings()
+log = structlog.get_logger()
 
 
 def _client_ip(request: Request) -> str | None:
@@ -112,32 +114,53 @@ async def start_digilocker(
 @callback_router.get("/pujari/kyc/callback")
 async def kyc_callback(
     request: Request,
-    id: str = Query(..., description="Setu DigiLocker request id"),
-    success: bool = Query(...),
+    id: str | None = Query(default=None, description="Setu DigiLocker request id"),
+    txnId: str | None = Query(default=None, description="API Sathi transaction id"),
+    success: bool | None = Query(default=None),
     kyc_nonce: str | None = Query(default=None),
     scope: str | None = Query(default=None),
     errCode: str | None = Query(default=None),
     errMessage: str | None = Query(default=None),
+    error_code: str | None = Query(default=None),
+    errMsg: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db_txn),
 ):
-    """PUBLIC — nonce-bound DigiLocker redirect landing (no bearer token)."""
+    """PUBLIC — nonce-bound DigiLocker redirect landing (no bearer token).
+
+    Accepts Setu (``id``/``success``/``errCode``/``errMessage``) and API Sathi
+    (``txnId``/``success``/``error_code``/``errMsg``) redirect params. The callback
+    is only a hint: polling confirms with the vendor, so an unbound/unverifiable
+    callback changes nothing and still returns the partner to the app.
+    """
+    vendor_request_id = id or txnId
+    err_code = errCode or error_code
+    err_message = errMessage or errMsg
+    if success is None and err_code:
+        success = False
     await _rate_limit(
-        f"kyc_callback:{id}",
+        f"kyc_callback:{vendor_request_id or 'none'}",
         settings.KYC_CALLBACK_RATE_LIMIT_PER_HOUR,
         3600,
     )
-    try:
-        await kyc_svc.handle_callback(
-            db,
-            vendor_request_id=id,
-            success=success,
-            nonce=kyc_nonce,
-            scope=scope,
-            error_code=errCode,
-            error_message=errMessage,
-        )
-    except PartnerKycError as exc:
-        raise _map_kyc_error(exc) from exc
+    if vendor_request_id and success is not None:
+        try:
+            await kyc_svc.handle_callback(
+                db,
+                vendor_request_id=vendor_request_id,
+                success=success,
+                nonce=kyc_nonce,
+                scope=scope,
+                error_code=err_code,
+                error_message=err_message,
+            )
+        except PartnerKycError as exc:
+            if exc.status_code not in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND):
+                raise _map_kyc_error(exc) from exc
+            log.warning(
+                "kyc_callback_unbound",
+                vendor_request_id=vendor_request_id,
+                status_code=exc.status_code,
+            )
     return RedirectResponse(url=settings.KYC_APP_RETURN_URL, status_code=status.HTTP_302_FOUND)
 
 
@@ -154,7 +177,7 @@ async def get_kyc_request(
         )
     except PartnerKycError as exc:
         raise _map_kyc_error(exc) from exc
-    flags = row.review_flags if isinstance(row.review_flags, list) else []
+    flags = kyc_svc.partner_visible_review_flags(row.review_flags)
     return KycRequestStatusResponse(
         request_id=row.id,
         status=row.status,
@@ -245,7 +268,7 @@ async def submit_pan(
     p: Principal = Depends(require_pujari),
     db: AsyncSession = Depends(get_db_txn),
 ):
-    """Partner PAN + entity type for TDS (Setu verify when KYC_SETU_PAN_PRODUCT_ID set)."""
+    """Partner PAN + entity type for TDS (verified via the KYC_VENDOR PAN product when configured)."""
     pid = await _pujari_id(db, p.user_id)
     result = await submit_partner_pan(
         db,
@@ -282,7 +305,7 @@ async def partner_kyc_status(
 
     active: KycActiveDigilockerRequest | None = None
     if live is not None:
-        flags = live.review_flags if isinstance(live.review_flags, list) else []
+        flags = kyc_svc.partner_visible_review_flags(live.review_flags)
         resume_url = await kyc_svc.digilocker_resume_url(live)
         active = KycActiveDigilockerRequest(
             request_id=live.id,

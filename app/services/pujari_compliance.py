@@ -1,6 +1,7 @@
 """Pujari tax compliance fields for TDS accrual (pan_hash, entity_type)."""
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import hmac
 import re
@@ -13,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.services.kyc_types import KycVendorError
+from app.core.redis_client import redis_set_nx
+from app.services.kyc_vendor import active_kyc_vendor_name, get_kyc_vendor
 from app.services.pricing import ALLOWED_ENTITY_TYPES
-from app.services.setu_digilocker_client import SetuDigiLockerClient
 
 log = structlog.get_logger()
 
@@ -36,11 +38,40 @@ def validate_pan(pan: str) -> str:
     return normalized
 
 
-def _map_kyc_vendor_error(exc: KycVendorError) -> HTTPException:
+async def _verify_pan_with_vendor(
+    vendor,
+    *,
+    pan: str,
+    consent: bool,
+    reason: str,
+):
+    """One immediate retry on transient vendor failures (vendor-agnostic)."""
+    last: KycVendorError | None = None
+    for attempt in range(2):
+        try:
+            return await vendor.verify_pan(pan=pan, consent=consent, reason=reason)
+        except KycVendorError as exc:
+            last = exc
+            if attempt == 0 and exc.retryable:
+                log.warning(
+                    "pan_verify_retry",
+                    vendor=vendor.vendor_name,
+                    error_code=exc.code,
+                )
+                continue
+            raise
+    assert last is not None
+    raise last
+
+
+def _map_kyc_vendor_error(exc: KycVendorError, *, vendor_name: str) -> HTTPException:
     if exc.code == "pan_not_found":
         settings = get_settings()
         base = (settings.KYC_SETU_BASE_URL or "").lower()
-        if "sandbox" in base or settings.APP_ENV != "production":
+        setu_sandbox = vendor_name == "setu_digilocker" and (
+            "sandbox" in base or settings.APP_ENV != "production"
+        )
+        if setu_sandbox:
             detail = (
                 "Setu sandbox does not verify real PANs against Income Tax. "
                 "For local/staging tests use sandbox PAN ABCDE1234A (ABCDE1234B = invalid). "
@@ -53,10 +84,16 @@ def _map_kyc_vendor_error(exc: KycVendorError) -> HTTPException:
         return HTTPException(http.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
     if exc.code == "vendor_config":
         return HTTPException(http.HTTP_503_SERVICE_UNAVAILABLE, str(exc))
+    if exc.code in ("vendor_auth", "insufficient_balance", "product_retired"):
+        log.error("pan_vendor_unavailable", vendor=vendor_name, error_code=exc.code)
+        return HTTPException(
+            http.HTTP_503_SERVICE_UNAVAILABLE,
+            "PAN verification is temporarily unavailable. Contact support.",
+        )
     if exc.retryable:
         return HTTPException(
             http.HTTP_502_BAD_GATEWAY,
-            "PAN verification service is temporarily unavailable. Try again shortly.",
+            "PAN verification is temporarily unavailable. Wait a minute and try again.",
         )
     return HTTPException(http.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
 
@@ -121,7 +158,7 @@ async def submit_partner_pan(
     consent: bool,
     reason: str,
 ) -> dict:
-    """Validate PAN with Setu when configured; store hash + pan_status (never log raw PAN)."""
+    """Validate PAN with the KYC vendor when configured; store hash + pan_status (never log raw PAN)."""
     if not consent:
         raise HTTPException(
             http.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -133,15 +170,29 @@ async def submit_partner_pan(
     verified_name: str | None = None
     user_message = "PAN recorded for tax compliance."
 
-    product_id = (settings.KYC_SETU_PAN_PRODUCT_ID or "").strip()
-    if product_id:
-        client = SetuDigiLockerClient()
+    vendor = get_kyc_vendor(await active_kyc_vendor_name(db))
+    if vendor.pan_verification_enabled():
+        pan_interval = settings.KYC_VENDOR_PAN_MIN_INTERVAL_SECONDS
+        if pan_interval > 0:
+            pan_slot = await redis_set_nx(
+                f"kyc:pan_verify:{pujari_id}",
+                "1",
+                ex=pan_interval,
+            )
+            if not pan_slot:
+                raise HTTPException(
+                    http.HTTP_429_TOO_MANY_REQUESTS,
+                    "PAN was just submitted. Wait a moment before trying again.",
+                )
         try:
-            result = await client.verify_pan(
-                pan=normalized, consent=consent, reason=reason
+            result = await _verify_pan_with_vendor(
+                vendor,
+                pan=normalized,
+                consent=consent,
+                reason=reason,
             )
         except KycVendorError as exc:
-            raise _map_kyc_vendor_error(exc) from exc
+            raise _map_kyc_vendor_error(exc, vendor_name=vendor.vendor_name) from exc
         if not result.is_success:
             raise HTTPException(
                 http.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -151,7 +202,8 @@ async def submit_partner_pan(
         verified_name = result.full_name
         user_message = result.message or "PAN verified successfully."
         log.info(
-            "pan_verified_setu",
+            "pan_verified",
+            vendor=vendor.vendor_name,
             pujari_id=str(pujari_id)[:8],
             trace_id=result.trace_id,
             category=result.category,
@@ -163,12 +215,13 @@ async def submit_partner_pan(
         )
     else:
         log.warning(
-            "pan_stored_without_setu_verify",
+            "pan_stored_without_vendor_verify",
+            vendor=vendor.vendor_name,
             pujari_id=str(pujari_id)[:8],
             app_env=settings.APP_ENV,
         )
         user_message = (
-            "PAN saved for testing. Enable KYC_SETU_PAN_PRODUCT_ID for operative verification."
+            "PAN saved for testing. Configure the KYC vendor PAN product for operative verification."
         )
 
     await update_tax_compliance(

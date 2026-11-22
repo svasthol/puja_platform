@@ -13,6 +13,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import uuid
+
+import structlog
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -42,6 +44,9 @@ from app.schemas.admin import (
     CredentialProvisionResponse,
     DispatchPolicyResponse,
     DispatchPolicyUpdate,
+    KycVendorOption,
+    KycVendorResponse,
+    KycVendorUpdate,
     RoleAssignRequest,
     TdsFacilitationResponse,
     TdsFacilitationUpdate,
@@ -60,9 +65,19 @@ from app.services.pricing import (
     parse_tds_facilitation_config,
 )
 from app.services.audit import record_admin_action
+from app.services.kyc_vendor import (
+    KYC_VENDOR_LABELS,
+    KYC_VENDOR_SETTING_KEY,
+    env_default_kyc_vendor,
+    invalidate_active_kyc_vendor_cache,
+    is_known_kyc_vendor,
+    kyc_vendor_configured,
+    read_kyc_vendor_setting,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
+log = structlog.get_logger()
 
 
 async def _roles_for(db: AsyncSession, user_id: uuid.UUID) -> list[str]:
@@ -222,6 +237,92 @@ async def set_booking_fee(
     return BookingFeeResponse(amount=payload.amount, currency="INR", label=label)
 
 
+# --------------------------------------------------------------------------- #
+# Platform settings — KYC vendor (DigiLocker + PAN) for new requests
+# --------------------------------------------------------------------------- #
+def _kyc_vendor_response(stored: str | None, updated_at: str | None) -> KycVendorResponse:
+    env_default = env_default_kyc_vendor()
+    console_choice = (
+        stored
+        if stored and is_known_kyc_vendor(stored) and kyc_vendor_configured(stored)
+        else None
+    )
+    effective = console_choice or env_default
+    stored_misconfigured = bool(
+        stored and is_known_kyc_vendor(stored) and not kyc_vendor_configured(stored)
+    )
+    if stored_misconfigured and effective == env_default:
+        log.warning(
+            "kyc_vendor_console_choice_unusable",
+            stored=stored,
+            effective=effective,
+        )
+    return KycVendorResponse(
+        active_vendor=effective,
+        source="console" if console_choice else "env",
+        env_default=env_default,
+        vendors=[
+            KycVendorOption(name=name, label=label, configured=kyc_vendor_configured(name))
+            for name, label in KYC_VENDOR_LABELS.items()
+        ],
+        updated_at=updated_at,
+    )
+
+
+@router.get("/settings/kyc-vendor", response_model=KycVendorResponse)
+async def get_kyc_vendor_setting(
+    _p: Principal = Depends(require_admin), db: AsyncSession = Depends(get_db)
+):
+    stored, updated_at = await read_kyc_vendor_setting(db)
+    return _kyc_vendor_response(stored, updated_at)
+
+
+@router.put("/settings/kyc-vendor", response_model=KycVendorResponse)
+async def set_kyc_vendor_setting(
+    payload: KycVendorUpdate,
+    request: Request,
+    p: Principal = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db_txn),
+):
+    """Switch the vendor for NEW KYC/PAN calls; in-flight requests finish on their own vendor."""
+    vendor = payload.vendor.strip().lower()
+    if not is_known_kyc_vendor(vendor):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"vendor must be one of: {', '.join(KYC_VENDOR_LABELS)}.",
+        )
+    if not kyc_vendor_configured(vendor):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{KYC_VENDOR_LABELS[vendor]} credentials are not configured on this server.",
+        )
+    before, _ = await read_kyc_vendor_setting(db)
+    stmt = text(
+        """
+        INSERT INTO platform_settings (key, value_json, updated_at)
+        VALUES (:key, :vj, now())
+        ON CONFLICT (key) DO UPDATE SET
+            value_json = :vj,
+            updated_at = now()
+        """
+    ).bindparams(bindparam("vj", type_=JSONB))
+    await db.execute(stmt, {"key": KYC_VENDOR_SETTING_KEY, "vj": {"vendor": vendor}})
+    await record_admin_action(
+        db,
+        actor_user_id=p.user_id,
+        action="update",
+        entity_type="platform_settings",
+        entity_id=KYC_VENDOR_SETTING_KEY,
+        before={"vendor": before or env_default_kyc_vendor()},
+        after={"vendor": vendor},
+        change_reason=payload.change_reason,
+        ip=request.client.host if request.client else None,
+    )
+    invalidate_active_kyc_vendor_cache()
+    _, updated_at = await read_kyc_vendor_setting(db)
+    return _kyc_vendor_response(vendor, updated_at)
+
+
 def _tds_facilitation_response(
     cfg,
     *,
@@ -329,6 +430,7 @@ def _dispatch_policy_response(view: DispatchPolicyView) -> DispatchPolicyRespons
         max_live_advance_offers_per_pujari=view.max_live_advance_offers_per_pujari,
         rm_escalation_hours_no_accept=view.rm_escalation_hours_no_accept,
         rm_escalation_t24_hours=view.rm_escalation_t24_hours,
+        max_offer_rounds=view.max_offer_rounds,
         night_bookings_enabled=view.night_bookings_enabled,
         reconfirm_quiet_hours_start=view.reconfirm_quiet_hours_start,
         reconfirm_quiet_hours_end=view.reconfirm_quiet_hours_end,
@@ -336,7 +438,9 @@ def _dispatch_policy_response(view: DispatchPolicyView) -> DispatchPolicyRespons
     )
 
 
-def _dispatch_view_from_update(payload: DispatchPolicyUpdate) -> DispatchPolicyView:
+def _dispatch_view_from_update(
+    payload: DispatchPolicyUpdate, current: DispatchPolicyView
+) -> DispatchPolicyView:
     return DispatchPolicyView(
         instant_lead_hours=payload.instant_lead_hours,
         instant_dispatch_minutes=payload.instant_dispatch_minutes,
@@ -350,6 +454,11 @@ def _dispatch_view_from_update(payload: DispatchPolicyUpdate) -> DispatchPolicyV
         max_live_advance_offers_per_pujari=payload.max_live_advance_offers_per_pujari,
         rm_escalation_hours_no_accept=payload.rm_escalation_hours_no_accept,
         rm_escalation_t24_hours=payload.rm_escalation_t24_hours,
+        max_offer_rounds=(
+            payload.max_offer_rounds
+            if payload.max_offer_rounds is not None
+            else current.max_offer_rounds
+        ),
         night_bookings_enabled=payload.night_bookings_enabled,
         reconfirm_quiet_hours_start=payload.reconfirm_quiet_hours_start,
         reconfirm_quiet_hours_end=payload.reconfirm_quiet_hours_end,
@@ -376,7 +485,7 @@ async def set_dispatch_policy(
     before_view = await fetch_dispatch_policy(db)
     before = _dispatch_policy_response(before_view).model_dump()
     after_view = await persist_dispatch_policy(
-        db, _dispatch_view_from_update(payload)
+        db, _dispatch_view_from_update(payload, before_view)
     )
     after = _dispatch_policy_response(after_view).model_dump()
     await record_admin_action(
