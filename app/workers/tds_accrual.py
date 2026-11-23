@@ -1,10 +1,9 @@
 """TDS accrual intent processor (§0.S decouple — D1/D3/R4)."""
 from __future__ import annotations
 
-import asyncio
-
 import structlog
 
+from app.workers.async_bridge import run_async
 from app.workers.celery_app import celery_app
 
 log = structlog.get_logger("tds_accrual")
@@ -21,7 +20,7 @@ async def _process_batch(limit: int) -> dict[str, int]:
 
 @celery_app.task(name="app.workers.tds_accrual.process_tds_accrual_intents")
 def process_tds_accrual_intents(batch: int = 50) -> dict[str, int]:
-    result = asyncio.run(_process_batch(batch))
+    result = run_async(_process_batch(batch))
     if any(result.values()):
         log.info("tds_accrual_batch_done", **result)
     return result
@@ -38,7 +37,7 @@ async def _sweep_no_show(limit: int) -> dict[str, int]:
 
 @celery_app.task(name="app.workers.tds_accrual.sweep_never_collected_tds")
 def sweep_never_collected_tds(batch: int = 50) -> dict[str, int]:
-    result = asyncio.run(_sweep_no_show(batch))
+    result = run_async(_sweep_no_show(batch))
     if any(result.values()):
         log.info("tds_no_show_sweep_done", **result)
     return result

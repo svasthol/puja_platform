@@ -28,6 +28,8 @@ class LaunchDispatchSettings:
     max_live_advance_offers_per_pujari: int = 15
     rm_escalation_hours_no_accept: int = 24
     rm_escalation_t24_hours: int = 24
+    # Rounds that sent >= 1 offer; zero-offer passes do not count. 0 = retry until dispatch_deadline.
+    max_offer_rounds: int = 0
 
 
 def _int_setting(raw: Any, default: int) -> int:
@@ -76,6 +78,7 @@ _DISPATCH_SETTING_KEYS = (
     "max_live_advance_offers_per_pujari",
     "rm_escalation_hours_no_accept",
     "rm_escalation_t24_hours",
+    "max_offer_rounds",
 )
 
 # Shared with admin dispatch-policy API — keep in sync with worker load_dispatch_settings().
@@ -102,6 +105,7 @@ def _settings_from_rows(rows: dict[str, Any]) -> LaunchDispatchSettings:
             rows.get("rm_escalation_hours_no_accept"), 24
         ),
         rm_escalation_t24_hours=_int_setting(rows.get("rm_escalation_t24_hours"), 24),
+        max_offer_rounds=max(0, _int_setting(rows.get("max_offer_rounds"), 0)),
     )
 
 

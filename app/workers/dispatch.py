@@ -10,7 +10,9 @@ Idempotency, layered:
      already ran (duplicate task delivery); exit.
   4. ux_booking_assignments_one_live makes duplicate live offers impossible.
 
-Launch exhaustion is time-based (dispatch_deadline), not round-count based.
+Launch exhaustion is time-based (dispatch_deadline). `round` counts only rounds that sent
+at least one offer; the optional platform cap `max_offer_rounds` (0 = off) fails the booking
+once that many offer rounds have lapsed. The legacy per-row `max_rounds` column is Phase 2 geo.
 """
 from __future__ import annotations
 
@@ -31,6 +33,7 @@ from app.workers.sweep import get_connection
 log = structlog.get_logger("dispatch")
 
 RADIUS_SCHEDULE = {1: 3.0, 2: 6.0, 3: 10.0, 4: 15.0}
+_ROUND_COLUMN_MAX = 32767  # booking_dispatch_state.round is SMALLINT
 
 
 def _status_id(cur, domain: str, code: str) -> int:
@@ -91,6 +94,22 @@ def _skip_if_not_dispatchable(cur, booking_id: str, *, for_share: bool = False) 
         )
         return {"skipped": "not_dispatchable"}
     return None
+
+
+def _has_live_offer(cur, booking_id: str) -> bool:
+    cur.execute(
+        """
+        SELECT 1 FROM booking_assignments ba
+        JOIN status_types st ON st.id = ba.status_id
+        WHERE ba.booking_id = %s
+          AND st.domain = 'assignment' AND st.code = 'offered'
+          AND ba.responded_at IS NULL
+          AND ba.expires_at > now()
+        LIMIT 1
+        """,
+        (booking_id,),
+    )
+    return cur.fetchone() is not None
 
 
 def _reset_dispatch_state_if_fresh(cur, booking_id: str, *, fresh: bool) -> None:
@@ -194,23 +213,27 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                 return exhaust_booking_no_pujari(cur, conn, booking_id)
 
             cur.execute(
-                "SELECT round, max_rounds FROM booking_dispatch_state WHERE booking_id=%s",
+                "SELECT round, radius_km FROM booking_dispatch_state WHERE booking_id=%s",
                 (booking_id,),
             )
             row = cur.fetchone()
             if row is None:
                 return {"error": "no_dispatch_state"}
-            expected, max_rounds = row[0], row[1]
-            if expected >= max_rounds:
+            expected, prior_radius = row[0], row[1]
+            max_rounds = settings.max_offer_rounds
+            if max_rounds and expected >= max_rounds:
+                if _has_live_offer(cur, booking_id):
+                    conn.rollback()
+                    return {"skipped": "live_offer_pending"}
                 log.info(
                     "dispatch_round_cap_reached",
                     booking_id=booking_id,
                     round=expected,
-                    max_rounds=max_rounds,
+                    max_offer_rounds=max_rounds,
                 )
                 return exhaust_booking_no_pujari(cur, conn, booking_id)
 
-            next_round = expected + 1
+            next_round = min(expected + 1, _ROUND_COLUMN_MAX)
             radius = RADIUS_SCHEDULE.get(next_round, 15.0)
 
             cur.execute(
@@ -292,11 +315,17 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                 except Exception:
                     cur.execute("ROLLBACK TO SAVEPOINT dispatch_offer_insert")
                     continue
+            if not inserted:
+                cur.execute(
+                    "UPDATE booking_dispatch_state SET round=%s, radius_km=%s WHERE booking_id=%s",
+                    (expected, prior_radius, booking_id),
+                )
+            stored_round = next_round if inserted else expected
             conn.commit()
             log.info(
                 "dispatch_round_done",
                 booking_id=booking_id,
-                round=next_round,
+                round=stored_round,
                 offers=inserted,
                 candidates=len(candidates),
                 live=len(live),
@@ -308,7 +337,7 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                 celery_app.send_task(
                     "app.workers.notifications.notify_offers", args=[booking_id]
                 )
-            return {"round": next_round, "offers": inserted}
+            return {"round": stored_round, "offers": inserted}
     finally:
         conn.close()
         release_lock(r, lock_key, lock_token)

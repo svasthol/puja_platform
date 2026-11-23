@@ -299,7 +299,8 @@ def bookings_needing_rebroadcast(conn: psycopg.Connection) -> list[str]:
 
     Includes rounds that inserted `offers=0` (e.g. no online pujari) — not only bookings
     that previously had assignment rows. Retries every sweep cycle until offers land or
-    dispatch_deadline exhausts the booking.
+    dispatch_deadline exhausts the booking. No round filter here: `_dispatch_round` applies
+    the `max_offer_rounds` policy and exhausts capped bookings instead of stranding them.
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -314,7 +315,6 @@ def bookings_needing_rebroadcast(conn: psycopg.Connection) -> list[str]:
               AND b.paid_at IS NOT NULL
               AND bds.last_dispatched IS NOT NULL
               AND bds.exhausted_at IS NULL
-              AND bds.round < bds.max_rounds
               AND (bds.dispatch_starts_at IS NULL OR bds.dispatch_starts_at <= now())
               {_dispatch_window_open_sql()}
               AND NOT EXISTS (
