@@ -1,5 +1,9 @@
--- Dev-only: remove all bookings and dependent rows; keep users, pujaris, catalog.
--- Usage: psql -d Mana_Guruji -f scripts/clean_dev_bookings.sql
+-- =============================================================================
+-- DEV-ONLY — NEVER run on staging or production.
+-- Wipes all bookings and dependent rows; keeps users, pujaris, catalog.
+-- Prefer: python scripts/dev/run_clean_dev_bookings.py --confirm-wipe-bookings
+-- Manual:  psql -d <local_dev_db> -f scripts/dev/clean_dev_bookings.sql
+-- =============================================================================
 
 TRUNCATE TABLE
   chat_messages,

@@ -1,4 +1,7 @@
-"""Truncate all booking-related dev data (keeps partners/catalog)."""
+"""Truncate all booking-related **local dev** data (keeps partners/catalog).
+
+See scripts/dev/README.md. Requires APP_ENV=development and --confirm-wipe-bookings.
+"""
 from __future__ import annotations
 
 import sys
@@ -7,15 +10,29 @@ from pathlib import Path
 from app.core.config import get_settings
 from app.workers.sweep import get_connection
 
+_SQL = Path(__file__).parent / "clean_dev_bookings.sql"
+_CONFIRM_FLAG = "--confirm-wipe-bookings"
+
 
 def _run(flush_redis: bool) -> None:
-    sql_path = Path(__file__).parent / "clean_dev_bookings.sql"
-    sql = sql_path.read_text(encoding="utf-8")
-    settings = get_settings()
-    if settings.APP_ENV == "production":
-        print("REFUSED: APP_ENV=production", file=sys.stderr)
+    if _CONFIRM_FLAG not in sys.argv:
+        print(
+            f"REFUSED: pass {_CONFIRM_FLAG} to run dev booking wipe "
+            f"(see scripts/dev/README.md)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
+    settings = get_settings()
+    if settings.APP_ENV != "development":
+        print(
+            f"REFUSED: APP_ENV={settings.APP_ENV!r} "
+            "(only development; never staging/production)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    sql = _SQL.read_text(encoding="utf-8")
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -41,7 +58,7 @@ def _run(flush_redis: bool) -> None:
         conn.commit()
     finally:
         conn.close()
-    print("PostgreSQL: clean_dev_bookings.sql applied.")
+    print("PostgreSQL: scripts/dev/clean_dev_bookings.sql applied.")
 
     if flush_redis:
         import redis

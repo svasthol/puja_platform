@@ -19,7 +19,7 @@ Bookings stayed in `requested` for hours after `dispatch_deadline` passed becaus
 | Reconfirmation/monitor exceptions block exhaust | One step failure skips deadline enforcement | Per-step `_safe_step` isolation in `run_sweep` |
 | Exhaust loop unbounded, no per-booking try/except | One bad row blocks batch | `LIMIT 50` + per-booking try/except |
 | NULL `dispatch_deadline` treated as in-window for rebroadcast | Permanent rebroadcast trap | Require non-NULL deadline + future slot for rebroadcast |
-| `max_rounds` column never enforced | Rounds exceeded cap (6 rows in dev) | Enforce in `_dispatch_round` + rebroadcast scan |
+| Legacy `max_rounds` (row default 4) exhausted zero-offer rounds | `failed_no_pujari` minutes after pay with 0 assignments | **PR #22:** zero-offer rounds do not advance `round`; optional admin `max_offer_rounds` (0 = until `dispatch_deadline`); rebroadcast scan no longer filters on `bds.max_rounds` |
 | No past-slot gate at booking creation | Past slots bookable | `SLOT_IN_PAST` 422 in `assert_booking_gate` |
 | Eligibility missing slot-in-future | Offers for past pujas | `(scheduled_date + scheduled_time) > now()` in `_eligibility_predicates` |
 | Accept without slot check | Past slot confirmable | `assert_slot_not_past_for_accept` → 410 |
@@ -29,7 +29,7 @@ Bookings stayed in `requested` for hours after `dispatch_deadline` passed becaus
 1. **Always run beat and worker together:**
    ```bash
    celery -A app.workers.celery_app beat --loglevel=info
-   celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,notifications --pool=solo
+   celery -A app.workers.celery_app worker --loglevel=info -Q sweep,dispatch,refund,reconcile,notifications --pool=solo
    ```
 2. **Apply migration 024:** `python scripts/apply_migration_024.py`
 3. **Monitor `/health`:** `sweep_stale: true` or `sweep_age_seconds > 120` → page ops (beat dead or sweep failing).
@@ -42,7 +42,7 @@ Bookings stayed in `requested` for hours after `dispatch_deadline` passed becaus
 | `app/workers/sweep.py` | Exhaust batch, isolated steps, `sweep_done` log |
 | `app/workers/sweep_heartbeat.py` | Postgres heartbeat read/write |
 | `app/workers/redis_sync.py` | Sync Redis client + owner-token locks |
-| `app/workers/dispatch.py` | `max_rounds` cap before next round |
+| `app/workers/dispatch.py` | Offer-round cap via `platform_settings.max_offer_rounds`; deadline exhaust |
 | `app/services/booking_gate.py` | `SLOT_IN_PAST` gate |
 | `app/services/slot_guard.py` | Accept-time slot guard |
 | `app/services/dispatch_launch.py` | Eligibility slot-in-future |
