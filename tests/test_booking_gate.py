@@ -82,6 +82,15 @@ def test_compute_booking_class_threshold():
     assert compute_booking_class(4.1, 4) == "advance"
 
 
+def test_compute_list_urgency_live_lead_only():
+    from app.services.dispatch_launch import compute_list_urgency
+
+    assert compute_list_urgency("instant", 2.0, 4) == "instant"
+    assert compute_list_urgency("instant", 40000.0, 4) == "advance"
+    assert compute_list_urgency("advance", 3.0, 4) == "instant"
+    assert compute_list_urgency("advance", 10.0, 4) == "advance"
+
+
 def test_night_gate_error_codes():
     assert night_gate_error_code("instant", True, False) == "INSTANT_NIGHT_BLOCKED"
     assert night_gate_error_code("advance", True, False) == "NIGHT_BOOKINGS_DISABLED"

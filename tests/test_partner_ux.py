@@ -170,6 +170,18 @@ async def test_notify_offers_quiet_advance_sets_om_sound(session, seed, uniq):
 async def test_notify_offers_instant_uses_offer_instant_type(session, seed, uniq):
     await _require_migration_014(session)
     bid, _ = await _seed_live_offer(session, uniq, booking_class="instant")
+    await session.execute(
+        text(
+            """
+            UPDATE bookings
+            SET scheduled_date = (now() + interval '2 hours')::date,
+                scheduled_time = (now() + interval '2 hours')::time
+            WHERE id = :bid
+            """
+        ),
+        {"bid": bid},
+    )
+    await session.commit()
     await _register_device(session, uniq)
 
     with patch(
@@ -181,6 +193,22 @@ async def test_notify_offers_instant_uses_offer_instant_type(session, seed, uniq
     assert result["offer_type"] == "offer_instant"
     assert mock_push.call_args.kwargs["data"]["type"] == "offer_instant"
     assert mock_push.call_args.kwargs["priority"] == "high"
+
+
+@pytest.mark.asyncio
+async def test_notify_far_frozen_instant_uses_advance_type(session, seed, uniq):
+    """Stale dev rows: class instant + far slot → advance FCM (no nadaswaram path)."""
+    await _require_migration_014(session)
+    bid, _ = await _seed_live_offer(session, uniq, booking_class="instant")
+    await _register_device(session, uniq)
+
+    with patch(
+        "app.workers.notifications.send_push_sync",
+        return_value=FcmResult(outcome=FcmOutcome.SENT, message_id="m1"),
+    ):
+        result = _notify_offers_impl(bid)
+
+    assert result["offer_type"] == "offer_advance"
 
 
 @pytest.mark.asyncio

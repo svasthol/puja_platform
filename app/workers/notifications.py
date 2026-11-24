@@ -61,13 +61,13 @@ WHERE b.id = %s
 
 def _broadcast_offer_payload(
     booking_id: str,
-    booking_class: str,
     *,
+    live_instant: bool = False,
     urgency_escalated: bool = False,
     high_escalated: bool = False,
 ) -> tuple[str, str, dict[str, str], str]:
     """FCM content for broadcast notify_offers (§21.6.H)."""
-    if booking_class == "instant" or high_escalated:
+    if live_instant or high_escalated:
         return (
             "New puja offer",
             "You have an urgent booking offer — open the app to accept.",
@@ -164,10 +164,17 @@ def _notify_offers_impl(
             sms_sent = 0
             is_direct = rows[0][3] == "direct" or rows[0][4] is not None
 
+            import datetime as dt
             import zoneinfo
 
             from app.core.config import get_settings
-            from app.services.dispatch_launch import load_quiet_hours, slot_datetime
+            from app.services.booking_gate import compute_lead_hours
+            from app.services.dispatch_launch import (
+                compute_list_urgency,
+                load_dispatch_settings,
+                load_quiet_hours,
+                slot_datetime,
+            )
             from app.services.escalated_delivery import (
                 dedupe_ttl_seconds_until_slot,
                 escalated_delivery_policy,
@@ -176,6 +183,7 @@ def _notify_offers_impl(
             from app.workers.redis_sync import get_sync_redis, namespaced_key
 
             quiet_start, quiet_end = load_quiet_hours(cur)
+            dispatch_settings = load_dispatch_settings(cur)
             r = get_sync_redis()
             slot_local = (
                 slot_datetime(sched_d, sched_t) if sched_d and sched_t else None
@@ -216,9 +224,22 @@ def _notify_offers_impl(
                         ttl = dedupe_ttl_seconds_until_slot(slot_local, now_local)
                         if r.set(dedupe_key, "1", nx=True, ex=ttl):
                             high_escalated = True
+                lead_hours = (
+                    compute_lead_hours(sched_d, sched_t, now=now_local.astimezone(dt.UTC))
+                    if sched_d is not None and sched_t is not None
+                    else 9999.0
+                )
+                live_instant = (
+                    compute_list_urgency(
+                        booking_class,
+                        lead_hours,
+                        dispatch_settings.instant_lead_hours,
+                    )
+                    == "instant"
+                )
                 title, body, data, priority = _broadcast_offer_payload(
                     booking_id,
-                    booking_class,
+                    live_instant=live_instant,
                     urgency_escalated=urgency_escalated,
                     high_escalated=high_escalated,
                 )

@@ -486,6 +486,126 @@ async def test_expand_skips_when_past_deadline(session, seed, uniq):
 
 
 @pytest.mark.asyncio
+async def test_list_offers_frozen_instant_far_slot_is_advance_urgency(session, seed, uniq):
+    """Dev-style bad rows: booking_class=instant + 2035 slot → inbox only (B6 live lead)."""
+    await _require_migration_014(session)
+    pujari_id = await _pujari_id(session)
+    bid, aid = uniq.id(), uniq.id()
+    slot_time = "10:00:00"
+    requested_id = await _status_id(session, "booking", "requested")
+    offered_id = await _status_id(session, "assignment", "offered")
+    policy_id = (
+        await session.execute(
+            text("SELECT id FROM cancellation_policies WHERE name = 'standard'")
+        )
+    ).scalar_one()
+
+    await session.execute(
+        text(
+            """
+            INSERT INTO bookings (
+                id, user_id, puja_id, address_id, status_id, cancellation_policy_id,
+                scheduled_date, scheduled_time, duration_minutes, total_amount,
+                amount_due_online, amount_due_offline, payment_mode, paid_at,
+                dispatch_mode, booking_class, created_at, updated_at
+            ) VALUES (
+                :bid, :uid, :puja, :addr, :sid, :cpid,
+                CAST(:d AS date), CAST(:t AS time),
+                90, 2100, 2100, 0, 'full_online', now(),
+                'broadcast', 'instant', now(), now()
+            )
+            """
+        ),
+        {
+            "bid": bid,
+            "uid": CUSTOMER,
+            "puja": PUJA,
+            "addr": ADDRESS,
+            "sid": requested_id,
+            "cpid": policy_id,
+            "d": uniq.date,
+            "t": slot_time,
+        },
+    )
+    await session.execute(
+        text(
+            """
+            INSERT INTO booking_assignments (
+                id, booking_id, pujari_id, status_id, offered_at, expires_at
+            ) VALUES (
+                :aid, :bid, :pid, :oid, now(), now() + interval '2 hours'
+            )
+            """
+        ),
+        {"aid": aid, "bid": bid, "pid": pujari_id, "oid": offered_id},
+    )
+    await session.commit()
+
+    result = await offers_ep.list_offers(limit=50, p=_pujari_principal(), db=session)
+    offer = next(o for o in result.offers if str(o.booking_id) == bid)
+    assert offer.urgency == "advance"
+
+
+@pytest.mark.asyncio
+async def test_list_offers_frozen_instant_near_slot_stays_instant_urgency(session, seed, uniq):
+    """Production instant: frozen class + live lead inside window → modal urgency."""
+    await _require_migration_014(session)
+    pujari_id = await _pujari_id(session)
+    bid, aid = uniq.id(), uniq.id()
+    requested_id = await _status_id(session, "booking", "requested")
+    offered_id = await _status_id(session, "assignment", "offered")
+    policy_id = (
+        await session.execute(
+            text("SELECT id FROM cancellation_policies WHERE name = 'standard'")
+        )
+    ).scalar_one()
+
+    await session.execute(
+        text(
+            """
+            INSERT INTO bookings (
+                id, user_id, puja_id, address_id, status_id, cancellation_policy_id,
+                scheduled_date, scheduled_time, duration_minutes, total_amount,
+                amount_due_online, amount_due_offline, payment_mode, paid_at,
+                dispatch_mode, booking_class, created_at, updated_at
+            ) VALUES (
+                :bid, :uid, :puja, :addr, :sid, :cpid,
+                (now() + interval '2 hours')::date,
+                (now() + interval '2 hours')::time,
+                90, 2100, 2100, 0, 'full_online', now(),
+                'broadcast', 'instant', now(), now()
+            )
+            """
+        ),
+        {
+            "bid": bid,
+            "uid": CUSTOMER,
+            "puja": PUJA,
+            "addr": ADDRESS,
+            "sid": requested_id,
+            "cpid": policy_id,
+        },
+    )
+    await session.execute(
+        text(
+            """
+            INSERT INTO booking_assignments (
+                id, booking_id, pujari_id, status_id, offered_at, expires_at
+            ) VALUES (
+                :aid, :bid, :pid, :oid, now(), now() + interval '2 hours'
+            )
+            """
+        ),
+        {"aid": aid, "bid": bid, "pid": pujari_id, "oid": offered_id},
+    )
+    await session.commit()
+
+    result = await offers_ep.list_offers(limit=50, p=_pujari_principal(), db=session)
+    offer = next(o for o in result.offers if str(o.booking_id) == bid)
+    assert offer.urgency == "instant"
+
+
+@pytest.mark.asyncio
 async def test_flip_task_enqueues_single_expand_per_booking(session, seed, uniq, monkeypatch):
     """First flip enqueues expand; second tick does not re-flip."""
     await _require_migration_014(session)
