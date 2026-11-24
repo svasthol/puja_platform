@@ -19,11 +19,16 @@ from app.models.identity import Address
 from app.schemas.address import AddressCreate, AddressOut, AddressPage, AddressUpdate
 from app.schemas.common import decode_cursor, encode_cursor
 from app.services.service_area_guard import require_active_service_area
+from app.services.service_boundary import assert_serviceable, is_serviceable
+from app.services.service_boundary_settings import load_service_boundary_enabled
 
 router = APIRouter(prefix="/addresses", tags=["addresses"])
 
 
-def _out(a: Address) -> AddressOut:
+def _out(a: Address, *, boundary_active: bool = False) -> AddressOut:
+    svc: bool | None = None
+    if boundary_active and a.latitude is not None and a.longitude is not None:
+        svc = is_serviceable(float(a.latitude), float(a.longitude))
     return AddressOut(
         id=a.id,
         line1=a.line1,
@@ -36,7 +41,15 @@ def _out(a: Address) -> AddressOut:
         service_area_id=a.service_area_id,
         is_default=a.is_default,
         created_at=a.created_at,
+        is_serviceable=svc,
     )
+
+
+async def _maybe_assert_pin(
+    db: AsyncSession, lat: float, lng: float, *, route: str
+) -> None:
+    if await load_service_boundary_enabled(db):
+        assert_serviceable(lat, lng, route=route)
 
 
 async def _clear_default(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -68,12 +81,16 @@ async def list_addresses(
     rows = (
         await db.execute(q.order_by(Address.created_at.desc(), Address.id.desc()).limit(limit + 1))
     ).scalars().all()
+    boundary_active = await load_service_boundary_enabled(db)
     next_cursor = None
     if len(rows) > limit:
         rows = rows[:limit]
         last = rows[-1]
         next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
-    return AddressPage(addresses=[_out(a) for a in rows], next_cursor=next_cursor)
+    return AddressPage(
+        addresses=[_out(a, boundary_active=boundary_active) for a in rows],
+        next_cursor=next_cursor,
+    )
 
 
 @router.post("", response_model=AddressOut, status_code=http.HTTP_201_CREATED)
@@ -85,6 +102,12 @@ async def create_address(
     if payload.is_default:
         await _clear_default(db, p.user_id)
     await require_active_service_area(db, payload.service_area_id)
+    await _maybe_assert_pin(
+        db,
+        float(payload.latitude),
+        float(payload.longitude),
+        route="POST /v1/addresses",
+    )
     addr = Address(
         id=uuid.uuid4(),
         user_id=p.user_id,
@@ -101,7 +124,8 @@ async def create_address(
     )
     db.add(addr)
     await db.flush()
-    return _out(addr)
+    boundary_active = await load_service_boundary_enabled(db)
+    return _out(addr, boundary_active=boundary_active)
 
 
 @router.put("/{address_id}", response_model=AddressOut)
@@ -128,5 +152,12 @@ async def update_address(
         await require_active_service_area(db, changes["service_area_id"])
     for field, value in changes.items():
         setattr(addr, field, value)
+    if "latitude" in changes or "longitude" in changes:
+        lat = float(addr.latitude)
+        lng = float(addr.longitude)
+        await _maybe_assert_pin(
+            db, lat, lng, route="PUT /v1/addresses/{id}"
+        )
     await db.flush()  # trigger recomputes geom when lat/lng changed
-    return _out(addr)
+    boundary_active = await load_service_boundary_enabled(db)
+    return _out(addr, boundary_active=boundary_active)

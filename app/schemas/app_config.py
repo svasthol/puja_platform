@@ -26,3 +26,5 @@ class AppConfigResponse(BaseModel):
     pujari_tax_profile_required_for_accept: bool = False
     pujari_fy_pan_gate_enabled: bool = False
     setu_pan_verify_configured: bool = False
+    service_boundary_enabled: bool = False
+    service_boundary_etag: str | None = None

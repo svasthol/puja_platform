@@ -53,6 +53,7 @@ class AddressOut(BaseModel):
     service_area_id: int
     is_default: bool
     created_at: dt.datetime
+    is_serviceable: bool | None = None
 
 
 class AddressPage(Page):

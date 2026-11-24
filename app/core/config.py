@@ -128,6 +128,8 @@ class Settings(BaseSettings):
 
     # ---- Maps ----------------------------------------------------------------
     GOOGLE_MAPS_API_KEY: str = ""
+    # Launch customer service polygon (GeoJSON on disk — §21.13).
+    SERVICE_BOUNDARY_GEOJSON_PATH: str = "spec/geo/hyderabad_launch_service.geojson"
 
     # ---- Panchangam (§23.6) --------------------------------------------------
     # Self-hosted telugu-panchangam-app / @ishubhamx/panchangam-js adapter URL.

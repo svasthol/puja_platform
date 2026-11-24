@@ -297,6 +297,27 @@ async def prepare_booking_checkout(
     if addr_geom is False:
         raise HTTPException(http.HTTP_422_UNPROCESSABLE_ENTITY, "Address has no coordinates.")
 
+    from app.services.service_boundary import assert_serviceable
+    from app.services.service_boundary_settings import load_service_boundary_enabled
+
+    if await load_service_boundary_enabled(db):
+        row = (
+            await db.execute(
+                text(
+                    "SELECT latitude, longitude FROM addresses "
+                    "WHERE id = :aid AND user_id = :uid"
+                ),
+                {"aid": str(payload.address_id), "uid": str(user_id)},
+            )
+        ).one_or_none()
+        if row is None:
+            raise HTTPException(http.HTTP_404_NOT_FOUND, "Address not found.")
+        assert_serviceable(
+            float(row.latitude),
+            float(row.longitude),
+            route="POST /v1/bookings",
+        )
+
     puja = (await db.execute(select(Puja).where(Puja.id == puja_id))).scalar_one_or_none()
     if puja is None or not puja.is_active:
         raise HTTPException(http.HTTP_404_NOT_FOUND, "Puja not found.")
