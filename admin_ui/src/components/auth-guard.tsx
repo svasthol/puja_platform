@@ -8,42 +8,61 @@ import { clearTokens, isAuthenticated } from "@/lib/auth/tokens";
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-  const [authed, setAuthed] = useState(false);
-  const { isError, isPending, isFetching, isSuccess } = useAdminMe({
-    enabled: mounted && authed,
-  });
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    setAuthed(isAuthenticated());
+    setHydrated(true);
   }, []);
 
+  const tokenPresent = hydrated && isAuthenticated();
+  const meQuery = useAdminMe({ enabled: tokenPresent });
+
+  // Fixed-length dependency array (React 19) — never add/remove deps across saves/HMR.
   useEffect(() => {
-    if (!mounted) return;
-    if (!authed) {
+    if (!hydrated) return;
+    if (!isAuthenticated()) {
       router.replace("/login");
       return;
     }
-    if (isError) {
+    if (meQuery.isError) {
       clearTokens();
       router.replace("/login");
     }
-  }, [mounted, authed, isError, router]);
+    // #region agent log
+    fetch("http://127.0.0.1:7654/ingest/3666bc3a-f5d5-4e97-9312-8addb48dd2d4", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "e7cdae" },
+      body: JSON.stringify({
+        sessionId: "e7cdae",
+        hypothesisId: "H4-stable-deps",
+        location: "auth-guard.tsx:redirect-effect",
+        message: "redirect effect ran",
+        data: {
+          hydrated,
+          hasToken: isAuthenticated(),
+          isError: meQuery.isError,
+          status: meQuery.status,
+        },
+        timestamp: Date.now(),
+        runId: "post-fix",
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [hydrated, meQuery.isError, router]);
 
-  if (!mounted) {
+  if (!hydrated) {
     return null;
   }
 
-  if (!authed) {
+  if (!isAuthenticated()) {
     return null;
   }
 
-  if (isError) {
+  if (meQuery.isError) {
     return null;
   }
 
-  if (!isSuccess && (isPending || isFetching)) {
+  if (meQuery.isPending) {
     return (
       <div className="flex min-h-screen items-center justify-center text-ink-muted">
         <div className="flex flex-col items-center gap-3">
@@ -58,7 +77,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isSuccess) {
+  if (!meQuery.isSuccess) {
     return null;
   }
 
