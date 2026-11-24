@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import text
 
 from app.services import offer_service
-from app.services.fcm_client import FcmOutcome, FcmResult
+from app.services.fcm_client import FcmOutcome, FcmResult, SOUND_OFFER_ADVANCE_PUJA
 from app.workers.notifications import _notify_accept_ack_impl, _notify_offers_impl
 
 CUSTOMER = uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001")
@@ -138,6 +138,27 @@ async def test_notify_offers_advance_uses_offer_advance_type(session, seed, uniq
     assert result["offer_type"] == "offer_advance"
     assert mock_push.call_args.kwargs["data"]["type"] == "offer_advance"
     assert mock_push.call_args.kwargs["priority"] == "normal"
+    assert mock_push.call_args.kwargs.get("android_sound") is None
+
+
+@pytest.mark.asyncio
+async def test_notify_offers_quiet_advance_sets_om_sound(session, seed, uniq):
+    await _require_migration_014(session)
+    bid, _ = await _seed_live_offer(session, uniq, booking_class="advance")
+    await _register_device(session, uniq)
+
+    with (
+        patch("app.services.reconfirmation.is_quiet_hours", return_value=True),
+        patch(
+            "app.workers.notifications.send_push_sync",
+            return_value=FcmResult(outcome=FcmOutcome.SENT, message_id="m1"),
+        ) as mock_push,
+    ):
+        _notify_offers_impl(bid)
+
+    kw = mock_push.call_args.kwargs
+    assert kw["android_sound"] == SOUND_OFFER_ADVANCE_PUJA
+    assert kw["data"]["alert_sound"] == "puja"
 
 
 @pytest.mark.asyncio

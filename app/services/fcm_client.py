@@ -40,9 +40,12 @@ _UNREGISTERED_ERRORS = frozenset(
 )
 
 # Must match partner MainActivity notification channels + res/raw sound files.
-_PARTNER_OFFER_CHANNEL_INSTANT = "mana_guruji_offers_ghanta"
+_PARTNER_OFFER_CHANNEL_URGENT = "mana_guruji_offers_urgent"
 _PARTNER_OFFER_CHANNEL_ADVANCE = "mana_guruji_offers_advance"
-_SOUND_OFFER_INSTANT = "offer_instant_ghanta"
+PARTNER_OFFER_CHANNEL_ADVANCE_PUJA = "mana_guruji_offers_advance_puja"
+_PARTNER_OFFER_CHANNEL_ADVANCE_PUJA = PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
+_SOUND_OFFER_URGENT = "offer_urgent_nadaswaram"
+SOUND_OFFER_ADVANCE_PUJA = "offer_advance_puja"
 
 _token_cache: dict[str, Any] = {"access_token": None, "expires_at": 0.0}
 
@@ -161,9 +164,9 @@ def _android_message_config(
 
 
 def _default_android_notification(priority: str) -> tuple[str | None, str | None]:
-    """Instant uses ghanta channel; advance uses visible tray channel (B4)."""
+    """Urgent instant uses nadaswaram channel; advance tray optional."""
     if priority == "high":
-        return _PARTNER_OFFER_CHANNEL_INSTANT, _SOUND_OFFER_INSTANT
+        return _PARTNER_OFFER_CHANNEL_URGENT, _SOUND_OFFER_URGENT
     return _PARTNER_OFFER_CHANNEL_ADVANCE, None
 
 
@@ -223,6 +226,10 @@ def _send_once_v1(
 
     if android_channel_id is None and android_sound is None:
         android_channel_id, android_sound = _default_android_notification(priority)
+    elif android_channel_id is None:
+        android_channel_id, _ = _default_android_notification(priority)
+    if android_sound == SOUND_OFFER_ADVANCE_PUJA:
+        android_channel_id = _PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
 
     # Advance / normal inbox refresh — data-only so Android does not play default tray sound.
     message: dict[str, Any] = {
@@ -234,7 +241,7 @@ def _send_once_v1(
         ),
         "apns": _apns_config(priority, title=title, body=body),
     }
-    if priority == "high":
+    if priority == "high" or (priority == "normal" and android_sound):
         message["notification"] = {"title": title, "body": body}
     if data:
         message["data"] = {k: str(v) for k, v in data.items()}
@@ -279,11 +286,15 @@ def _send_once_legacy(
         return FcmResult(outcome=FcmOutcome.SKIPPED)
     if android_channel_id is None and android_sound is None:
         android_channel_id, android_sound = _default_android_notification(priority)
+    elif android_channel_id is None:
+        android_channel_id, _ = _default_android_notification(priority)
+    if android_sound == SOUND_OFFER_ADVANCE_PUJA:
+        android_channel_id = _PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
     payload: dict = {
         "to": device_token,
         "priority": priority,
     }
-    if priority == "high":
+    if priority == "high" or (priority == "normal" and android_sound):
         notification: dict[str, Any] = {"title": title, "body": body}
         if android_channel_id:
             notification["android_channel_id"] = android_channel_id

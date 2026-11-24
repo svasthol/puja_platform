@@ -13,7 +13,12 @@ import uuid
 
 import structlog
 
-from app.services.fcm_client import FcmOutcome, send_push_sync
+from app.services.fcm_client import (
+    FcmOutcome,
+    PARTNER_OFFER_CHANNEL_ADVANCE_PUJA,
+    SOUND_OFFER_ADVANCE_PUJA,
+    send_push_sync,
+)
 from app.services.sms_router import send_transactional_sms_sync
 from app.workers.celery_app import celery_app
 from app.workers.sweep import get_connection
@@ -103,6 +108,8 @@ def _push_to_user(
     body: str,
     data: dict[str, str],
     priority: str = "high",
+    android_sound: str | None = None,
+    android_channel_id: str | None = None,
 ) -> tuple[int, int, int]:
     """Returns (sent, failed, unregistered_deleted)."""
     cur.execute(_DEVICES_SQL, (user_id,))
@@ -110,7 +117,13 @@ def _push_to_user(
     sent = failed = deleted = 0
     for tok in tokens:
         result = send_push_sync(
-            tok, title=title, body=body, data=data, priority=priority
+            tok,
+            title=title,
+            body=body,
+            data=data,
+            priority=priority,
+            android_sound=android_sound,
+            android_channel_id=android_channel_id,
         )
         if result.outcome == FcmOutcome.SENT:
             sent += 1
@@ -148,17 +161,30 @@ def _notify_offers_impl(
             sms_sent = 0
             is_direct = rows[0][3] == "direct" or rows[0][4] is not None
 
+            import zoneinfo
+
+            from app.core.config import get_settings
             from app.services.dispatch_launch import load_quiet_hours, slot_datetime
             from app.services.escalated_delivery import (
                 dedupe_ttl_seconds_until_slot,
                 escalated_delivery_policy,
             )
+            from app.services.reconfirmation import is_quiet_hours
             from app.workers.redis_sync import get_sync_redis, namespaced_key
 
             quiet_start, quiet_end = load_quiet_hours(cur)
             r = get_sync_redis()
             slot_local = (
                 slot_datetime(sched_d, sched_t) if sched_d and sched_t else None
+            )
+            platform_tz = zoneinfo.ZoneInfo(get_settings().PLATFORM_TIMEZONE)
+            cur.execute("SELECT now()")
+            now_db = cur.fetchone()[0]
+            biz_tz = slot_local.tzinfo if slot_local is not None else platform_tz
+            now_local = (
+                now_db.replace(tzinfo=biz_tz)
+                if now_db.tzinfo is None
+                else now_db.astimezone(biz_tz)
             )
 
             for pujari_id, user_id, phone, _dm, _intended in rows:
@@ -168,14 +194,7 @@ def _notify_offers_impl(
                 uid = str(user_id)
                 high_escalated = False
                 if urgency_escalated and slot_local is not None:
-                    cur.execute("SELECT now()")
-                    now_db = cur.fetchone()[0]
                     tz = slot_local.tzinfo
-                    now_local = (
-                        now_db.replace(tzinfo=tz)
-                        if now_db.tzinfo is None
-                        else now_db.astimezone(tz)
-                    )
                     dl = deadline
                     if dl is not None and dl.tzinfo is None:
                         dl = dl.replace(tzinfo=tz)
@@ -200,6 +219,14 @@ def _notify_offers_impl(
                     urgency_escalated=urgency_escalated,
                     high_escalated=high_escalated,
                 )
+                android_sound: str | None = None
+                android_channel_id: str | None = None
+                if priority == "normal" and is_quiet_hours(
+                    now_local, quiet_start, quiet_end
+                ):
+                    data = {**data, "alert_sound": "puja"}
+                    android_sound = SOUND_OFFER_ADVANCE_PUJA
+                    android_channel_id = PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
                 sent, failed, deleted = _push_to_user(
                     cur,
                     user_id=uid,
@@ -207,6 +234,8 @@ def _notify_offers_impl(
                     body=body,
                     data=data,
                     priority=priority,
+                    android_sound=android_sound,
+                    android_channel_id=android_channel_id,
                 )
                 total_sent += sent
                 total_failed += failed
