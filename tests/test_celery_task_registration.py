@@ -14,6 +14,8 @@ _ENQUEUED_DISPATCH_TASKS = (
     "app.workers.dispatch.broadcast_booking",
     "app.workers.dispatch.rebroadcast_booking",
     "app.workers.dispatch.direct_dispatch",
+    "app.workers.dispatch.expand_booking",
+    "app.workers.dispatch.expand_for_pujari",
 )
 
 _ENQUEUED_NOTIFY_TASKS = (

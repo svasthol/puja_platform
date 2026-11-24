@@ -12,6 +12,7 @@ from app.core.config import get_settings
 _TZ = zoneinfo.ZoneInfo(get_settings().PLATFORM_TIMEZONE)
 
 BookingClass = Literal["instant", "advance"]
+EffectiveOfferMode = Literal["instant", "advance", "escalated"]
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,9 @@ class LaunchDispatchSettings:
     rm_escalation_t24_hours: int = 24
     # Rounds that sent >= 1 offer; zero-offer passes do not count. 0 = retry until dispatch_deadline.
     max_offer_rounds: int = 0
+    urgency_escalation_lead_hours: int = 4
+    escalated_offer_ttl_seconds: int = 900
+    rebroadcast_on_urgency_flip: bool = True
 
 
 def _int_setting(raw: Any, default: int) -> int:
@@ -79,7 +83,33 @@ _DISPATCH_SETTING_KEYS = (
     "rm_escalation_hours_no_accept",
     "rm_escalation_t24_hours",
     "max_offer_rounds",
+    "urgency_escalation_lead_hours",
+    "escalated_offer_ttl_seconds",
+    "rebroadcast_on_urgency_flip",
 )
+
+
+def effective_offer_mode(
+    booking_class: BookingClass,
+    urgency_escalated_at: dt.datetime | None,
+) -> EffectiveOfferMode:
+    """Dispatch TTL, inbox cap, and notify mode follow escalation marker (§21.6.E)."""
+    if urgency_escalated_at is not None:
+        return "escalated"
+    return booking_class
+
+
+def compute_list_urgency(
+    booking_class: BookingClass,
+    lead_hours: float,
+    instant_lead_hours: int,
+) -> BookingClass:
+    """Partner modal urgency — frozen instant class or live lead inside instant window (B6)."""
+    if booking_class == "instant":
+        return "instant"
+    if lead_hours <= instant_lead_hours:
+        return "instant"
+    return "advance"
 
 # Shared with admin dispatch-policy API — keep in sync with worker load_dispatch_settings().
 DISPATCH_PLATFORM_SETTING_KEYS: tuple[str, ...] = _DISPATCH_SETTING_KEYS
@@ -106,6 +136,15 @@ def _settings_from_rows(rows: dict[str, Any]) -> LaunchDispatchSettings:
         ),
         rm_escalation_t24_hours=_int_setting(rows.get("rm_escalation_t24_hours"), 24),
         max_offer_rounds=max(0, _int_setting(rows.get("max_offer_rounds"), 0)),
+        urgency_escalation_lead_hours=_int_setting(
+            rows.get("urgency_escalation_lead_hours"), 4
+        ),
+        escalated_offer_ttl_seconds=_int_setting(
+            rows.get("escalated_offer_ttl_seconds"), 900
+        ),
+        rebroadcast_on_urgency_flip=_bool_setting(
+            rows.get("rebroadcast_on_urgency_flip"), True
+        ),
     )
 
 
@@ -174,10 +213,18 @@ def compute_dispatch_windows(
     return starts, deadline
 
 
-def offer_expires_interval(booking_class: BookingClass, settings: LaunchDispatchSettings) -> str:
-    """PostgreSQL interval literal for offer TTL by frozen class (§21.6.D)."""
-    if booking_class == "instant":
+def offer_expires_interval(
+    booking_class: BookingClass,
+    settings: LaunchDispatchSettings,
+    *,
+    urgency_escalated_at: dt.datetime | None = None,
+) -> str:
+    """PostgreSQL interval literal for offer TTL (§21.6.D + escalated mode)."""
+    mode = effective_offer_mode(booking_class, urgency_escalated_at)
+    if mode == "instant":
         return f"{settings.instant_offer_ttl_seconds} seconds"
+    if mode == "escalated":
+        return f"{settings.escalated_offer_ttl_seconds} seconds"
     return f"{settings.advance_offer_ttl_hours} hours"
 
 
@@ -218,12 +265,12 @@ def filter_candidates_inbox_cap(
 
 def ensure_dispatch_windows(
     cur, booking_id: str, settings: LaunchDispatchSettings
-) -> tuple[dt.datetime, dt.datetime, dt.date, dt.time, BookingClass]:
+) -> tuple[dt.datetime, dt.datetime, dt.date, dt.time, BookingClass, dt.datetime | None]:
     """Worker-owned: set dispatch_starts_at / dispatch_deadline once (§21.6.C)."""
     cur.execute(
         """
         SELECT b.scheduled_date, b.scheduled_time, b.booking_class,
-               bds.dispatch_starts_at, bds.dispatch_deadline
+               bds.dispatch_starts_at, bds.dispatch_deadline, bds.urgency_escalated_at
         FROM bookings b
         LEFT JOIN booking_dispatch_state bds ON bds.booking_id = b.id
         WHERE b.id = %s
@@ -233,7 +280,7 @@ def ensure_dispatch_windows(
     row = cur.fetchone()
     if row is None:
         raise RuntimeError(f"booking {booking_id} not found")
-    scheduled_date, scheduled_time, booking_class, starts_at, deadline = row
+    scheduled_date, scheduled_time, booking_class, starts_at, deadline, urgency_escalated_at = row
     if booking_class not in ("instant", "advance"):
         booking_class = "advance"
 
@@ -253,6 +300,28 @@ def ensure_dispatch_windows(
             """,
             (starts_at, deadline, booking_id),
         )
+        # B9 born-escalated: advance paid inside escalation lead (idempotent).
+        if (
+            booking_class == "advance"
+            and urgency_escalated_at is None
+        ):
+            from app.services.booking_gate import compute_lead_hours
+
+            lead = compute_lead_hours(scheduled_date, scheduled_time)
+            if lead <= settings.urgency_escalation_lead_hours:
+                cur.execute(
+                    """
+                    UPDATE booking_dispatch_state
+                    SET urgency_escalated_at = now()
+                    WHERE booking_id = %s AND urgency_escalated_at IS NULL
+                    """,
+                    (booking_id,),
+                )
+                cur.execute(
+                    "SELECT urgency_escalated_at FROM booking_dispatch_state WHERE booking_id = %s",
+                    (booking_id,),
+                )
+                urgency_escalated_at = cur.fetchone()[0]
     elif booking_class == "instant" and computed_deadline > deadline:
         # Extend instant window when policy allows (e.g. after code fix); never shrink.
         deadline = computed_deadline
@@ -264,7 +333,7 @@ def ensure_dispatch_windows(
             """,
             (deadline, booking_id),
         )
-    return starts_at, deadline, scheduled_date, scheduled_time, booking_class
+    return starts_at, deadline, scheduled_date, scheduled_time, booking_class, urgency_escalated_at
 
 
 def _eligibility_core_predicates(settings: LaunchDispatchSettings) -> str:
@@ -359,6 +428,21 @@ def launch_eligibility_sql(settings: LaunchDispatchSettings) -> str:
         WHERE b.id = %s
         {_eligibility_predicates(settings)}
     """
+
+
+def load_quiet_hours(cur) -> tuple[dt.time, dt.time]:
+    """Reconfirm quiet window — shared by urgency flip and dispatch (B11)."""
+    from app.services.reconfirmation import parse_hhmm
+
+    cur.execute(
+        "SELECT key, value_json FROM platform_settings WHERE key = ANY(%s)",
+        (["reconfirm_quiet_hours_start", "reconfirm_quiet_hours_end"],),
+    )
+    rows = {k: v for k, v in cur.fetchall()}
+    return (
+        parse_hhmm(rows.get("reconfirm_quiet_hours_start"), dt.time(22, 0)),
+        parse_hhmm(rows.get("reconfirm_quiet_hours_end"), dt.time(8, 0)),
+    )
 
 
 def launch_eligibility_slot_sql(settings: LaunchDispatchSettings) -> str:

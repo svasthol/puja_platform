@@ -172,6 +172,43 @@ async def test_admin_sets_max_offer_rounds_and_omission_keeps_it(session, seed):
         await session.commit()
 
 
+@pytest.mark.asyncio
+async def test_admin_rejects_escalation_lead_lte_fail_hours(session, seed):
+    from app.services.admin_dispatch_policy import (
+        DispatchPolicyView,
+        fetch_dispatch_policy,
+        persist_dispatch_policy,
+    )
+
+    actor = await _mk_admin(session)
+    await session.commit()
+    current = await fetch_dispatch_policy(session)
+    bad = DispatchPolicyView(
+        instant_lead_hours=current.instant_lead_hours,
+        instant_dispatch_minutes=current.instant_dispatch_minutes,
+        advance_dispatch_start_hours=current.advance_dispatch_start_hours,
+        advance_dispatch_fail_hours=current.advance_dispatch_fail_hours,
+        reoffer_cooldown_minutes=current.reoffer_cooldown_minutes,
+        dispatch_buffer_minutes=current.dispatch_buffer_minutes,
+        immediate_dispatch_on_payment=current.immediate_dispatch_on_payment,
+        instant_offer_ttl_seconds=current.instant_offer_ttl_seconds,
+        advance_offer_ttl_hours=current.advance_offer_ttl_hours,
+        max_live_advance_offers_per_pujari=current.max_live_advance_offers_per_pujari,
+        rm_escalation_hours_no_accept=current.rm_escalation_hours_no_accept,
+        rm_escalation_t24_hours=current.rm_escalation_t24_hours,
+        max_offer_rounds=current.max_offer_rounds,
+        urgency_escalation_lead_hours=current.advance_dispatch_fail_hours,
+        escalated_offer_ttl_seconds=current.escalated_offer_ttl_seconds,
+        rebroadcast_on_urgency_flip=current.rebroadcast_on_urgency_flip,
+        night_bookings_enabled=current.night_bookings_enabled,
+        reconfirm_quiet_hours_start=current.reconfirm_quiet_hours_start,
+        reconfirm_quiet_hours_end=current.reconfirm_quiet_hours_end,
+    )
+    with pytest.raises(HTTPException) as exc:
+        await persist_dispatch_policy(session, bad)
+    assert exc.value.status_code == 422
+
+
 def test_max_offer_rounds_rejects_negative():
     with pytest.raises(ValidationError) as exc:
         DispatchPolicyUpdate.model_validate({"max_offer_rounds": -1})

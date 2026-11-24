@@ -191,7 +191,7 @@ async def test_escalate_flips_advance_booking_inside_lead_window(session, seed, 
     try:
         with conn2.cursor() as cur:
             cur.execute(
-                "SELECT expires_at < now() + interval '5 minutes' FROM booking_assignments WHERE id = %s",
+                "SELECT expires_at < now() + interval '20 minutes' FROM booking_assignments WHERE id = %s",
                 (aid,),
             )
             short_ttl = cur.fetchone()[0]
@@ -276,11 +276,17 @@ async def test_lg_urgency_flip_idempotent(session, seed, uniq, monkeypatch):
 
     assert bid in flipped1
     assert flipped2 == []
-    instant_calls = [
-        c for c in sent if c[0] == "app.workers.notifications.notify_offer_instant"
+    notify_calls = [
+        c
+        for c in sent
+        if c[0]
+        in (
+            "app.workers.notifications.notify_offer_escalated",
+            "app.workers.notifications.notify_offer_instant",
+        )
     ]
-    assert len(instant_calls) == 1
-    assert instant_calls[0][1] == [bid]
+    assert len(notify_calls) == 1
+    assert notify_calls[0][1] == [bid]
 
 
 @pytest.mark.asyncio
@@ -331,7 +337,7 @@ async def test_list_offers_urgency_escalated_after_flip(session, seed, uniq):
 
 @pytest.mark.asyncio
 async def test_escalate_task_enqueues_offer_instant_fcm(session, seed, uniq, monkeypatch):
-    """Beat task wires flip → notify_offer_instant."""
+    """Beat task wires flip → notify_offer_escalated (+ expand when enabled)."""
     await _require_migration_014(session)
     pujari_id = await _pujari_id(session)
     bid, aid = uniq.id(), uniq.id()
@@ -360,4 +366,158 @@ async def test_escalate_task_enqueues_offer_instant_fcm(session, seed, uniq, mon
     result = escalate_urgency_on_threshold_task()
     assert result["flipped"] >= 1
     assert bid in result["booking_ids"]
-    assert ("app.workers.notifications.notify_offer_instant", [bid]) in sent
+    assert (
+        "app.workers.notifications.notify_offer_escalated",
+        [bid],
+    ) in sent
+
+
+@pytest.mark.asyncio
+async def test_list_offers_escalated_far_lead_stays_advance_urgency(session, seed, uniq):
+    """B6: urgency_escalated at 10h lead still shows urgency=advance until instant window."""
+    await _require_migration_014(session)
+    pujari_id = await _pujari_id(session)
+    bid, aid = uniq.id(), uniq.id()
+
+    await _seed_advance_offer_near_slot(
+        session,
+        booking_id=bid,
+        assignment_id=aid,
+        pujari_id=pujari_id,
+        slot_offset_sql="now() + interval '10 hours'",
+        urgency_escalated=True,
+    )
+    await session.commit()
+
+    result = await offers_ep.list_offers(limit=50, p=_pujari_principal(), db=session)
+    offer = next(o for o in result.offers if str(o.booking_id) == bid)
+    assert offer.urgency == "advance"
+    assert offer.urgency_escalated is True
+
+
+@pytest.mark.asyncio
+async def test_born_escalated_on_first_ensure_dispatch_windows(session, seed, uniq):
+    """B9: first window write marks urgency_escalated when lead ≤ escalation lead."""
+    await _require_migration_014(session)
+    bid = uniq.id()
+    requested_id = await _status_id(session, "booking", "requested")
+    policy_id = (
+        await session.execute(
+            text("SELECT id FROM cancellation_policies WHERE name = 'standard'")
+        )
+    ).scalar_one()
+
+    await session.execute(
+        text(
+            """
+            INSERT INTO bookings (
+                id, user_id, puja_id, address_id, status_id, cancellation_policy_id,
+                scheduled_date, scheduled_time, duration_minutes, total_amount,
+                amount_due_online, amount_due_offline, payment_mode, paid_at,
+                dispatch_mode, booking_class, created_at, updated_at
+            ) VALUES (
+                :bid, :uid, :puja, :addr, :sid, :cpid,
+                (now() + interval '3 hours')::date,
+                (now() + interval '3 hours')::time,
+                90, 2100, 2100, 0, 'full_online', now(),
+                'broadcast', 'advance', now(), now()
+            )
+            """
+        ),
+        {
+            "bid": bid,
+            "uid": CUSTOMER,
+            "puja": PUJA,
+            "addr": ADDRESS,
+            "sid": requested_id,
+            "cpid": policy_id,
+        },
+    )
+    await session.execute(
+        text("INSERT INTO booking_dispatch_state (booking_id) VALUES (:bid)"),
+        {"bid": bid},
+    )
+    await session.commit()
+
+    from app.services.dispatch_launch import ensure_dispatch_windows, load_dispatch_settings
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            settings = load_dispatch_settings(cur)
+            ensure_dispatch_windows(cur, bid, settings)
+            conn.commit()
+        assert _urgency_escalated_at(conn, bid) is not None
+    finally:
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_expand_skips_when_past_deadline(session, seed, uniq):
+    """Expand no-ops after dispatch_deadline."""
+    await _require_migration_014(session)
+    pujari_id = await _pujari_id(session)
+    bid, aid = uniq.id(), uniq.id()
+
+    await _seed_advance_offer_near_slot(
+        session,
+        booking_id=bid,
+        assignment_id=aid,
+        pujari_id=pujari_id,
+        slot_offset_sql="now() + interval '30 minutes'",
+        expires_at_sql="now() + interval '1 hour'",
+    )
+    await session.execute(
+        text(
+            """
+            UPDATE booking_dispatch_state
+            SET dispatch_deadline = now() - interval '1 minute'
+            WHERE booking_id = :bid
+            """
+        ),
+        {"bid": bid},
+    )
+    await session.commit()
+
+    from app.workers.dispatch import _expand_booking_impl
+
+    result = _expand_booking_impl(bid, "test")
+    assert result.get("skipped") == "past_deadline"
+
+
+@pytest.mark.asyncio
+async def test_flip_task_enqueues_single_expand_per_booking(session, seed, uniq, monkeypatch):
+    """First flip enqueues expand; second tick does not re-flip."""
+    await _require_migration_014(session)
+    pujari_id = await _pujari_id(session)
+    bid, aid = uniq.id(), uniq.id()
+
+    await _seed_advance_offer_near_slot(
+        session,
+        booking_id=bid,
+        assignment_id=aid,
+        pujari_id=pujari_id,
+        slot_offset_sql="now() + interval '2 hours'",
+    )
+    await session.commit()
+
+    mock_redis = MagicMock()
+    mock_redis.set.return_value = True
+    monkeypatch.setattr("redis.from_url", lambda _url: mock_redis)
+    sent: list[tuple] = []
+
+    def _capture(name, args=None, **kw):
+        sent.append((name, args))
+
+    monkeypatch.setattr("app.workers.urgency_flip.celery_app.send_task", _capture)
+
+    from app.workers.urgency_flip import escalate_urgency_on_threshold_task
+
+    escalate_urgency_on_threshold_task()
+    expand_first = [c for c in sent if c[0] == "app.workers.dispatch.expand_booking" and bid in (c[1] or [])]
+    sent.clear()
+    escalate_urgency_on_threshold_task()
+    expand_second = [c for c in sent if c[0] == "app.workers.dispatch.expand_booking" and bid in (c[1] or [])]
+
+    assert len(expand_first) == 1
+    assert expand_second == []

@@ -13,6 +13,9 @@ from app.db import post_commit
 from app.db.engine import get_db, get_db_txn
 from app.schemas.offers import OfferCard, OfferListResponse
 from app.services import offer_service
+from app.services.booking_gate import compute_lead_hours
+from app.services.dispatch_launch import compute_list_urgency, load_dispatch_settings_async
+
 router = APIRouter(tags=["offers"])
 
 
@@ -60,10 +63,14 @@ async def list_offers(
             {"uid": str(p.user_id), "lim": limit},
         )
     ).mappings().all()
+    dispatch_settings = await load_dispatch_settings_async(db)
     offers = []
     for row in rows:
-        # Frozen at booking time (§21) — do not reclassify from wall clock (REL modal mixups).
-        urgency = row["booking_class"] or "advance"
+        booking_class = row["booking_class"] or "advance"
+        lead = compute_lead_hours(row["scheduled_date"], row["scheduled_time"])
+        urgency = compute_list_urgency(
+            booking_class, lead, dispatch_settings.instant_lead_hours
+        )
         offers.append(
             OfferCard(
                 assignment_id=row["assignment_id"],
@@ -76,7 +83,7 @@ async def list_offers(
                 payment_mode=row["payment_mode"],
                 total_amount=Decimal(str(row["total_amount"])),
                 amount_due_offline=Decimal(str(row["amount_due_offline"])),
-                booking_class=row["booking_class"] or "advance",
+                booking_class=booking_class,
                 urgency=urgency,
                 urgency_escalated=bool(row["urgency_escalated"]),
             )

@@ -604,7 +604,7 @@ All are idempotent (at-least-once delivery).
 |---|---|---|---|
 | `sweep_task` (existing) | 30s | `sweep_lock EX 25` | holds, abandonment, **instant** offer expiry, stranded rebroadcast, presence |
 | `refresh_advance_offers` (§21.6.D) | ~5 min | `refresh_lock` | extend advance `expires_at` **in place** (UPDATE only), guarded on `status='requested' AND responded_at IS NULL AND booking_class='advance' AND urgency_escalated_at IS NULL` |
-| `escalate_urgency_on_threshold` (§21.6.E) | ~2 min | `urgency_lock` | advance booking crossing `instant_lead_hours` → one-shot `UPDATE … WHERE urgency_escalated_at IS NULL`, shorten offers to instant TTL, high-priority `offer_instant` FCM |
+| `escalate_urgency_on_threshold` (§21.6.E) | ~2 min | `urgency_lock` | advance booking crossing **`urgency_escalation_lead_hours`** (effective flip clamp §21.6.H) → `urgency_escalated_at`, holder shorten per B11, **`expand_booking`**, `notify_offer_escalated` (deduped high FCM); morning wake for overnight escalations |
 | `rm_escalation_scan` (§21.6.F) | ~15 min | `rm_lock` | idempotent RM alerts via `rm_escalated_no_accept_at` (long-lead no-accept) + `rm_escalated_t24_at` (approaching slot; covers 4h–48h mid-lead band) |
 
 The `slot − advance_dispatch_fail_hours` (3h) automated `failed_no_pujari` + full refund backstop

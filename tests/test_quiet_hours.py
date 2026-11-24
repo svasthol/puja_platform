@@ -6,6 +6,8 @@ import zoneinfo
 
 import pytest
 
+from app.services.escalated_delivery import effective_flip_at
+from app.services.dispatch_launch import slot_datetime
 from app.services.reconfirmation import (
     ReconfirmSettings,
     effective_escalation_at,
@@ -67,3 +69,16 @@ def test_preceding_quiet_start_same_evening():
     assert preceding_quiet_start(local, dt.time(22, 0)) == dt.datetime(
         2026, 7, 23, 22, 0, tzinfo=_TZ
     )
+
+
+def test_effective_flip_clamps_nominal_inside_quiet_to_2130():
+    """B5: 14:00 slot, 12h lead → nominal 02:00 quiet → flip at prior 21:30."""
+    slot = slot_datetime(dt.date(2026, 7, 24), dt.time(14, 0))
+    flip = effective_flip_at(slot, 12, dt.time(22, 0), dt.time(8, 0))
+    assert flip == dt.datetime(2026, 7, 23, 21, 30, tzinfo=_TZ)
+
+
+def test_effective_flip_daytime_unchanged():
+    slot = slot_datetime(dt.date(2026, 7, 24), dt.time(16, 0))
+    flip = effective_flip_at(slot, 4, dt.time(22, 0), dt.time(8, 0))
+    assert flip == slot - dt.timedelta(hours=4)

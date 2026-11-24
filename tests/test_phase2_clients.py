@@ -124,7 +124,7 @@ class TestFcmClient:
     @patch("app.services.fcm_client._load_service_account")
     @patch("app.services.fcm_client._service_account_path")
     @patch("app.services.fcm_client.httpx.Client")
-    def test_v1_advance_offer_is_data_only_silent(
+    def test_v1_advance_offer_uses_visible_tray_channel(
         self, mock_client_cls, mock_path, mock_load_sa, mock_token
     ):
         mock_path.return_value = MagicMock()
@@ -144,9 +144,8 @@ class TestFcmClient:
         payload = mock_client_cls.return_value.__enter__.return_value.post.call_args.kwargs[
             "json"
         ]["message"]
-        assert "notification" not in payload
         android = payload["android"]
-        assert "notification" not in android
+        assert android["notification"]["channel_id"] == "mana_guruji_offers_advance"
         assert android["priority"] == "NORMAL"
         assert payload["data"]["type"] == "offer_advance"
 

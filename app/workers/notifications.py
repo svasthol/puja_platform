@@ -44,17 +44,36 @@ WHERE b.id = %s
 
 _BOOKING_CLASS_SQL = "SELECT booking_class FROM bookings WHERE id = %s"
 
+_BOOKING_DISPATCH_SQL = """
+SELECT b.booking_class, bds.urgency_escalated_at, b.scheduled_date, b.scheduled_time,
+       bds.dispatch_deadline
+FROM bookings b
+LEFT JOIN booking_dispatch_state bds ON bds.booking_id = b.id
+WHERE b.id = %s
+"""
+
 
 def _broadcast_offer_payload(
-    booking_id: str, booking_class: str
+    booking_id: str,
+    booking_class: str,
+    *,
+    urgency_escalated: bool = False,
+    high_escalated: bool = False,
 ) -> tuple[str, str, dict[str, str], str]:
     """FCM content for broadcast notify_offers (§21.6.H)."""
-    if booking_class == "instant":
+    if booking_class == "instant" or high_escalated:
         return (
             "New puja offer",
             "You have an urgent booking offer — open the app to accept.",
             {"type": "offer_instant", "booking_id": booking_id},
             "high",
+        )
+    if urgency_escalated:
+        return (
+            "Priority puja offer",
+            "A booking needs attention soon — open your inbox.",
+            {"type": "offer_advance", "booking_id": booking_id},
+            "normal",
         )
     return (
         "New puja offer",
@@ -106,14 +125,17 @@ def _push_to_user(
     return sent, failed, deleted
 
 
-def _notify_offers_impl(booking_id: str) -> dict:
+def _notify_offers_impl(
+    booking_id: str, new_pujari_ids: list[str] | None = None
+) -> dict:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(_BOOKING_CLASS_SQL, (booking_id,))
-            class_row = cur.fetchone()
-            booking_class = class_row[0] if class_row and class_row[0] else "advance"
-            title, body, data, priority = _broadcast_offer_payload(booking_id, booking_class)
+            cur.execute(_BOOKING_DISPATCH_SQL, (booking_id,))
+            meta = cur.fetchone()
+            booking_class = meta[0] if meta and meta[0] else "advance"
+            urgency_escalated = bool(meta and meta[1])
+            sched_d, sched_t, deadline = meta[2], meta[3], meta[4]
 
             cur.execute(_LIVE_OFFERS_SQL, (booking_id,))
             rows = cur.fetchall()
@@ -121,12 +143,63 @@ def _notify_offers_impl(booking_id: str) -> dict:
                 log.info("notify_offers_none_live", booking_id=booking_id)
                 return {"booking_id": booking_id, "targets": 0}
 
+            filter_set = {str(x) for x in new_pujari_ids} if new_pujari_ids else None
             total_sent = total_failed = total_deleted = 0
             sms_sent = 0
             is_direct = rows[0][3] == "direct" or rows[0][4] is not None
 
+            from app.services.dispatch_launch import load_quiet_hours, slot_datetime
+            from app.services.escalated_delivery import (
+                dedupe_ttl_seconds_until_slot,
+                escalated_delivery_policy,
+            )
+            from app.workers.redis_sync import get_sync_redis, namespaced_key
+
+            quiet_start, quiet_end = load_quiet_hours(cur)
+            r = get_sync_redis()
+            slot_local = (
+                slot_datetime(sched_d, sched_t) if sched_d and sched_t else None
+            )
+
             for pujari_id, user_id, phone, _dm, _intended in rows:
+                pid = str(pujari_id)
+                if filter_set is not None and pid not in filter_set:
+                    continue
                 uid = str(user_id)
+                high_escalated = False
+                if urgency_escalated and slot_local is not None:
+                    cur.execute("SELECT now()")
+                    now_db = cur.fetchone()[0]
+                    tz = slot_local.tzinfo
+                    now_local = (
+                        now_db.replace(tzinfo=tz)
+                        if now_db.tzinfo is None
+                        else now_db.astimezone(tz)
+                    )
+                    dl = deadline
+                    if dl is not None and dl.tzinfo is None:
+                        dl = dl.replace(tzinfo=tz)
+                    elif dl is not None:
+                        dl = dl.astimezone(tz)
+                    policy = escalated_delivery_policy(
+                        now_local,
+                        quiet_start=quiet_start,
+                        quiet_end=quiet_end,
+                        dispatch_deadline=dl,
+                    )
+                    if policy.allow_high_push:
+                        dedupe_key = namespaced_key(
+                            f"notif:{pid}:{booking_id}:escalated_high"
+                        )
+                        ttl = dedupe_ttl_seconds_until_slot(slot_local, now_local)
+                        if r.set(dedupe_key, "1", nx=True, ex=ttl):
+                            high_escalated = True
+                title, body, data, priority = _broadcast_offer_payload(
+                    booking_id,
+                    booking_class,
+                    urgency_escalated=urgency_escalated,
+                    high_escalated=high_escalated,
+                )
                 sent, failed, deleted = _push_to_user(
                     cur,
                     user_id=uid,
@@ -589,55 +662,14 @@ def _notify_offer_withdrawn_impl(booking_id: str) -> dict:
         conn.close()
 
 
+def _notify_offer_escalated_impl(booking_id: str) -> dict:
+    """Holder + flip notify with B11 quiet / dedupe (§21.6.E)."""
+    return _notify_offers_impl(booking_id)
+
+
 def _notify_offer_instant_impl(booking_id: str) -> dict:
-    """High-priority modal push on urgency flip (§21.6.E)."""
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(_LIVE_OFFERS_SQL, (booking_id,))
-            rows = cur.fetchall()
-            if not rows:
-                log.info("notify_offer_instant_none_live", booking_id=booking_id)
-                return {"booking_id": booking_id, "targets": 0}
-
-            total_sent = total_failed = total_deleted = 0
-            for pujari_id, user_id, _phone, _dm, _intended in rows:
-                uid = str(user_id)
-                title = "Urgent puja offer"
-                body = "A booking needs immediate attention — open the app to accept."
-                data = {"type": "offer_instant", "booking_id": booking_id}
-                sent, failed, deleted = _push_to_user(
-                    cur, user_id=uid, title=title, body=body, data=data
-                )
-                total_sent += sent
-                total_failed += failed
-                total_deleted += deleted
-                _insert_notification(
-                    cur,
-                    user_id=uid,
-                    app_context="pujari",
-                    related_type="assignment",
-                    related_id=booking_id,
-                    title=title,
-                    body=body,
-                )
-
-            conn.commit()
-            log.info(
-                "notify_offer_instant_done",
-                booking_id=booking_id,
-                targets=len(rows),
-                fcm_sent=total_sent,
-            )
-            return {
-                "booking_id": booking_id,
-                "targets": len(rows),
-                "fcm_sent": total_sent,
-                "fcm_failed": total_failed,
-                "devices_deleted": total_deleted,
-            }
-    finally:
-        conn.close()
+    """Legacy entry — delegates to escalated-aware notify."""
+    return _notify_offer_escalated_impl(booking_id)
 
 
 @celery_app.task(name="app.workers.notifications.notify_accept_ack")
@@ -646,13 +678,18 @@ def notify_accept_ack(booking_id: str, pujari_user_id: str) -> dict:
 
 
 @celery_app.task(name="app.workers.notifications.notify_offers")
-def notify_offers(booking_id: str) -> dict:
-    return _notify_offers_impl(booking_id)
+def notify_offers(booking_id: str, new_pujari_ids: list[str] | None = None) -> dict:
+    return _notify_offers_impl(booking_id, new_pujari_ids)
 
 
 @celery_app.task(name="app.workers.notifications.notify_offer_instant")
 def notify_offer_instant(booking_id: str) -> dict:
     return _notify_offer_instant_impl(booking_id)
+
+
+@celery_app.task(name="app.workers.notifications.notify_offer_escalated")
+def notify_offer_escalated(booking_id: str) -> dict:
+    return _notify_offer_escalated_impl(booking_id)
 
 
 @celery_app.task(name="app.workers.notifications.notify_rm_dispatch_escalation")

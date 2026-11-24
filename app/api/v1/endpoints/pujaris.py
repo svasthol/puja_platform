@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.dependencies import Principal, require_pujari
 from app.core.redis_keys import presence_redis_key
-from app.core.redis_client import redis_delete, redis_set
+from app.core.redis_client import redis_delete, redis_get, redis_set
+from app.db import post_commit
 from app.db.engine import get_db, get_db_txn
 from app.schemas.tax import PujariTaxSummary
 from app.schemas.tax_profile import (
@@ -149,7 +150,15 @@ async def heartbeat(
             ),
             {"pid": str(pid), "lat": payload.lat, "lng": payload.lng},
         )
-    await redis_set(presence_redis_key(pid), "1", ex=settings.PUJARI_PRESENCE_TTL_SECONDS)
+    key = presence_redis_key(pid)
+    was_absent = await redis_get(key) is None
+    await redis_set(key, "1", ex=settings.PUJARI_PRESENCE_TTL_SECONDS)
+    if was_absent:
+        post_commit.enqueue_celery_task(
+            db,
+            task_name="app.workers.dispatch.expand_for_pujari",
+            args=[str(pid)],
+        )
     return {"status": "ok"}
 
 

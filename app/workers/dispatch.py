@@ -19,11 +19,18 @@ from __future__ import annotations
 import structlog
 
 from app.services.dispatch_launch import (
+    effective_offer_mode,
     ensure_dispatch_windows,
     filter_candidates_inbox_cap,
     launch_eligibility_sql,
     load_dispatch_settings,
+    load_quiet_hours,
     offer_expires_interval,
+    slot_datetime,
+)
+from app.services.escalated_delivery import (
+    compute_escalated_offer_expires_at,
+    escalated_delivery_policy,
 )
 from app.workers.celery_app import celery_app
 from app.core.redis_keys import presence_redis_key
@@ -199,9 +206,15 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
             settings = load_dispatch_settings(cur)
             _ensure_dispatch_state(cur, booking_id)
             _reset_dispatch_state_if_fresh(cur, booking_id, fresh=fresh)
-            starts_at, deadline, _, _, booking_class = ensure_dispatch_windows(
-                cur, booking_id, settings
-            )
+            (
+                starts_at,
+                deadline,
+                scheduled_date,
+                scheduled_time,
+                booking_class,
+                urgency_escalated_at,
+            ) = ensure_dispatch_windows(cur, booking_id, settings)
+            offer_mode = effective_offer_mode(booking_class, urgency_escalated_at)
             conn.commit()
 
             cur.execute("SELECT now()")
@@ -252,7 +265,7 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
             candidates = [c[0] for c in cur.fetchall()]
 
             inbox_capped = 0
-            if booking_class == "advance":
+            if offer_mode == "advance":
                 candidates, inbox_capped = filter_candidates_inbox_cap(
                     cur,
                     candidates,
@@ -300,16 +313,54 @@ def _dispatch_round(booking_id: str, *, fresh: bool = False) -> dict:
                 return skip
 
             inserted = 0
-            offer_ttl = offer_expires_interval(booking_class, settings)
+            offer_ttl = offer_expires_interval(
+                booking_class, settings, urgency_escalated_at=urgency_escalated_at
+            )
+            quiet_start, quiet_end = load_quiet_hours(cur)
+            cur.execute("SELECT now()")
+            now_db = cur.fetchone()[0]
+            if offer_mode == "escalated":
+                tz = slot_datetime(scheduled_date, scheduled_time).tzinfo
+                now_local = (
+                    now_db.replace(tzinfo=tz)
+                    if now_db.tzinfo is None
+                    else now_db.astimezone(tz)
+                )
+                dl_local = (
+                    deadline.replace(tzinfo=tz)
+                    if deadline.tzinfo is None
+                    else deadline.astimezone(tz)
+                )
+                esc_policy = escalated_delivery_policy(
+                    now_local,
+                    quiet_start=quiet_start,
+                    quiet_end=quiet_end,
+                    dispatch_deadline=dl_local,
+                )
             for pujari_id in live:
                 try:
                     cur.execute("SAVEPOINT dispatch_offer_insert")
-                    cur.execute(
-                        "INSERT INTO booking_assignments "
-                        "(id, booking_id, pujari_id, status_id, offered_at, expires_at) "
-                        f"VALUES (gen_random_uuid(), %s, %s, %s, now(), now() + interval '{offer_ttl}')",
-                        (booking_id, pujari_id, offered_id),
-                    )
+                    if offer_mode == "escalated":
+                        exp = compute_escalated_offer_expires_at(
+                            now_local,
+                            esc_policy,
+                            quiet_end=quiet_end,
+                            escalated_ttl_seconds=settings.escalated_offer_ttl_seconds,
+                            dispatch_deadline=dl_local,
+                        )
+                        cur.execute(
+                            "INSERT INTO booking_assignments "
+                            "(id, booking_id, pujari_id, status_id, offered_at, expires_at) "
+                            "VALUES (gen_random_uuid(), %s, %s, %s, now(), %s)",
+                            (booking_id, pujari_id, offered_id, exp),
+                        )
+                    else:
+                        cur.execute(
+                            "INSERT INTO booking_assignments "
+                            "(id, booking_id, pujari_id, status_id, offered_at, expires_at) "
+                            f"VALUES (gen_random_uuid(), %s, %s, %s, now(), now() + interval '{offer_ttl}')",
+                            (booking_id, pujari_id, offered_id),
+                        )
                     cur.execute("RELEASE SAVEPOINT dispatch_offer_insert")
                     inserted += 1
                 except Exception:
@@ -419,3 +470,209 @@ def rebroadcast_booking(booking_id: str, fresh: bool = False) -> dict:
 @celery_app.task(name="app.workers.dispatch.direct_dispatch")
 def direct_dispatch(booking_id: str) -> dict:
     return _direct_dispatch(booking_id)
+
+
+def _insert_live_offers(
+    cur,
+    *,
+    booking_id: str,
+    offered_id: int,
+    live: list,
+    booking_class: str,
+    urgency_escalated_at,
+    settings,
+    scheduled_date,
+    scheduled_time,
+    deadline,
+) -> tuple[int, list[str]]:
+    """Shared insert path for dispatch round and expand (B8). Returns count + pujari ids inserted."""
+    offer_mode = effective_offer_mode(booking_class, urgency_escalated_at)
+    offer_ttl = offer_expires_interval(
+        booking_class, settings, urgency_escalated_at=urgency_escalated_at
+    )
+    quiet_start, quiet_end = load_quiet_hours(cur)
+    cur.execute("SELECT now()")
+    now_db = cur.fetchone()[0]
+    inserted = 0
+    inserted_pujari_ids: list[str] = []
+    if offer_mode == "escalated":
+        tz = slot_datetime(scheduled_date, scheduled_time).tzinfo
+        now_local = (
+            now_db.replace(tzinfo=tz) if now_db.tzinfo is None else now_db.astimezone(tz)
+        )
+        dl_local = (
+            deadline.replace(tzinfo=tz)
+            if deadline.tzinfo is None
+            else deadline.astimezone(tz)
+        )
+        esc_policy = escalated_delivery_policy(
+            now_local,
+            quiet_start=quiet_start,
+            quiet_end=quiet_end,
+            dispatch_deadline=dl_local,
+        )
+    for pujari_id in live:
+        try:
+            cur.execute("SAVEPOINT dispatch_offer_insert")
+            if offer_mode == "escalated":
+                exp = compute_escalated_offer_expires_at(
+                    now_local,
+                    esc_policy,
+                    quiet_end=quiet_end,
+                    escalated_ttl_seconds=settings.escalated_offer_ttl_seconds,
+                    dispatch_deadline=dl_local,
+                )
+                cur.execute(
+                    "INSERT INTO booking_assignments "
+                    "(id, booking_id, pujari_id, status_id, offered_at, expires_at) "
+                    "VALUES (gen_random_uuid(), %s, %s, %s, now(), %s)",
+                    (booking_id, pujari_id, offered_id, exp),
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO booking_assignments "
+                    "(id, booking_id, pujari_id, status_id, offered_at, expires_at) "
+                    f"VALUES (gen_random_uuid(), %s, %s, %s, now(), now() + interval '{offer_ttl}')",
+                    (booking_id, pujari_id, offered_id),
+                )
+            cur.execute("RELEASE SAVEPOINT dispatch_offer_insert")
+            inserted += 1
+            inserted_pujari_ids.append(str(pujari_id))
+        except Exception:
+            cur.execute("ROLLBACK TO SAVEPOINT dispatch_offer_insert")
+            continue
+    return inserted, inserted_pujari_ids
+
+
+def _expand_booking_impl(
+    booking_id: str,
+    reason: str,
+    *,
+    target_pujari_id: str | None = None,
+) -> dict:
+    """Offer expand wave — does not bump dispatch round (§21.6.E)."""
+    r = _redis()
+    lock_key = namespaced_key(f"dispatch_lock:{booking_id}")
+    lock_token = new_lock_token()
+    if not r.set(lock_key, lock_token, nx=True, ex=60):
+        log.info("expand_skipped_locked", booking_id=booking_id, reason=reason)
+        return {"skipped": "locked"}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            skip = _skip_if_not_dispatchable(cur, booking_id)
+            if skip:
+                conn.rollback()
+                return skip
+            settings = load_dispatch_settings(cur)
+            _ensure_dispatch_state(cur, booking_id)
+            (
+                starts_at,
+                deadline,
+                scheduled_date,
+                scheduled_time,
+                booking_class,
+                urgency_escalated_at,
+            ) = ensure_dispatch_windows(cur, booking_id, settings)
+            conn.commit()
+
+            cur.execute("SELECT now()")
+            now_db = cur.fetchone()[0]
+            if deadline <= now_db:
+                return {"skipped": "past_deadline"}
+            if starts_at > now_db:
+                return {"skipped": "deferred"}
+
+            offer_mode = effective_offer_mode(booking_class, urgency_escalated_at)
+            offered_id = _status_id(cur, "assignment", "offered")
+            eligibility = launch_eligibility_sql(settings)
+            cur.execute(eligibility, (booking_id,))
+            candidates = [str(c[0]) for c in cur.fetchall()]
+            if target_pujari_id is not None:
+                candidates = [c for c in candidates if c == str(target_pujari_id)]
+            if not candidates:
+                return {"skipped": "no_candidates", "reason": reason}
+
+            if offer_mode == "advance":
+                candidates, inbox_capped = filter_candidates_inbox_cap(
+                    cur,
+                    candidates,
+                    settings.max_live_advance_offers_per_pujari,
+                )
+            else:
+                inbox_capped = 0
+
+            keys = [presence_redis_key(c) for c in candidates]
+            vals = r.mget(keys)
+            live = [c for c, v in zip(candidates, vals) if v is not None]
+            if not live:
+                return {"skipped": "no_live_presence", "reason": reason}
+
+            inserted, new_pujari_ids = _insert_live_offers(
+                cur,
+                booking_id=booking_id,
+                offered_id=offered_id,
+                live=live,
+                booking_class=booking_class,
+                urgency_escalated_at=urgency_escalated_at,
+                settings=settings,
+                scheduled_date=scheduled_date,
+                scheduled_time=scheduled_time,
+                deadline=deadline,
+            )
+            conn.commit()
+            log.info(
+                "urgency_flip_expand_done",
+                booking_id=booking_id,
+                reason=reason,
+                new_offers=inserted,
+                inbox_capped=inbox_capped,
+            )
+            if inserted:
+                celery_app.send_task(
+                    "app.workers.notifications.notify_offers",
+                    args=[booking_id],
+                    kwargs={"new_pujari_ids": new_pujari_ids},
+                )
+            return {"reason": reason, "offers": inserted}
+    finally:
+        conn.close()
+        release_lock(r, lock_key, lock_token)
+
+
+@celery_app.task(name="app.workers.dispatch.expand_booking")
+def expand_booking(booking_id: str, reason: str) -> dict:
+    return _expand_booking_impl(booking_id, reason)
+
+
+@celery_app.task(name="app.workers.dispatch.expand_for_pujari")
+def expand_for_pujari(pujari_id: str) -> dict:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT b.id::text
+                FROM bookings b
+                JOIN booking_dispatch_state bds ON bds.booking_id = b.id
+                JOIN status_types st ON st.id = b.status_id
+                WHERE st.domain = 'booking' AND st.code = 'requested'
+                  AND b.pujari_id IS NULL
+                  AND b.cancelled_at IS NULL
+                  AND b.paid_at IS NOT NULL
+                  AND bds.dispatch_deadline > now()
+                  AND (bds.dispatch_starts_at IS NULL OR bds.dispatch_starts_at <= now())
+                """
+            )
+            booking_ids = [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+    touched = 0
+    for bid in booking_ids:
+        result = _expand_booking_impl(
+            bid, "go_online", target_pujari_id=pujari_id
+        )
+        if result.get("offers", 0) > 0:
+            touched += 1
+    return {"bookings_scanned": len(booking_ids), "bookings_with_new_offers": touched}
