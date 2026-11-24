@@ -42,6 +42,7 @@ _UNREGISTERED_ERRORS = frozenset(
 # Must match partner MainActivity notification channels + res/raw sound files.
 _PARTNER_OFFER_CHANNEL_URGENT = "mana_guruji_offers_urgent"
 _PARTNER_OFFER_CHANNEL_ADVANCE = "mana_guruji_offers_advance"
+PARTNER_OFFER_CHANNEL_ADVANCE = _PARTNER_OFFER_CHANNEL_ADVANCE
 PARTNER_OFFER_CHANNEL_ADVANCE_PUJA = "mana_guruji_offers_advance_puja"
 _PARTNER_OFFER_CHANNEL_ADVANCE_PUJA = PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
 _SOUND_OFFER_URGENT = "offer_urgent_nadaswaram"
@@ -186,8 +187,10 @@ def _parse_v1_error(body: dict[str, Any]) -> tuple[FcmOutcome, str]:
     return FcmOutcome.FAILED, message
 
 
-def _apns_config(priority: str, *, title: str, body: str) -> dict[str, Any]:
-    """High-priority instant offers alert; advance/data pushes are silent."""
+def _apns_config(
+    priority: str, *, title: str, body: str, visible_tray: bool = False
+) -> dict[str, Any]:
+    """High-priority instant offers alert; silent advance tray when requested."""
     if priority == "high":
         return {
             "headers": {"apns-priority": "10"},
@@ -195,6 +198,16 @@ def _apns_config(priority: str, *, title: str, body: str) -> dict[str, Any]:
                 "aps": {
                     "alert": {"title": title, "body": body},
                     "sound": "default",
+                }
+            },
+        }
+    if visible_tray:
+        return {
+            "headers": {"apns-priority": "5"},
+            "payload": {
+                "aps": {
+                    "alert": {"title": title, "body": body},
+                    "sound": "",
                 }
             },
         }
@@ -213,6 +226,7 @@ def _send_once_v1(
     priority: str = "high",
     android_channel_id: str | None = None,
     android_sound: str | None = None,
+    visible_tray: bool = False,
 ) -> FcmResult:
     sa = _load_service_account()
     if sa is None:
@@ -231,7 +245,6 @@ def _send_once_v1(
     if android_sound == SOUND_OFFER_ADVANCE_PUJA:
         android_channel_id = _PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
 
-    # Advance / normal inbox refresh — data-only so Android does not play default tray sound.
     message: dict[str, Any] = {
         "token": device_token,
         "android": _android_message_config(
@@ -239,9 +252,9 @@ def _send_once_v1(
             channel_id=android_channel_id,
             sound=android_sound,
         ),
-        "apns": _apns_config(priority, title=title, body=body),
+        "apns": _apns_config(priority, title=title, body=body, visible_tray=visible_tray),
     }
-    if priority == "high" or (priority == "normal" and android_sound):
+    if priority == "high" or android_sound or visible_tray:
         message["notification"] = {"title": title, "body": body}
     if data:
         message["data"] = {k: str(v) for k, v in data.items()}
@@ -281,6 +294,7 @@ def _send_once_legacy(
     priority: str = "high",
     android_channel_id: str | None = None,
     android_sound: str | None = None,
+    visible_tray: bool = False,
 ) -> FcmResult:
     if not settings.FCM_SERVER_KEY:
         return FcmResult(outcome=FcmOutcome.SKIPPED)
@@ -294,7 +308,7 @@ def _send_once_legacy(
         "to": device_token,
         "priority": priority,
     }
-    if priority == "high" or (priority == "normal" and android_sound):
+    if priority == "high" or android_sound or visible_tray:
         notification: dict[str, Any] = {"title": title, "body": body}
         if android_channel_id:
             notification["android_channel_id"] = android_channel_id
@@ -337,6 +351,7 @@ def _send_once_sync(
     priority: str = "high",
     android_channel_id: str | None = None,
     android_sound: str | None = None,
+    visible_tray: bool = False,
 ) -> FcmResult:
     if _service_account_path() is not None:
         return _send_once_v1(
@@ -347,6 +362,7 @@ def _send_once_sync(
             priority=priority,
             android_channel_id=android_channel_id,
             android_sound=android_sound,
+            visible_tray=visible_tray,
         )
     return _send_once_legacy(
         device_token,
@@ -356,6 +372,7 @@ def _send_once_sync(
         priority=priority,
         android_channel_id=android_channel_id,
         android_sound=android_sound,
+        visible_tray=visible_tray,
     )
 
 
@@ -368,6 +385,7 @@ def send_push_sync(
     priority: str = "high",
     android_channel_id: str | None = None,
     android_sound: str | None = None,
+    visible_tray: bool = False,
     max_attempts: int = 3,
 ) -> FcmResult:
     """Send with retries (DISPATCH_FLOW: 2 retries = 3 attempts total)."""
@@ -381,6 +399,7 @@ def send_push_sync(
             priority=priority,
             android_channel_id=android_channel_id,
             android_sound=android_sound,
+            visible_tray=visible_tray,
         )
         if last.outcome in (FcmOutcome.SENT, FcmOutcome.UNREGISTERED, FcmOutcome.SKIPPED):
             return last

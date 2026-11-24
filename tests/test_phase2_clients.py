@@ -138,6 +138,7 @@ class TestFcmClient:
             title="Offer",
             body="Advance inbox",
             priority="normal",
+            visible_tray=True,
             data={"type": "offer_advance", "booking_id": "b-1"},
         )
         assert result.outcome == FcmOutcome.SENT
@@ -147,8 +148,9 @@ class TestFcmClient:
         android = payload["android"]
         assert android["notification"]["channel_id"] == "mana_guruji_offers_advance"
         assert android["priority"] == "NORMAL"
+        assert "sound" not in android["notification"]
         assert payload["data"]["type"] == "offer_advance"
-        assert "notification" not in payload
+        assert payload["notification"]["title"] == "Offer"
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")

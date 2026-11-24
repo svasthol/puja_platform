@@ -9,7 +9,8 @@
 | 0 | merge-pr22 | PR #22 → `dev`; Celery worker + beat restart | **pending (ops)** |
 | 1–8 | Track B | b1–b11 code + admin UI + Flutter B6 | **done** (puja #23, Flutter #8) |
 | A1 | Track A Phase 1 | background `presence_mode` + heartbeat | **done** (puja #24, Flutter #9) |
-| C | Track C | quiet-hours advance Om FCM + inbox badge | **in PR** `feature/track-c-advance-om-quiet` |
+| C | Track C | quiet-hours advance Om FCM + inbox badge | **done** (#25, Flutter #10) |
+| C+ | Track C follow-up | daytime silent advance tray + inbox date/net | **ready** `feature/track-c-inbox-visible-advance` |
 | 9 | spec/tests | §6 core tests + `DISPATCH_FLOW` + `partner-app.mdc` | **done** |
 | 9+ | spec/full | `SPEC_AMENDMENTS`, `LAUNCH_POLICY` prose (optional) | optional |
 
@@ -35,8 +36,8 @@ See [`DEV_MERGE_STAGING_CI_CHECKLIST.md`](./DEV_MERGE_STAGING_CI_CHECKLIST.md) �
 
 ### Not in scope for Track B closeout
 
-- Full overnight B11 matrix (23:00/14:00, 07:00 urgent) — add when time-freeze CI helper exists
-- Heartbeat → `expand_for_pujari` integration test (needs Redis + post_commit harness)
+- Full overnight B11 **integration** matrix (time-freeze + dispatch worker) — policy unit tests in `test_b11_escalated_delivery.py`
+- Heartbeat → `expand_for_pujari` **full Redis integration** — unit gate in `test_heartbeat_go_online.py`
 - Track A Phase 2 FGS
 - `offer_advance_batch` grouped FCM
 
@@ -50,7 +51,7 @@ See [`DEV_MERGE_STAGING_CI_CHECKLIST.md`](./DEV_MERGE_STAGING_CI_CHECKLIST.md) �
 ### Verification
 
 ```text
-.\.venv\Scripts\python.exe -m pytest tests/test_urgency_flip.py tests/test_quiet_hours.py tests/test_admin_dispatch_policy.py tests/test_celery_task_registration.py tests/test_migration_040.py -q
+.\.venv\Scripts\python.exe -m pytest tests/test_urgency_flip.py tests/test_quiet_hours.py tests/test_b11_escalated_delivery.py tests/test_admin_dispatch_policy.py tests/test_celery_task_registration.py tests/test_migration_040.py tests/test_partner_ux.py tests/test_phase2_clients.py tests/test_phase2_notifications.py tests/test_partner_fcm_dedupe.py tests/test_offers_partner_net.py tests/test_heartbeat_go_online.py tests/test_launch_slice.py -q
 ```
 
 **Last updated:** 2026-11-24

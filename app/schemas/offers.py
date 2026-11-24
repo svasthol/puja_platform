@@ -20,6 +20,7 @@ class OfferCard(BaseModel):
     area_label: str | None
     payment_mode: str
     total_amount: Decimal
+    partner_net_amount: Decimal
     amount_due_offline: Decimal
     booking_class: str
     urgency: str  # instant | advance — live UX (§21.6.E)

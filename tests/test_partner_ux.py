@@ -139,6 +139,10 @@ async def test_notify_offers_advance_uses_offer_advance_type(session, seed, uniq
     assert mock_push.call_args.kwargs["data"]["type"] == "offer_advance"
     assert mock_push.call_args.kwargs["priority"] == "normal"
     assert mock_push.call_args.kwargs.get("android_sound") is None
+    assert mock_push.call_args.kwargs["visible_tray"] is True
+    from app.services.fcm_client import PARTNER_OFFER_CHANNEL_ADVANCE
+
+    assert mock_push.call_args.kwargs["android_channel_id"] == PARTNER_OFFER_CHANNEL_ADVANCE
 
 
 @pytest.mark.asyncio
@@ -159,6 +163,7 @@ async def test_notify_offers_quiet_advance_sets_om_sound(session, seed, uniq):
     kw = mock_push.call_args.kwargs
     assert kw["android_sound"] == SOUND_OFFER_ADVANCE_PUJA
     assert kw["data"]["alert_sound"] == "puja"
+    assert kw["visible_tray"] is True
 
 
 @pytest.mark.asyncio

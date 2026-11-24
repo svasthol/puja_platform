@@ -264,13 +264,16 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
 - `GET  /v1/offers`                            live assignments per booking:
   `assignment_id`, `booking_id`, `expires_at`, `puja_name`, `scheduled_date`,
   `scheduled_time`, `area_label` (from address `service_area_id` — **no street**),
-  `payment_mode`, `amount_due_offline`. Polled on foreground.
+  `payment_mode`, `total_amount`, `partner_net_amount` (latest successful payment
+  `net_pujari_amount` + `amount_due_offline` — partner “You earn”), `amount_due_offline`.
+  Polled on foreground.
   **Filters:** `responded_at IS NULL`, `expires_at > now()`, **`bookings.cancelled_at IS NULL`**
   (customer-cancelled bookings never appear — pending rows are expired in
   `cancellation_service` on cancel).
   **Dispatch v2 (§21.6.E):** also returns `urgency` (`instant` | `advance`, computed live from
   slot lead vs `instant_lead_hours`) and `urgency_escalated` (bool). Client renders a modal when
-  `urgency=='instant'` OR `urgency_escalated`, else an inbox row (§21.6.G). `booking_class`
+  `urgency=='instant'` only (B6 — `urgency_escalated` alone does not open the Rapido sheet), else
+  an inbox row (§21.6.G). `booking_class`
   (frozen) is informational; `urgency` drives UX. Advance offers may be `is_still_available=false`
   when another pujari already accepted (superseded — §21.6.B).
 - `GET  /v1/pujari/bookings`                   assigned pujari's bookings (cursor);

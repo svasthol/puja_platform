@@ -183,6 +183,7 @@ async def test_list_offers_includes_area_label_and_puja(session, seed, uniq):
     assert offer.area_label == expected_label
     assert offer.scheduled_date is not None
     assert offer.total_amount == 2100
+    assert offer.partner_net_amount == 0
 
 
 @pytest.mark.asyncio

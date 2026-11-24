@@ -15,6 +15,7 @@ import structlog
 
 from app.services.fcm_client import (
     FcmOutcome,
+    PARTNER_OFFER_CHANNEL_ADVANCE,
     PARTNER_OFFER_CHANNEL_ADVANCE_PUJA,
     SOUND_OFFER_ADVANCE_PUJA,
     send_push_sync,
@@ -110,6 +111,7 @@ def _push_to_user(
     priority: str = "high",
     android_sound: str | None = None,
     android_channel_id: str | None = None,
+    visible_tray: bool = False,
 ) -> tuple[int, int, int]:
     """Returns (sent, failed, unregistered_deleted)."""
     cur.execute(_DEVICES_SQL, (user_id,))
@@ -124,6 +126,7 @@ def _push_to_user(
             priority=priority,
             android_sound=android_sound,
             android_channel_id=android_channel_id,
+            visible_tray=visible_tray,
         )
         if result.outcome == FcmOutcome.SENT:
             sent += 1
@@ -221,12 +224,16 @@ def _notify_offers_impl(
                 )
                 android_sound: str | None = None
                 android_channel_id: str | None = None
-                if priority == "normal" and is_quiet_hours(
-                    now_local, quiet_start, quiet_end
-                ):
-                    data = {**data, "alert_sound": "puja"}
-                    android_sound = SOUND_OFFER_ADVANCE_PUJA
-                    android_channel_id = PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
+                visible_tray = False
+                if priority == "normal":
+                    if is_quiet_hours(now_local, quiet_start, quiet_end):
+                        data = {**data, "alert_sound": "puja"}
+                        android_sound = SOUND_OFFER_ADVANCE_PUJA
+                        android_channel_id = PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
+                        visible_tray = True
+                    else:
+                        android_channel_id = PARTNER_OFFER_CHANNEL_ADVANCE
+                        visible_tray = True
                 sent, failed, deleted = _push_to_user(
                     cur,
                     user_id=uid,
@@ -236,6 +243,7 @@ def _notify_offers_impl(
                     priority=priority,
                     android_sound=android_sound,
                     android_channel_id=android_channel_id,
+                    visible_tray=visible_tray,
                 )
                 total_sent += sent
                 total_failed += failed

@@ -10328,6 +10328,10 @@
             "type": "string",
             "title": "Total Amount"
           },
+          "partner_net_amount": {
+            "type": "string",
+            "title": "Partner Net Amount"
+          },
           "amount_due_offline": {
             "type": "string",
             "title": "Amount Due Offline"
@@ -10356,6 +10360,7 @@
           "area_label",
           "payment_mode",
           "total_amount",
+          "partner_net_amount",
           "amount_due_offline",
           "booking_class",
           "urgency",
