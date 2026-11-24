@@ -6,6 +6,8 @@ import uuid
 import zoneinfo
 
 from fastapi import APIRouter, Depends, HTTPException, status as http
+from typing import Literal
+
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +35,7 @@ _TZ = zoneinfo.ZoneInfo(settings.PLATFORM_TIMEZONE)
 class Heartbeat(BaseModel):
     lat: float | None = None
     lng: float | None = None
+    presence_mode: Literal["foreground", "background"] | None = None
 
     @model_validator(mode="after")
     def lat_lng_together(self) -> "Heartbeat":
@@ -152,7 +155,11 @@ async def heartbeat(
         )
     key = presence_redis_key(pid)
     was_absent = await redis_get(key) is None
-    await redis_set(key, "1", ex=settings.PUJARI_PRESENCE_TTL_SECONDS)
+    if payload.presence_mode == "background":
+        presence_ttl = settings.PUJARI_PRESENCE_BACKGROUND_TTL_SECONDS
+    else:
+        presence_ttl = settings.PUJARI_PRESENCE_TTL_SECONDS
+    await redis_set(key, "1", ex=presence_ttl)
     if was_absent:
         post_commit.enqueue_celery_task(
             db,

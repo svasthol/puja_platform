@@ -193,8 +193,10 @@ def test_heartbeat_model_optional_gps():
 
     assert Heartbeat().lat is None
     assert Heartbeat().lng is None
+    assert Heartbeat().presence_mode is None
     hb = Heartbeat(lat=17.4, lng=78.4)
     assert hb.lat == 17.4
+    assert Heartbeat(presence_mode="background").presence_mode == "background"
 
     with pytest.raises(ValueError, match="together"):
         Heartbeat(lat=17.4)
