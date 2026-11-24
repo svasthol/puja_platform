@@ -122,7 +122,8 @@ Recommended repo name: `mana_guruji_mobile` (separate from `puja_platform`).
 8. **Partner offer sounds** (`P-FLUTTER-FCM-SOUND`) — Android channels must match
    `fcm_client.py`: urgent `mana_guruji_offers_urgent` + raw `offer_urgent_nadaswaram`;
    quiet-hours advance `mana_guruji_offers_advance_puja` + raw `offer_advance_puja`.
-   Daytime advance stays data-only on `mana_guruji_offers_advance`. QA:
+   Daytime advance uses a **silent visible tray** on `mana_guruji_offers_advance`
+   (`visible_tray` FCM). QA:
    `mana_guruji_mobile/test/PARTNER_FCM_SOUND.md`.
 
 ### Suggested `build.gradle` flavor sketch

@@ -40,6 +40,17 @@ async def list_offers(
                     sa.zone_name AS area_label,
                     b.payment_mode,
                     b.total_amount,
+                    COALESCE(
+                        (
+                            SELECT ps.net_pujari_amount
+                            FROM payments p
+                            JOIN payment_splits ps ON ps.payment_id = p.id
+                            WHERE p.booking_id = b.id AND p.status = 'success'
+                            ORDER BY p.created_at DESC
+                            LIMIT 1
+                        ),
+                        0
+                    ) + COALESCE(b.amount_due_offline, 0) AS partner_net_amount,
                     b.amount_due_offline,
                     b.booking_class,
                     bds.urgency_escalated_at IS NOT NULL AS urgency_escalated
@@ -82,6 +93,7 @@ async def list_offers(
                 area_label=row["area_label"],
                 payment_mode=row["payment_mode"],
                 total_amount=Decimal(str(row["total_amount"])),
+                partner_net_amount=Decimal(str(row["partner_net_amount"])),
                 amount_due_offline=Decimal(str(row["amount_due_offline"])),
                 booking_class=booking_class,
                 urgency=urgency,
