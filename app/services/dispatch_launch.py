@@ -100,13 +100,15 @@ def effective_offer_mode(
 
 
 def compute_list_urgency(
-    booking_class: BookingClass,
+    _booking_class: BookingClass,
     lead_hours: float,
     instant_lead_hours: int,
 ) -> BookingClass:
-    """Partner modal urgency — frozen instant class or live lead inside instant window (B6)."""
-    if booking_class == "instant":
-        return "instant"
+    """Partner modal urgency — live lead only (B6 / §21.6.E).
+
+    Frozen `booking_class` drives dispatch TTL and policy; it must not force the
+    Rapido modal when the slot is far away (e.g. bad dev rows: instant + 2037).
+    """
     if lead_hours <= instant_lead_hours:
         return "instant"
     return "advance"
