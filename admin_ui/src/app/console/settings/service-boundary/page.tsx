@@ -135,7 +135,12 @@ export default function ServiceBoundarySettingsPage() {
             <p>Loading…</p>
           )}
           {canEdit ? (
-            <Button type="button" variant="outline" disabled={reloadMut.isPending} onClick={() => reloadMut.mutate()}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={reloadMut.isPending}
+              onClick={() => reloadMut.mutate()}
+            >
               Reload polygon from disk
             </Button>
           ) : null}
@@ -147,7 +152,7 @@ export default function ServiceBoundarySettingsPage() {
             <Input value={probeLat} onChange={(e) => setProbeLat(e.target.value)} placeholder="latitude" />
             <Input value={probeLng} onChange={(e) => setProbeLng(e.target.value)} placeholder="longitude" />
           </div>
-          <Button type="button" variant="outline" onClick={() => probeMut.mutate()}>
+          <Button type="button" variant="secondary" onClick={() => probeMut.mutate()}>
             Check
           </Button>
           {probeResult ? <p className="text-sm text-ink">{probeResult}</p> : null}
