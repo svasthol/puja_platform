@@ -13,7 +13,7 @@ import uuid
 
 import structlog
 
-from app.services.fcm_client import FcmOutcome, send_push_sync
+from app.services.fcm_client import FcmOutcome, SOUND_OFFER_ADVANCE_OM, send_push_sync
 from app.services.sms_router import send_transactional_sms_sync
 from app.workers.celery_app import celery_app
 from app.workers.sweep import get_connection
@@ -103,6 +103,7 @@ def _push_to_user(
     body: str,
     data: dict[str, str],
     priority: str = "high",
+    android_sound: str | None = None,
 ) -> tuple[int, int, int]:
     """Returns (sent, failed, unregistered_deleted)."""
     cur.execute(_DEVICES_SQL, (user_id,))
@@ -110,7 +111,12 @@ def _push_to_user(
     sent = failed = deleted = 0
     for tok in tokens:
         result = send_push_sync(
-            tok, title=title, body=body, data=data, priority=priority
+            tok,
+            title=title,
+            body=body,
+            data=data,
+            priority=priority,
+            android_sound=android_sound,
         )
         if result.outcome == FcmOutcome.SENT:
             sent += 1
@@ -153,6 +159,7 @@ def _notify_offers_impl(
                 dedupe_ttl_seconds_until_slot,
                 escalated_delivery_policy,
             )
+            from app.services.reconfirmation import is_quiet_hours
             from app.workers.redis_sync import get_sync_redis, namespaced_key
 
             quiet_start, quiet_end = load_quiet_hours(cur)
@@ -200,6 +207,19 @@ def _notify_offers_impl(
                     urgency_escalated=urgency_escalated,
                     high_escalated=high_escalated,
                 )
+                android_sound: str | None = None
+                if priority == "normal" and slot_local is not None:
+                    cur.execute("SELECT now()")
+                    now_push = cur.fetchone()[0]
+                    tz = slot_local.tzinfo
+                    now_local_push = (
+                        now_push.replace(tzinfo=tz)
+                        if now_push.tzinfo is None
+                        else now_push.astimezone(tz)
+                    )
+                    if is_quiet_hours(now_local_push, quiet_start, quiet_end):
+                        data = {**data, "alert_sound": "om"}
+                        android_sound = SOUND_OFFER_ADVANCE_OM
                 sent, failed, deleted = _push_to_user(
                     cur,
                     user_id=uid,
@@ -207,6 +227,7 @@ def _notify_offers_impl(
                     body=body,
                     data=data,
                     priority=priority,
+                    android_sound=android_sound,
                 )
                 total_sent += sent
                 total_failed += failed

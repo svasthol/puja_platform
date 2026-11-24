@@ -153,6 +153,37 @@ class TestFcmClient:
     @patch("app.services.fcm_client._load_service_account")
     @patch("app.services.fcm_client._service_account_path")
     @patch("app.services.fcm_client.httpx.Client")
+    def test_v1_quiet_advance_uses_om_sound_and_visible_notification(
+        self, mock_client_cls, mock_path, mock_load_sa, mock_token
+    ):
+        mock_path.return_value = MagicMock()
+        mock_load_sa.return_value = {"project_id": "manapujari"}
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {"name": "projects/manapujari/messages/msg-3"}
+        mock_client_cls.return_value.__enter__.return_value.post.return_value = resp
+        from app.services.fcm_client import SOUND_OFFER_ADVANCE_OM
+
+        result = send_push_sync(
+            "device-tok-quiet",
+            title="Offer",
+            body="Quiet hours advance",
+            priority="normal",
+            android_sound=SOUND_OFFER_ADVANCE_OM,
+            data={"type": "offer_advance", "booking_id": "b-2", "alert_sound": "om"},
+        )
+        assert result.outcome == FcmOutcome.SENT
+        payload = mock_client_cls.return_value.__enter__.return_value.post.call_args.kwargs[
+            "json"
+        ]["message"]
+        assert payload["notification"]["title"] == "Offer"
+        android = payload["android"]
+        assert android["notification"]["sound"] == SOUND_OFFER_ADVANCE_OM
+
+    @patch("app.services.fcm_client._access_token", return_value="oauth-token")
+    @patch("app.services.fcm_client._load_service_account")
+    @patch("app.services.fcm_client._service_account_path")
+    @patch("app.services.fcm_client.httpx.Client")
     def test_v1_unregistered(self, mock_client_cls, mock_path, mock_load_sa, mock_token):
         mock_path.return_value = MagicMock()
         mock_load_sa.return_value = {"project_id": "manapujari"}

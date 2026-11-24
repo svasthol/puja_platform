@@ -7,7 +7,9 @@
 | Phase | ID | Description | Status |
 |-------|-----|-------------|--------|
 | 0 | merge-pr22 | PR #22 → `dev`; Celery worker + beat restart | **pending (ops)** |
-| 1–8 | Track B | b1–b11 code + admin UI + Flutter B6 | **done** |
+| 1–8 | Track B | b1–b11 code + admin UI + Flutter B6 | **done** (puja #23, Flutter #8) |
+| A1 | Track A Phase 1 | background `presence_mode` + heartbeat | **done** (puja #24, Flutter #9) |
+| C | Track C | quiet-hours advance Om FCM + inbox badge | **in PR** `feature/track-c-advance-om-quiet` |
 | 9 | spec/tests | §6 core tests + `DISPATCH_FLOW` + `partner-app.mdc` | **done** |
 | 9+ | spec/full | `SPEC_AMENDMENTS`, `LAUNCH_POLICY` prose (optional) | optional |
 
@@ -23,9 +25,9 @@
 | Admin validation | `test_admin_rejects_escalation_lead_lte_fail_hours` |
 | (+ existing) idempotent flip, live urgency, escalate TTL | `test_urgency_flip.py` |
 
-### Track A (Phase 1 — `feature/partner-background-presence`)
+### Track A
 
-See [`TRACK_A_BACKGROUND_PRESENCE.md`](./TRACK_A_BACKGROUND_PRESENCE.md). Phase 2 FGS not started.
+See [`TRACK_A_BACKGROUND_PRESENCE.md`](./TRACK_A_BACKGROUND_PRESENCE.md). Phase 1 merged; Phase 2 FGS not started.
 
 ### CI/CD on merge to `dev`
 
@@ -35,7 +37,7 @@ See [`DEV_MERGE_STAGING_CI_CHECKLIST.md`](./DEV_MERGE_STAGING_CI_CHECKLIST.md) �
 
 - Full overnight B11 matrix (23:00/14:00, 07:00 urgent) — add when time-freeze CI helper exists
 - Heartbeat → `expand_for_pujari` integration test (needs Redis + post_commit harness)
-- Track A / Track C branches
+- Track A Phase 2 FGS
 - `offer_advance_batch` grouped FCM
 
 ### Before Track A

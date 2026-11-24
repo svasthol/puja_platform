@@ -43,6 +43,7 @@ _UNREGISTERED_ERRORS = frozenset(
 _PARTNER_OFFER_CHANNEL_INSTANT = "mana_guruji_offers_ghanta"
 _PARTNER_OFFER_CHANNEL_ADVANCE = "mana_guruji_offers_advance"
 _SOUND_OFFER_INSTANT = "offer_instant_ghanta"
+SOUND_OFFER_ADVANCE_OM = "offer_advance_om"
 
 _token_cache: dict[str, Any] = {"access_token": None, "expires_at": 0.0}
 
@@ -223,6 +224,8 @@ def _send_once_v1(
 
     if android_channel_id is None and android_sound is None:
         android_channel_id, android_sound = _default_android_notification(priority)
+    elif android_channel_id is None:
+        android_channel_id, _ = _default_android_notification(priority)
 
     # Advance / normal inbox refresh — data-only so Android does not play default tray sound.
     message: dict[str, Any] = {
@@ -234,7 +237,7 @@ def _send_once_v1(
         ),
         "apns": _apns_config(priority, title=title, body=body),
     }
-    if priority == "high":
+    if priority == "high" or (priority == "normal" and android_sound):
         message["notification"] = {"title": title, "body": body}
     if data:
         message["data"] = {k: str(v) for k, v in data.items()}
@@ -279,6 +282,8 @@ def _send_once_legacy(
         return FcmResult(outcome=FcmOutcome.SKIPPED)
     if android_channel_id is None and android_sound is None:
         android_channel_id, android_sound = _default_android_notification(priority)
+    elif android_channel_id is None:
+        android_channel_id, _ = _default_android_notification(priority)
     payload: dict = {
         "to": device_token,
         "priority": priority,

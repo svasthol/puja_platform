@@ -3,7 +3,7 @@
 **Branch:** `feature/partner-background-presence`  
 **Depends on:** Track B `expand_for_pujari` on backend (`dev` after urgency PR)
 
-## Phase 1 (this branch)
+## Phase 1 (merged to `dev` PR #24 + Flutter #9)
 
 | Item | Status |
 |------|--------|
