@@ -7,7 +7,10 @@
     "node": ">=20.18.0 <23"
   },
   "scripts": {
+    "clean": "node scripts/clean-next.mjs",
+    "predev": "node scripts/verify-next-build.mjs",
     "dev": "next dev --port 3000",
+    "dev:clean": "npm run clean && next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "next lint",
