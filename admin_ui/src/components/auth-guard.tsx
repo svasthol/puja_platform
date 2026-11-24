@@ -17,20 +17,6 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMounted(true);
     setAuthed(isAuthenticated());
-    // #region agent log
-    fetch("http://127.0.0.1:7654/ingest/3666bc3a-f5d5-4e97-9312-8addb48dd2d4", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "e7cdae" },
-      body: JSON.stringify({
-        sessionId: "e7cdae",
-        hypothesisId: "H3-auth-guard",
-        location: "auth-guard.tsx:mount",
-        message: "AuthGuard mounted",
-        data: { authed: isAuthenticated() },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   }, []);
 
   useEffect(() => {
@@ -43,21 +29,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
       clearTokens();
       router.replace("/login");
     }
-    // #region agent log
-    fetch("http://127.0.0.1:7654/ingest/3666bc3a-f5d5-4e97-9312-8addb48dd2d4", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "e7cdae" },
-      body: JSON.stringify({
-        sessionId: "e7cdae",
-        hypothesisId: "H3-auth-guard",
-        location: "auth-guard.tsx:session-state",
-        message: "AuthGuard session query state",
-        data: { authed, isError, isPending, isFetching, isSuccess },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [mounted, authed, isError, isPending, isFetching, isSuccess, router]);
+  }, [mounted, authed, isError, router]);
 
   if (!mounted) {
     return null;
