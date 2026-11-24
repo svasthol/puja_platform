@@ -41,6 +41,7 @@ _UNREGISTERED_ERRORS = frozenset(
 
 # Must match partner MainActivity notification channels + res/raw sound files.
 _PARTNER_OFFER_CHANNEL_INSTANT = "mana_guruji_offers_ghanta"
+_PARTNER_OFFER_CHANNEL_ADVANCE = "mana_guruji_offers_advance"
 _SOUND_OFFER_INSTANT = "offer_instant_ghanta"
 
 _token_cache: dict[str, Any] = {"access_token": None, "expires_at": 0.0}
@@ -160,10 +161,10 @@ def _android_message_config(
 
 
 def _default_android_notification(priority: str) -> tuple[str | None, str | None]:
-    """Only instant (high-priority) offers use the custom bell channel."""
+    """Instant uses ghanta channel; advance uses visible tray channel (B4)."""
     if priority == "high":
         return _PARTNER_OFFER_CHANNEL_INSTANT, _SOUND_OFFER_INSTANT
-    return None, None
+    return _PARTNER_OFFER_CHANNEL_ADVANCE, None
 
 
 def _parse_v1_error(body: dict[str, Any]) -> tuple[FcmOutcome, str]:

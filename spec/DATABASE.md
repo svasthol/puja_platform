@@ -581,3 +581,14 @@ Canonical file: **`db/migration_027.sql`** (chains after 026). Apply via `script
 | `tax_statutory_config` | Statutory TDS rates — `puja_app` SELECT only (R9) |
 | `pujari_tds_accrual_intents` | Async accrual queue; ordered per-pujari worker (D1/D3/R4/R13) |
 | `ux_tds_ledger_reversal_per_booking` | One reversal per booking (R2) |
+
+### Migration 040 — urgency escalation dispatch (partner UX Track B)
+
+Canonical file: **`spec/db/migration_040.sql`** (chains after 039). Apply via `scripts/apply_migration_040.py`. **No new tables.**
+
+| Change | Purpose |
+|--------|---------|
+| `booking_dispatch_state.escalated_holders_shortened_at TIMESTAMPTZ` | B11 morning-wake idempotency |
+| `platform_settings.urgency_escalation_lead_hours` (seed **4**) | Flip threshold (ops may raise to **12** after B6 fleet) |
+| `platform_settings.escalated_offer_ttl_seconds` (**900**) | Escalated holder/offer TTL |
+| `platform_settings.rebroadcast_on_urgency_flip` (**true**) | Kill switch for expand after flip |

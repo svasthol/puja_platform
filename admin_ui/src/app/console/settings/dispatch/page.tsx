@@ -85,6 +85,7 @@ export default function DispatchPolicySettingsPage() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [immediate, setImmediate] = useState(true);
   const [night, setNight] = useState(false);
+  const [rebroadcastFlip, setRebroadcastFlip] = useState(true);
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -92,8 +93,11 @@ export default function DispatchPolicySettingsPage() {
     if (!data) return;
     setImmediate(data.immediate_dispatch_on_payment);
     setNight(data.night_bookings_enabled);
+    setRebroadcastFlip(data.rebroadcast_on_urgency_flip);
     setForm({
       instant_lead_hours: String(data.instant_lead_hours),
+      urgency_escalation_lead_hours: String(data.urgency_escalation_lead_hours),
+      escalated_offer_ttl_seconds: String(data.escalated_offer_ttl_seconds),
       instant_dispatch_minutes: String(data.instant_dispatch_minutes),
       advance_dispatch_start_hours: String(data.advance_dispatch_start_hours),
       advance_dispatch_fail_hours: String(data.advance_dispatch_fail_hours),
@@ -126,6 +130,9 @@ export default function DispatchPolicySettingsPage() {
         rm_escalation_hours_no_accept: Number(form.rm_escalation_hours_no_accept),
         rm_escalation_t24_hours: Number(form.rm_escalation_t24_hours),
         max_offer_rounds: Number(form.max_offer_rounds),
+        urgency_escalation_lead_hours: Number(form.urgency_escalation_lead_hours),
+        escalated_offer_ttl_seconds: Number(form.escalated_offer_ttl_seconds),
+        rebroadcast_on_urgency_flip: rebroadcastFlip,
         night_bookings_enabled: night,
         reconfirm_quiet_hours_start: form.reconfirm_quiet_hours_start,
         reconfirm_quiet_hours_end: form.reconfirm_quiet_hours_end,
@@ -188,16 +195,39 @@ export default function DispatchPolicySettingsPage() {
                   onChange={setNight}
                   disabled={!canEdit}
                 />
+                <BoolRow
+                  label="Rebroadcast expand on urgency flip"
+                  help="When on, flip/morning-wake enqueues expand_booking to reach pujaris without a live row."
+                  checked={rebroadcastFlip}
+                  onChange={setRebroadcastFlip}
+                  disabled={!canEdit}
+                />
               </section>
 
               <section className="grid gap-4 sm:grid-cols-2">
                 <NumRow
-                  label="Instant lead (hours)"
+                  label="Instant booking threshold (hours)"
                   value={form.instant_lead_hours ?? ""}
                   onChange={(v) => setNum("instant_lead_hours", v)}
                   disabled={!canEdit}
                   min={1}
                   max={48}
+                />
+                <NumRow
+                  label="Urgency escalation lead (hours)"
+                  value={form.urgency_escalation_lead_hours ?? ""}
+                  onChange={(v) => setNum("urgency_escalation_lead_hours", v)}
+                  disabled={!canEdit}
+                  min={1}
+                  max={48}
+                />
+                <NumRow
+                  label="Escalated offer TTL (seconds)"
+                  value={form.escalated_offer_ttl_seconds ?? ""}
+                  onChange={(v) => setNum("escalated_offer_ttl_seconds", v)}
+                  disabled={!canEdit}
+                  min={60}
+                  max={7200}
                 />
                 <NumRow
                   label="Instant dispatch window (minutes)"

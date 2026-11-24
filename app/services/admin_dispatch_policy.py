@@ -52,6 +52,9 @@ class DispatchPolicyView:
   rm_escalation_hours_no_accept: int
   rm_escalation_t24_hours: int
   max_offer_rounds: int
+  urgency_escalation_lead_hours: int
+  escalated_offer_ttl_seconds: int
+  rebroadcast_on_urgency_flip: bool
   night_bookings_enabled: bool
   reconfirm_quiet_hours_start: str
   reconfirm_quiet_hours_end: str
@@ -82,6 +85,16 @@ def _validate_policy(view: DispatchPolicyView) -> None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "instant_offer_ttl_seconds should stay below instant_dispatch_minutes window.",
+        )
+    if view.urgency_escalation_lead_hours <= view.advance_dispatch_fail_hours:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "urgency_escalation_lead_hours must be greater than advance_dispatch_fail_hours.",
+        )
+    if view.urgency_escalation_lead_hours < view.instant_lead_hours:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "urgency_escalation_lead_hours must be >= instant_lead_hours (modal threshold).",
         )
 
 
@@ -135,6 +148,9 @@ async def fetch_dispatch_policy(db: AsyncSession) -> DispatchPolicyView:
         rm_escalation_hours_no_accept=launch.rm_escalation_hours_no_accept,
         rm_escalation_t24_hours=launch.rm_escalation_t24_hours,
         max_offer_rounds=launch.max_offer_rounds,
+        urgency_escalation_lead_hours=launch.urgency_escalation_lead_hours,
+        escalated_offer_ttl_seconds=launch.escalated_offer_ttl_seconds,
+        rebroadcast_on_urgency_flip=launch.rebroadcast_on_urgency_flip,
         night_bookings_enabled=_bool_setting(by_key.get("night_bookings_enabled"), False),
         reconfirm_quiet_hours_start=_hhmm_from_row(
             by_key.get("reconfirm_quiet_hours_start"), dt.time(22, 0)

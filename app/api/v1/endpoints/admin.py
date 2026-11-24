@@ -431,6 +431,9 @@ def _dispatch_policy_response(view: DispatchPolicyView) -> DispatchPolicyRespons
         rm_escalation_hours_no_accept=view.rm_escalation_hours_no_accept,
         rm_escalation_t24_hours=view.rm_escalation_t24_hours,
         max_offer_rounds=view.max_offer_rounds,
+        urgency_escalation_lead_hours=view.urgency_escalation_lead_hours,
+        escalated_offer_ttl_seconds=view.escalated_offer_ttl_seconds,
+        rebroadcast_on_urgency_flip=view.rebroadcast_on_urgency_flip,
         night_bookings_enabled=view.night_bookings_enabled,
         reconfirm_quiet_hours_start=view.reconfirm_quiet_hours_start,
         reconfirm_quiet_hours_end=view.reconfirm_quiet_hours_end,
@@ -458,6 +461,21 @@ def _dispatch_view_from_update(
             payload.max_offer_rounds
             if payload.max_offer_rounds is not None
             else current.max_offer_rounds
+        ),
+        urgency_escalation_lead_hours=(
+            payload.urgency_escalation_lead_hours
+            if payload.urgency_escalation_lead_hours is not None
+            else current.urgency_escalation_lead_hours
+        ),
+        escalated_offer_ttl_seconds=(
+            payload.escalated_offer_ttl_seconds
+            if payload.escalated_offer_ttl_seconds is not None
+            else current.escalated_offer_ttl_seconds
+        ),
+        rebroadcast_on_urgency_flip=(
+            payload.rebroadcast_on_urgency_flip
+            if payload.rebroadcast_on_urgency_flip is not None
+            else current.rebroadcast_on_urgency_flip
         ),
         night_bookings_enabled=payload.night_bookings_enabled,
         reconfirm_quiet_hours_start=payload.reconfirm_quiet_hours_start,

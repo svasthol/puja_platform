@@ -87,6 +87,9 @@ class DispatchPolicyResponse(BaseModel):
     rm_escalation_hours_no_accept: int
     rm_escalation_t24_hours: int
     max_offer_rounds: int
+    urgency_escalation_lead_hours: int
+    escalated_offer_ttl_seconds: int
+    rebroadcast_on_urgency_flip: bool
     night_bookings_enabled: bool
     reconfirm_quiet_hours_start: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
     reconfirm_quiet_hours_end: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
@@ -108,6 +111,9 @@ class DispatchPolicyUpdate(BaseModel):
     rm_escalation_t24_hours: int = Field(ge=1, le=72)
     # Omitted by older clients -> keep the stored value. 0 = retry until dispatch_deadline.
     max_offer_rounds: int | None = Field(default=None, ge=0, le=100)
+    urgency_escalation_lead_hours: int | None = Field(default=None, ge=1, le=48)
+    escalated_offer_ttl_seconds: int | None = Field(default=None, ge=60, le=7200)
+    rebroadcast_on_urgency_flip: bool | None = None
     night_bookings_enabled: bool
     reconfirm_quiet_hours_start: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
     reconfirm_quiet_hours_end: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$")
