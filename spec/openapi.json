@@ -9486,6 +9486,22 @@
               }
             ],
             "title": "Lng"
+          },
+          "presence_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "foreground",
+                  "background"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence Mode",
+            "description": "foreground (default): short Redis TTL for 30s heartbeat loop; background: extended TTL while app paused but still on duty."
           }
         },
         "type": "object",

@@ -310,7 +310,7 @@ also load `user_roles` from DB (JWT claim alone is insufficient). See SPEC_AMEND
   See `spec/plans/SPEC_AMENDMENTS.md`.
 - `PUT  /v1/me/availability` / `/unavailability`
 - `PUT  /v1/me/heartbeat`                      body: `{lat?, lng?}` — **lat/lng optional
-  at launch (§21.2).** Always `SET presence:{pujari_id} 1 EX 90` in Redis. When lat/lng
+  at launch (§21.2).** `SET presence:{pujari_id} 1 EX` — **90s** foreground (default), **600s** when `presence_mode=background`. When lat/lng
   provided (Phase 2), also writes `pujari_live_location`. App sends every 30s while on duty.
   Partner may go online **without** OS location permission. Go-offline:
   `DELETE /v1/me/heartbeat` (removes key immediately).

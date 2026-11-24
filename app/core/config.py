@@ -158,6 +158,7 @@ class Settings(BaseSettings):
     DISPATCH_MAX_ROUNDS: int = 4
     DISPATCH_RADIUS_KM: list[float] = [3.0, 6.0, 10.0, 15.0]
     PUJARI_PRESENCE_TTL_SECONDS: int = 90     # 3 missed 30s heartbeats = offline
+    PUJARI_PRESENCE_BACKGROUND_TTL_SECONDS: int = 600  # app paused while still on duty
     WS_TICKET_TTL_SECONDS: int = 30
 
     # ---- Monitoring (P-MONITOR) ----------------------------------------------
