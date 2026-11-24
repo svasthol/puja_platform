@@ -14,6 +14,22 @@ export class ApiError extends Error {
   }
 }
 
+const DEFAULT_FETCH_TIMEOUT_MS = 25_000;
+
+function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const ext = init.signal;
+  if (ext) {
+    if (ext.aborted) {
+      controller.abort();
+    } else {
+      ext.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+  }
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 async function parseJson(res: Response): Promise<unknown> {
   const text = await res.text();
   if (!text) return {};
@@ -27,7 +43,7 @@ async function parseJson(res: Response): Promise<unknown> {
 async function refreshAccessToken(): Promise<string | null> {
   const refresh = getRefreshToken();
   if (!refresh) return null;
-  const res = await fetch(`${getApiBase()}/auth/refresh`, {
+  const res = await fetchWithTimeout(`${getApiBase()}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: refresh }),
@@ -53,15 +69,38 @@ export async function apiFetch<T>(
     if (auth && token) {
       h.set("Authorization", `Bearer ${token}`);
     }
-    return fetch(url, { ...rest, headers: h });
+    return fetchWithTimeout(url, { ...rest, headers: h });
   };
 
   let token = auth ? getAccessToken() : null;
-  let res = await run(token);
+  let res: Response;
+  try {
+    res = await run(token);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(
+        "API request timed out. Is the backend running and reachable?",
+        0,
+      );
+    }
+    throw err;
+  }
 
   if (auth && res.status === 401 && getRefreshToken()) {
     token = await refreshAccessToken();
-    if (token) res = await run(token);
+    if (token) {
+      try {
+        res = await run(token);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          throw new ApiError(
+            "API request timed out. Is the backend running and reachable?",
+            0,
+          );
+        }
+        throw err;
+      }
+    }
   }
 
   const body = await parseJson(res);

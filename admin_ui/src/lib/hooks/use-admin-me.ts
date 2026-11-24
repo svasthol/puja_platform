@@ -15,5 +15,6 @@ export function useAdminMe(options?: Options) {
     enabled: options?.enabled ?? isAuthenticated(),
     staleTime: 60_000,
     retry: false,
+    gcTime: 120_000,
   });
 }
