@@ -25,6 +25,17 @@ class _FakeRequest:
     client = None
 
 
+@pytest.fixture(autouse=True)
+async def _service_boundary_toggle_off(session):
+    await session.execute(
+        text(
+            "UPDATE platform_settings SET value_json = 'false'::jsonb "
+            "WHERE key = 'service_boundary_enabled'"
+        )
+    )
+    await session.commit()
+
+
 async def _mk_admin(session) -> uuid.UUID:
     uid = uuid.uuid4()
     await session.execute(
@@ -67,6 +78,16 @@ async def test_admin_enables_boundary_when_polygon_loaded(session, seed):
         session,
     )
     assert updated.service_boundary_enabled is True
+
+    await sb_ep.update_service_boundary_settings(
+        ServiceBoundarySettingsUpdate(
+            service_boundary_enabled=False,
+            change_reason="test teardown",
+        ),
+        _FakeRequest(),
+        _admin(actor),
+        session,
+    )
 
 
 @pytest.mark.asyncio
