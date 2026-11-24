@@ -96,6 +96,53 @@ export async function fetchTdsFacilitation(): Promise<TdsFacilitation> {
   });
 }
 
+export async function fetchServiceBoundarySettings() {
+  const { serviceBoundarySettingsSchema } = await import("@/lib/schemas/admin");
+  return apiFetch("/admin/settings/service-boundary", {
+    schema: serviceBoundarySettingsSchema,
+  });
+}
+
+export async function updateServiceBoundarySettings(input: {
+  service_boundary_enabled: boolean;
+  change_reason: string;
+}) {
+  const { serviceBoundaryUpdateSchema, serviceBoundarySettingsSchema } = await import(
+    "@/lib/schemas/admin"
+  );
+  const body = serviceBoundaryUpdateSchema.parse(input);
+  return apiFetch("/admin/settings/service-boundary", {
+    method: "PUT",
+    body: JSON.stringify(body),
+    schema: serviceBoundarySettingsSchema,
+  });
+}
+
+export async function fetchServiceBoundaryStatus() {
+  const { serviceBoundaryStatusSchema } = await import("@/lib/schemas/admin");
+  return apiFetch("/admin/settings/service-boundary/status", {
+    schema: serviceBoundaryStatusSchema,
+  });
+}
+
+export async function probeServiceBoundary(lat: number, lng: number) {
+  const { serviceBoundaryProbeSchema } = await import("@/lib/schemas/admin");
+  return apiFetch("/admin/settings/service-boundary/probe", {
+    method: "POST",
+    body: JSON.stringify({ lat, lng }),
+    schema: serviceBoundaryProbeSchema,
+  });
+}
+
+export async function reloadServiceBoundary() {
+  const { serviceBoundaryStatusSchema } = await import("@/lib/schemas/admin");
+  return apiFetch("/admin/settings/service-boundary/reload", {
+    method: "POST",
+    body: JSON.stringify({}),
+    schema: serviceBoundaryStatusSchema,
+  });
+}
+
 export async function fetchDispatchPolicy(): Promise<DispatchPolicy> {
   return apiFetch("/admin/settings/dispatch-policy", {
     schema: dispatchPolicySchema,

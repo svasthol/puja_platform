@@ -86,6 +86,40 @@ export const dispatchPolicySchema = z.object({
   updated_at: z.string().nullable().optional(),
 });
 
+export const serviceBoundarySettingsSchema = z.object({
+  service_boundary_enabled: z.boolean(),
+  updated_at: z.string().nullable().optional(),
+});
+
+export const serviceBoundaryStatusSchema = z.object({
+  loaded: z.boolean(),
+  service_boundary_enabled: z.boolean(),
+  etag: z.string().nullable().optional(),
+  version: z.string().nullable().optional(),
+  vertex_count: z.number(),
+  bbox: z
+    .object({
+      min_lat: z.number(),
+      max_lat: z.number(),
+      min_lng: z.number(),
+      max_lng: z.number(),
+    })
+    .nullable()
+    .optional(),
+  source_path: z.string().nullable().optional(),
+  load_error: z.string().nullable().optional(),
+});
+
+export const serviceBoundaryUpdateSchema = z.object({
+  service_boundary_enabled: z.boolean(),
+  change_reason: z.string().min(3).max(500),
+});
+
+export const serviceBoundaryProbeSchema = z.object({
+  serviceable: z.boolean(),
+  code: z.string().nullable().optional(),
+});
+
 export const dispatchPolicyUpdateSchema = z.object({
   instant_lead_hours: z.coerce.number().min(1).max(48),
   instant_dispatch_minutes: z.coerce.number().min(5).max(180),

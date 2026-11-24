@@ -629,6 +629,85 @@
         }
       }
     },
+    "/v1/serviceability": {
+      "get": {
+        "tags": [
+          "serviceability"
+        ],
+        "summary": "Probe Serviceability",
+        "description": "Launch polygon point-in-polygon check (§21.13). No auth; returns serviceable=false when boundary toggle is off.",
+        "operationId": "probe_serviceability_v1_serviceability_get",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Lat"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Lng"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceabilityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/serviceability/boundary": {
+      "get": {
+        "tags": [
+          "serviceability"
+        ],
+        "summary": "Get Service Boundary Outline",
+        "description": "GeoJSON outline for map overlay; ETag + Cache-Control when polygon loaded.",
+        "operationId": "get_service_boundary_outline_v1_serviceability_boundary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "GeoJSON Outline"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/pujas": {
       "get": {
         "tags": [
@@ -6290,6 +6369,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "is_serviceable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Serviceable"
           }
         },
         "type": "object",
@@ -8148,6 +8238,22 @@
             "type": "boolean",
             "title": "Setu Pan Verify Configured",
             "default": false
+          },
+          "service_boundary_enabled": {
+            "type": "boolean",
+            "title": "Service Boundary Enabled",
+            "default": false
+          },
+          "service_boundary_etag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Boundary Etag"
           }
         },
         "type": "object",
@@ -13154,6 +13260,30 @@
           "is_active"
         ],
         "title": "ServiceAreaOut"
+      },
+      "ServiceabilityResponse": {
+        "properties": {
+          "serviceable": {
+            "type": "boolean",
+            "title": "Serviceable"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "serviceable"
+        ],
+        "title": "ServiceabilityResponse"
       },
       "ServiceAreaPublic": {
         "properties": {

@@ -204,6 +204,16 @@ def _enable_legacy_payment_modes_in_tests(request, monkeypatch):
     monkeypatch.setattr("app.services.booking_service._settings", settings)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _load_launch_service_boundary():
+    from app.core.config import get_settings
+    from app.services.service_boundary import init_boundary, resolve_geojson_path
+
+    settings = get_settings()
+    path = resolve_geojson_path(settings.SERVICE_BOUNDARY_GEOJSON_PATH)
+    init_boundary(path)
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",

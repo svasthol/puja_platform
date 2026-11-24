@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     addresses,
     admin,
     admin_areas,
+    admin_service_boundary,
     admin_auth,
     admin_bookings,
     admin_catalog,
@@ -26,6 +27,7 @@ from app.api.v1.endpoints import (
     pujaris,
     pujari_bookings,
     service_areas,
+    serviceability,
     service_lifecycle,
     webhooks,
     ws,
@@ -40,6 +42,7 @@ api_router.include_router(devices.router)
 api_router.include_router(me_profile.router)
 api_router.include_router(addresses.router)
 api_router.include_router(service_areas.router)
+api_router.include_router(serviceability.router)
 api_router.include_router(catalog.router)
 api_router.include_router(bookings.router)
 api_router.include_router(offers.router)
@@ -51,6 +54,7 @@ api_router.include_router(service_lifecycle.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_catalog.router)
 api_router.include_router(admin_areas.router)
+api_router.include_router(admin_service_boundary.router)
 api_router.include_router(admin_rm.router)
 api_router.include_router(admin_pujaris.router)
 api_router.include_router(admin_kyc.router)

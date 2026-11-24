@@ -1,0 +1,20 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "hyderabad_launch_service",
+    "version": "1",
+    "description": "Launch ops polygon (greater Hyd + Secunderabad + fringe buffer). Replace via deploy + Admin reload."
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [78.2, 17.15],
+        [78.75, 17.15],
+        [78.75, 17.75],
+        [78.2, 17.75],
+        [78.2, 17.15]
+      ]
+    ]
+  }
+}

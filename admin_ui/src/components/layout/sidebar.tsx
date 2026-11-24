@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
   { href: "/console/tds/backlog", label: "TDS accrual backlog", section: "TDS & compliance" },
   { href: "/console/tds/reconcile", label: "TDS FY reconcile", section: "TDS & compliance" },
   { href: "/console/settings/areas", label: "Service areas", section: "Settings" },
+  { href: "/console/settings/service-boundary", label: "Service boundary", section: "Settings" },
   { href: "/console/settings/relationship-managers", label: "Relationship managers", section: "Settings" },
   { href: "/console/team/roles", label: "Roles", section: "Team", adminOnly: true },
   { href: "/console/team/credentials", label: "TOTP credentials", section: "Team", adminOnly: true },

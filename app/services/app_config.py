@@ -11,6 +11,8 @@ from app.schemas.app_config import AppConfigResponse
 from app.services.booking_gate import load_booking_gate_settings
 from app.services.pricing import BOOKING_FEE_LABEL, load_booking_fee_setting
 from app.services.relationship_manager import fetch_default_rm_public
+from app.services.service_boundary import boundary_etag
+from app.services.service_boundary_settings import load_service_boundary_enabled
 
 _settings = get_settings()
 
@@ -34,6 +36,7 @@ async def load_app_config(db: AsyncSession) -> AppConfigResponse:
     key_id = (_settings.RAZORPAY_KEY_ID or "").strip()
     payments_enabled = key_id.startswith("rzp_")
     muhurat_help = await fetch_default_rm_public(db)
+    boundary_enabled = await load_service_boundary_enabled(db)
     pan_product = (_settings.KYC_SETU_PAN_PRODUCT_ID or "").strip()
     return AppConfigResponse(
         night_bookings_enabled=gate.night_bookings_enabled,
@@ -50,4 +53,6 @@ async def load_app_config(db: AsyncSession) -> AppConfigResponse:
         pujari_tax_profile_required_for_accept=_settings.PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT,
         pujari_fy_pan_gate_enabled=_settings.PUJARI_FY_PAN_GATE_ENABLED,
         setu_pan_verify_configured=bool(pan_product),
+        service_boundary_enabled=boundary_enabled,
+        service_boundary_etag=boundary_etag() if boundary_enabled else None,
     )

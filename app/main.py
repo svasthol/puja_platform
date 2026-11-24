@@ -26,6 +26,7 @@ from app.db.engine import engine
 from app.monitoring.middleware import MonitoringMiddleware
 from app.monitoring.metrics import get_metrics_content_type, render_metrics
 from app.monitoring.sentry_bridge import init_sentry
+from app.services.service_boundary import init_boundary, resolve_geojson_path
 
 settings = get_settings()
 configure_logging(debug=settings.DEBUG)
@@ -38,6 +39,12 @@ async def lifespan(app: FastAPI):
     init_sentry(settings.SENTRY_DSN, environment=settings.APP_ENV)
     await init_redis()
     app.state.redis_ready = True
+    boundary_path = resolve_geojson_path(settings.SERVICE_BOUNDARY_GEOJSON_PATH)
+    try:
+        init_boundary(boundary_path)
+    except (OSError, ValueError, FileNotFoundError) as exc:
+        log.error("service_boundary_startup_failed", error=str(exc), path=str(boundary_path))
+        raise
     yield
     await engine.dispose()
     await close_redis()
