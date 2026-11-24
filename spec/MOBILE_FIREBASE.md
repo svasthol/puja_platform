@@ -92,7 +92,7 @@ Required for: Google Sign-In (if used later), some Firebase features, Play Integ
 Celery worker must include the `notifications` queue:
 
 ```powershell
-celery -A app.workers.celery_app worker --pool=solo -Q dispatch,sweep,refund,notifications
+celery -A app.workers.celery_app worker --pool=solo -Q sweep,dispatch,refund,reconcile,notifications
 ```
 
 Device registration API (after OTP login):
@@ -119,11 +119,11 @@ Recommended repo name: `mana_guruji_mobile` (separate from `puja_platform`).
    `reconfirm_escalation`, `accept_ack`, `offer_withdrawn` (see `DISPATCH_FLOW.md` §21.6.H,
    `app/workers/notifications.py`, table below).
 7. **Safety net** — partner still polls `GET /v1/offers` (15–30s foreground / on-resume).
-8. **Partner instant sound** (`P-FLUTTER-FCM-SOUND`) — Android channel
-   `mana_guruji_offers_ghanta` + raw `offer_instant_ghanta` (double temple bell /
-   ghanta for instant offers only). Backend `fcm_client.py` must use the same channel +
-   sound name. Regenerate WAV: `mana_guruji_mobile/tool/generate_offer_sounds.py`.
-   Advance offers stay silent (inbox poll only). QA: `mana_guruji_mobile/test/PARTNER_FCM_SOUND.md`.
+8. **Partner offer sounds** (`P-FLUTTER-FCM-SOUND`) — Android channels must match
+   `fcm_client.py`: urgent `mana_guruji_offers_urgent` + raw `offer_urgent_nadaswaram`;
+   quiet-hours advance `mana_guruji_offers_advance_puja` + raw `offer_advance_puja`.
+   Daytime advance stays data-only on `mana_guruji_offers_advance`. QA:
+   `mana_guruji_mobile/test/PARTNER_FCM_SOUND.md`.
 
 ### Suggested `build.gradle` flavor sketch
 

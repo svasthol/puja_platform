@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import text
 
 from app.services import offer_service
-from app.services.fcm_client import FcmOutcome, FcmResult, SOUND_OFFER_ADVANCE_OM
+from app.services.fcm_client import FcmOutcome, FcmResult, SOUND_OFFER_ADVANCE_PUJA
 from app.workers.notifications import _notify_accept_ack_impl, _notify_offers_impl
 
 CUSTOMER = uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001")
@@ -157,8 +157,8 @@ async def test_notify_offers_quiet_advance_sets_om_sound(session, seed, uniq):
         _notify_offers_impl(bid)
 
     kw = mock_push.call_args.kwargs
-    assert kw["android_sound"] == SOUND_OFFER_ADVANCE_OM
-    assert kw["data"]["alert_sound"] == "om"
+    assert kw["android_sound"] == SOUND_OFFER_ADVANCE_PUJA
+    assert kw["data"]["alert_sound"] == "puja"
 
 
 @pytest.mark.asyncio

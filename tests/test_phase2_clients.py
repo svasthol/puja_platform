@@ -117,8 +117,8 @@ class TestFcmClient:
         assert "/v1/projects/manapujari/messages:send" in url
         payload = post_call.kwargs["json"]["message"]
         assert "notification" in payload
-        assert payload["android"]["notification"]["channel_id"] == "mana_guruji_offers_ghanta"
-        assert payload["android"]["notification"]["sound"] == "offer_instant_ghanta"
+        assert payload["android"]["notification"]["channel_id"] == "mana_guruji_offers_urgent"
+        assert payload["android"]["notification"]["sound"] == "offer_urgent_nadaswaram"
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")
@@ -164,8 +164,8 @@ class TestFcmClient:
         resp.json.return_value = {"name": "projects/manapujari/messages/msg-3"}
         mock_client_cls.return_value.__enter__.return_value.post.return_value = resp
         from app.services.fcm_client import (
-            PARTNER_OFFER_CHANNEL_ADVANCE_OM,
-            SOUND_OFFER_ADVANCE_OM,
+            PARTNER_OFFER_CHANNEL_ADVANCE_PUJA,
+            SOUND_OFFER_ADVANCE_PUJA,
         )
 
         result = send_push_sync(
@@ -173,8 +173,8 @@ class TestFcmClient:
             title="Offer",
             body="Quiet hours advance",
             priority="normal",
-            android_sound=SOUND_OFFER_ADVANCE_OM,
-            data={"type": "offer_advance", "booking_id": "b-2", "alert_sound": "om"},
+            android_sound=SOUND_OFFER_ADVANCE_PUJA,
+            data={"type": "offer_advance", "booking_id": "b-2", "alert_sound": "puja"},
         )
         assert result.outcome == FcmOutcome.SENT
         payload = mock_client_cls.return_value.__enter__.return_value.post.call_args.kwargs[
@@ -182,8 +182,8 @@ class TestFcmClient:
         ]["message"]
         assert payload["notification"]["title"] == "Offer"
         android = payload["android"]
-        assert android["notification"]["sound"] == SOUND_OFFER_ADVANCE_OM
-        assert android["notification"]["channel_id"] == PARTNER_OFFER_CHANNEL_ADVANCE_OM
+        assert android["notification"]["sound"] == SOUND_OFFER_ADVANCE_PUJA
+        assert android["notification"]["channel_id"] == PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")

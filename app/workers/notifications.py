@@ -15,8 +15,8 @@ import structlog
 
 from app.services.fcm_client import (
     FcmOutcome,
-    PARTNER_OFFER_CHANNEL_ADVANCE_OM,
-    SOUND_OFFER_ADVANCE_OM,
+    PARTNER_OFFER_CHANNEL_ADVANCE_PUJA,
+    SOUND_OFFER_ADVANCE_PUJA,
     send_push_sync,
 )
 from app.services.sms_router import send_transactional_sms_sync
@@ -224,9 +224,9 @@ def _notify_offers_impl(
                 if priority == "normal" and is_quiet_hours(
                     now_local, quiet_start, quiet_end
                 ):
-                    data = {**data, "alert_sound": "om"}
-                    android_sound = SOUND_OFFER_ADVANCE_OM
-                    android_channel_id = PARTNER_OFFER_CHANNEL_ADVANCE_OM
+                    data = {**data, "alert_sound": "puja"}
+                    android_sound = SOUND_OFFER_ADVANCE_PUJA
+                    android_channel_id = PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
                 sent, failed, deleted = _push_to_user(
                     cur,
                     user_id=uid,

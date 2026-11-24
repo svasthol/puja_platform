@@ -40,12 +40,12 @@ _UNREGISTERED_ERRORS = frozenset(
 )
 
 # Must match partner MainActivity notification channels + res/raw sound files.
-_PARTNER_OFFER_CHANNEL_INSTANT = "mana_guruji_offers_ghanta"
+_PARTNER_OFFER_CHANNEL_URGENT = "mana_guruji_offers_urgent"
 _PARTNER_OFFER_CHANNEL_ADVANCE = "mana_guruji_offers_advance"
-PARTNER_OFFER_CHANNEL_ADVANCE_OM = "mana_guruji_offers_advance_om"
-_PARTNER_OFFER_CHANNEL_ADVANCE_OM = PARTNER_OFFER_CHANNEL_ADVANCE_OM
-_SOUND_OFFER_INSTANT = "offer_instant_ghanta"
-SOUND_OFFER_ADVANCE_OM = "offer_advance_om"
+PARTNER_OFFER_CHANNEL_ADVANCE_PUJA = "mana_guruji_offers_advance_puja"
+_PARTNER_OFFER_CHANNEL_ADVANCE_PUJA = PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
+_SOUND_OFFER_URGENT = "offer_urgent_nadaswaram"
+SOUND_OFFER_ADVANCE_PUJA = "offer_advance_puja"
 
 _token_cache: dict[str, Any] = {"access_token": None, "expires_at": 0.0}
 
@@ -164,9 +164,9 @@ def _android_message_config(
 
 
 def _default_android_notification(priority: str) -> tuple[str | None, str | None]:
-    """Instant uses ghanta channel; advance uses visible tray channel (B4)."""
+    """Urgent instant uses nadaswaram channel; advance tray optional."""
     if priority == "high":
-        return _PARTNER_OFFER_CHANNEL_INSTANT, _SOUND_OFFER_INSTANT
+        return _PARTNER_OFFER_CHANNEL_URGENT, _SOUND_OFFER_URGENT
     return _PARTNER_OFFER_CHANNEL_ADVANCE, None
 
 
@@ -228,8 +228,8 @@ def _send_once_v1(
         android_channel_id, android_sound = _default_android_notification(priority)
     elif android_channel_id is None:
         android_channel_id, _ = _default_android_notification(priority)
-    if android_sound == SOUND_OFFER_ADVANCE_OM:
-        android_channel_id = _PARTNER_OFFER_CHANNEL_ADVANCE_OM
+    if android_sound == SOUND_OFFER_ADVANCE_PUJA:
+        android_channel_id = _PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
 
     # Advance / normal inbox refresh — data-only so Android does not play default tray sound.
     message: dict[str, Any] = {
@@ -288,8 +288,8 @@ def _send_once_legacy(
         android_channel_id, android_sound = _default_android_notification(priority)
     elif android_channel_id is None:
         android_channel_id, _ = _default_android_notification(priority)
-    if android_sound == SOUND_OFFER_ADVANCE_OM:
-        android_channel_id = _PARTNER_OFFER_CHANNEL_ADVANCE_OM
+    if android_sound == SOUND_OFFER_ADVANCE_PUJA:
+        android_channel_id = _PARTNER_OFFER_CHANNEL_ADVANCE_PUJA
     payload: dict = {
         "to": device_token,
         "priority": priority,
