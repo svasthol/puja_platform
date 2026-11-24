@@ -148,6 +148,7 @@ class TestFcmClient:
         assert android["notification"]["channel_id"] == "mana_guruji_offers_advance"
         assert android["priority"] == "NORMAL"
         assert payload["data"]["type"] == "offer_advance"
+        assert "notification" not in payload
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")
@@ -162,7 +163,10 @@ class TestFcmClient:
         resp.status_code = 200
         resp.json.return_value = {"name": "projects/manapujari/messages/msg-3"}
         mock_client_cls.return_value.__enter__.return_value.post.return_value = resp
-        from app.services.fcm_client import SOUND_OFFER_ADVANCE_OM
+        from app.services.fcm_client import (
+            PARTNER_OFFER_CHANNEL_ADVANCE_OM,
+            SOUND_OFFER_ADVANCE_OM,
+        )
 
         result = send_push_sync(
             "device-tok-quiet",
@@ -179,6 +183,7 @@ class TestFcmClient:
         assert payload["notification"]["title"] == "Offer"
         android = payload["android"]
         assert android["notification"]["sound"] == SOUND_OFFER_ADVANCE_OM
+        assert android["notification"]["channel_id"] == PARTNER_OFFER_CHANNEL_ADVANCE_OM
 
     @patch("app.services.fcm_client._access_token", return_value="oauth-token")
     @patch("app.services.fcm_client._load_service_account")
