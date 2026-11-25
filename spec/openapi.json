@@ -405,6 +405,32 @@
         }
       }
     },
+    "/v1/me": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Get Me",
+        "operationId": "get_me_v1_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/addresses": {
       "get": {
         "tags": [
@@ -635,7 +661,6 @@
           "serviceability"
         ],
         "summary": "Probe Serviceability",
-        "description": "Launch polygon point-in-polygon check (§21.13). No auth; returns serviceable=false when boundary toggle is off.",
         "operationId": "probe_serviceability_v1_serviceability_get",
         "parameters": [
           {
@@ -691,17 +716,13 @@
           "serviceability"
         ],
         "summary": "Get Service Boundary Outline",
-        "description": "GeoJSON outline for map overlay; ETag + Cache-Control when polygon loaded.",
         "operationId": "get_service_boundary_outline_v1_serviceability_boundary_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "GeoJSON Outline"
-                }
+                "schema": {}
               }
             }
           }
@@ -1089,6 +1110,7 @@
           "bookings"
         ],
         "summary": "Create Booking",
+        "description": "REL-013: commit booking before Razorpay; 503 includes booking_id for same-hold retry.",
         "operationId": "create_booking_v1_bookings_post",
         "security": [
           {
@@ -1192,6 +1214,63 @@
         }
       }
     },
+    "/v1/bookings/{booking_id}/payment-verify": {
+      "post": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Payment Verify",
+        "description": "Client-side confirm after Razorpay Checkout (REL-015). Webhook remains primary.",
+        "operationId": "payment_verify_v1_bookings__booking_id__payment_verify_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/bookings/{booking_id}/cancel": {
       "post": {
         "tags": [
@@ -1246,6 +1325,53 @@
         "summary": "Get Booking",
         "description": "C-GET: status + payment breakdown + assigned pujari + history + refund.",
         "operationId": "get_booking_v1_bookings__booking_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bookings/{booking_id}/status": {
+      "get": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Get Booking Status",
+        "description": "Lightweight poll for booking status + trust-card assignment version.",
+        "operationId": "get_booking_status_v1_bookings__booking_id__status_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2126,7 +2252,7 @@
           "pujari-onboarding"
         ],
         "summary": "Upload Selfie Document",
-        "description": "Raw image body after presign — server-side S3 put (mobile uses this instead of direct presigned PUT).",
+        "description": "Upload selfie bytes via API (server-side S3 put — reliable on OCI vs mobile presigned PUT).",
         "operationId": "upload_selfie_document_v1_pujari_documents__document_id__upload_put",
         "security": [
           {
@@ -2145,29 +2271,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "image/jpeg": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/png": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/webp": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -2240,7 +2343,7 @@
           "pujari-onboarding"
         ],
         "summary": "Submit Pan",
-        "description": "Partner PAN + entity type for TDS (Setu verify when KYC_SETU_PAN_PRODUCT_ID set).",
+        "description": "Partner PAN + entity type for TDS (verified via the KYC_VENDOR PAN product when configured).",
         "operationId": "submit_pan_v1_pujari_kyc_pan_post",
         "requestBody": {
           "content": {
@@ -2313,26 +2416,58 @@
           "pujari-kyc-callback"
         ],
         "summary": "Kyc Callback",
-        "description": "PUBLIC — nonce-bound DigiLocker redirect landing (no bearer token).",
+        "description": "PUBLIC — nonce-bound DigiLocker redirect landing (no bearer token).\n\nAccepts Setu (``id``/``success``/``errCode``/``errMessage``) and API Sathi\n(``txnId``/``success``/``error_code``/``errMsg``) redirect params. The callback\nis only a hint: polling confirms with the vendor, so an unbound/unverifiable\ncallback changes nothing and still returns the partner to the app.",
         "operationId": "kyc_callback_v1_pujari_kyc_callback_get",
         "parameters": [
           {
             "name": "id",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "description": "Setu DigiLocker request id",
               "title": "Id"
             },
             "description": "Setu DigiLocker request id"
           },
           {
+            "name": "txnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "API Sathi transaction id",
+              "title": "Txnid"
+            },
+            "description": "API Sathi transaction id"
+          },
+          {
             "name": "success",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "boolean",
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Success"
             }
           },
@@ -2398,6 +2533,38 @@
                 }
               ],
               "title": "Errmessage"
+            }
+          },
+          {
+            "name": "error_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error Code"
+            }
+          },
+          {
+            "name": "errMsg",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Errmsg"
             }
           }
         ],
@@ -2788,6 +2955,77 @@
         ]
       }
     },
+    "/v1/admin/settings/kyc-vendor": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Kyc Vendor Setting",
+        "operationId": "get_kyc_vendor_setting_v1_admin_settings_kyc_vendor_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KycVendorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Kyc Vendor Setting",
+        "description": "Switch the vendor for NEW KYC/PAN calls; in-flight requests finish on their own vendor.",
+        "operationId": "set_kyc_vendor_setting_v1_admin_settings_kyc_vendor_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KycVendorUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KycVendorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/admin/settings/tds-facilitation": {
       "get": {
         "tags": [
@@ -2836,6 +3074,78 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TdsFacilitationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings/dispatch-policy": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Dispatch Policy",
+        "description": "Read launch dispatch policy keys (support may view; admin writes).",
+        "operationId": "get_dispatch_policy_v1_admin_settings_dispatch_policy_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchPolicyResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Dispatch Policy",
+        "description": "Replace launch dispatch platform_settings (audited). Does not retro-edit booking_dispatch_state rows.",
+        "operationId": "set_dispatch_policy_v1_admin_settings_dispatch_policy_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchPolicyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchPolicyResponse"
                 }
               }
             }
@@ -4045,6 +4355,55 @@
         }
       }
     },
+    "/v1/admin/catalog/media/{media_id}": {
+      "delete": {
+        "tags": [
+          "admin-catalog"
+        ],
+        "summary": "Deactivate Catalog Media",
+        "description": "Soft-remove catalogue media (is_active=false); clears hero/category/addon links.",
+        "operationId": "deactivate_catalog_media_v1_admin_catalog_media__media_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/catalog/addons/{addon_id}": {
       "put": {
         "tags": [
@@ -4273,6 +4632,198 @@
             }
           }
         }
+      }
+    },
+    "/v1/admin/settings/service-boundary": {
+      "get": {
+        "tags": [
+          "admin-service-boundary"
+        ],
+        "summary": "Get Service Boundary Settings",
+        "operationId": "get_service_boundary_settings_v1_admin_settings_service_boundary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceBoundarySettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin-service-boundary"
+        ],
+        "summary": "Update Service Boundary Settings",
+        "operationId": "update_service_boundary_settings_v1_admin_settings_service_boundary_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceBoundarySettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceBoundarySettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings/service-boundary/status": {
+      "get": {
+        "tags": [
+          "admin-service-boundary"
+        ],
+        "summary": "Service Boundary Status",
+        "operationId": "service_boundary_status_v1_admin_settings_service_boundary_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceBoundaryStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings/service-boundary/probe": {
+      "post": {
+        "tags": [
+          "admin-service-boundary"
+        ],
+        "summary": "Service Boundary Probe",
+        "operationId": "service_boundary_probe_v1_admin_settings_service_boundary_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceabilityProbeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceBoundaryProbeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings/service-boundary/reload": {
+      "post": {
+        "tags": [
+          "admin-service-boundary"
+        ],
+        "summary": "Service Boundary Reload",
+        "operationId": "service_boundary_reload_v1_admin_settings_service_boundary_reload_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceBoundaryStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/settings/service-boundary/geojson": {
+      "get": {
+        "tags": [
+          "admin-service-boundary"
+        ],
+        "summary": "Download Service Boundary Geojson",
+        "operationId": "download_service_boundary_geojson_v1_admin_settings_service_boundary_geojson_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/v1/admin/relationship-managers": {
@@ -5239,6 +5790,91 @@
         ]
       }
     },
+    "/v1/admin/kyc/public-name-queue": {
+      "get": {
+        "tags": [
+          "admin-kyc"
+        ],
+        "summary": "List Public Name Queue",
+        "description": "Partners with a pending customer-facing display name awaiting approval.",
+        "operationId": "list_public_name_queue_v1_admin_kyc_public_name_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNameQueueResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/kyc/pujaris/{pujari_id}/approve-public-name": {
+      "post": {
+        "tags": [
+          "admin-kyc"
+        ],
+        "summary": "Approve Public Name",
+        "operationId": "approve_public_name_v1_admin_kyc_pujaris__pujari_id__approve_public_name_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pujari_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pujari Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicNameApproveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNameApproveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/bookings": {
       "get": {
         "tags": [
@@ -5569,6 +6205,55 @@
         }
       }
     },
+    "/v1/admin/bookings/{booking_id}/tds": {
+      "get": {
+        "tags": [
+          "admin-bookings"
+        ],
+        "summary": "Get Booking Tds",
+        "description": "Read-only TDS + offline collection snapshot for ops (no SQL).",
+        "operationId": "get_booking_tds_v1_admin_bookings__booking_id__tds_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminBookingTdsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/bookings/{booking_id}/dispute": {
       "post": {
         "tags": [
@@ -5827,6 +6512,150 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/v1/admin/tds/fy-reconcile/troubleshoot": {
+      "get": {
+        "tags": [
+          "admin-tds"
+        ],
+        "summary": "Get Fy Reconcile Troubleshoot",
+        "operationId": "get_fy_reconcile_troubleshoot_v1_admin_tds_fy_reconcile_troubleshoot_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pujari_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pujari Id"
+            }
+          },
+          {
+            "name": "fy_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Indian FY start (default: current FY)",
+              "title": "Fy Start"
+            },
+            "description": "Indian FY start (default: current FY)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdsFyTroubleshootResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/tds/fy-reconcile/troubleshoot/fix": {
+      "post": {
+        "tags": [
+          "admin-tds"
+        ],
+        "summary": "Post Fy Reconcile Troubleshoot Fix",
+        "operationId": "post_fy_reconcile_troubleshoot_fix_v1_admin_tds_fy_reconcile_troubleshoot_fix_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pujari_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pujari Id"
+            }
+          },
+          {
+            "name": "fy_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Indian FY start (default: current FY)",
+              "title": "Fy Start"
+            },
+            "description": "Indian FY start (default: current FY)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TdsFyTroubleshootFixRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TdsFyTroubleshootFixResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/admin/tds/bookings/{booking_id}/correct-offline-collection": {
@@ -7358,6 +8187,224 @@
           "created_at"
         ],
         "title": "AdminBookingSummary"
+      },
+      "AdminBookingTdsResponse": {
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Booking Id"
+          },
+          "pujari_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pujari Id"
+          },
+          "accrual_enabled": {
+            "type": "boolean",
+            "title": "Accrual Enabled"
+          },
+          "balance_collected_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance Collected At"
+          },
+          "balance_collected_amount_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance Collected Amount Inr"
+          },
+          "accept_tds_snapshot_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accept Tds Snapshot At"
+          },
+          "tds_liability_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Liability Inr"
+          },
+          "tds_taxable_base_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Taxable Base Inr"
+          },
+          "tds_rate_applied": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Rate Applied"
+          },
+          "tds_collected_online_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tds Collected Online Inr"
+          },
+          "ledger_accrual_present": {
+            "type": "boolean",
+            "title": "Ledger Accrual Present"
+          },
+          "ledger_fy_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger Fy Start"
+          },
+          "ledger_taxable_base_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger Taxable Base Inr"
+          },
+          "ledger_tds_amount_inr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger Tds Amount Inr"
+          },
+          "accrual_intent_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accrual Intent Status"
+          },
+          "accrual_intent_park_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accrual Intent Park Reason"
+          },
+          "accrual_intent_last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accrual Intent Last Error"
+          },
+          "accrual_intent_attempt_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accrual Intent Attempt Count"
+          },
+          "ops_status": {
+            "type": "string",
+            "title": "Ops Status"
+          },
+          "hints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hints"
+          }
+        },
+        "type": "object",
+        "required": [
+          "booking_id",
+          "pujari_id",
+          "accrual_enabled",
+          "balance_collected_at",
+          "balance_collected_amount_inr",
+          "accept_tds_snapshot_at",
+          "tds_liability_inr",
+          "tds_taxable_base_inr",
+          "tds_rate_applied",
+          "tds_collected_online_inr",
+          "ledger_accrual_present",
+          "ledger_fy_start",
+          "ledger_taxable_base_inr",
+          "ledger_tds_amount_inr",
+          "accrual_intent_status",
+          "accrual_intent_park_reason",
+          "accrual_intent_last_error",
+          "accrual_intent_attempt_count",
+          "ops_status",
+          "hints"
+        ],
+        "title": "AdminBookingTdsResponse"
       },
       "AdminDisputeRequest": {
         "properties": {
@@ -9297,8 +10344,7 @@
           },
           "unit_price": {
             "type": "string",
-            "title": "Unit Price",
-            "description": "Launch broadcast: catalog default_price for this puja (same for all listed pujaris)."
+            "title": "Unit Price"
           }
         },
         "type": "object",
@@ -9538,6 +10584,292 @@
         ],
         "title": "DispatchChoice"
       },
+      "DispatchPolicyResponse": {
+        "properties": {
+          "instant_lead_hours": {
+            "type": "integer",
+            "title": "Instant Lead Hours"
+          },
+          "instant_dispatch_minutes": {
+            "type": "integer",
+            "title": "Instant Dispatch Minutes"
+          },
+          "advance_dispatch_start_hours": {
+            "type": "integer",
+            "title": "Advance Dispatch Start Hours"
+          },
+          "advance_dispatch_fail_hours": {
+            "type": "integer",
+            "title": "Advance Dispatch Fail Hours"
+          },
+          "reoffer_cooldown_minutes": {
+            "type": "integer",
+            "title": "Reoffer Cooldown Minutes"
+          },
+          "dispatch_buffer_minutes": {
+            "type": "integer",
+            "title": "Dispatch Buffer Minutes"
+          },
+          "immediate_dispatch_on_payment": {
+            "type": "boolean",
+            "title": "Immediate Dispatch On Payment"
+          },
+          "instant_offer_ttl_seconds": {
+            "type": "integer",
+            "title": "Instant Offer Ttl Seconds"
+          },
+          "advance_offer_ttl_hours": {
+            "type": "integer",
+            "title": "Advance Offer Ttl Hours"
+          },
+          "max_live_advance_offers_per_pujari": {
+            "type": "integer",
+            "title": "Max Live Advance Offers Per Pujari"
+          },
+          "rm_escalation_hours_no_accept": {
+            "type": "integer",
+            "title": "Rm Escalation Hours No Accept"
+          },
+          "rm_escalation_t24_hours": {
+            "type": "integer",
+            "title": "Rm Escalation T24 Hours"
+          },
+          "max_offer_rounds": {
+            "type": "integer",
+            "title": "Max Offer Rounds"
+          },
+          "urgency_escalation_lead_hours": {
+            "type": "integer",
+            "title": "Urgency Escalation Lead Hours"
+          },
+          "escalated_offer_ttl_seconds": {
+            "type": "integer",
+            "title": "Escalated Offer Ttl Seconds"
+          },
+          "rebroadcast_on_urgency_flip": {
+            "type": "boolean",
+            "title": "Rebroadcast On Urgency Flip"
+          },
+          "night_bookings_enabled": {
+            "type": "boolean",
+            "title": "Night Bookings Enabled"
+          },
+          "reconfirm_quiet_hours_start": {
+            "type": "string",
+            "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+            "title": "Reconfirm Quiet Hours Start"
+          },
+          "reconfirm_quiet_hours_end": {
+            "type": "string",
+            "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+            "title": "Reconfirm Quiet Hours End"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instant_lead_hours",
+          "instant_dispatch_minutes",
+          "advance_dispatch_start_hours",
+          "advance_dispatch_fail_hours",
+          "reoffer_cooldown_minutes",
+          "dispatch_buffer_minutes",
+          "immediate_dispatch_on_payment",
+          "instant_offer_ttl_seconds",
+          "advance_offer_ttl_hours",
+          "max_live_advance_offers_per_pujari",
+          "rm_escalation_hours_no_accept",
+          "rm_escalation_t24_hours",
+          "max_offer_rounds",
+          "urgency_escalation_lead_hours",
+          "escalated_offer_ttl_seconds",
+          "rebroadcast_on_urgency_flip",
+          "night_bookings_enabled",
+          "reconfirm_quiet_hours_start",
+          "reconfirm_quiet_hours_end"
+        ],
+        "title": "DispatchPolicyResponse",
+        "description": "Launch dispatch + booking-gate keys from platform_settings (migrations 012/014)."
+      },
+      "DispatchPolicyUpdate": {
+        "properties": {
+          "instant_lead_hours": {
+            "type": "integer",
+            "maximum": 48.0,
+            "minimum": 1.0,
+            "title": "Instant Lead Hours"
+          },
+          "instant_dispatch_minutes": {
+            "type": "integer",
+            "maximum": 180.0,
+            "minimum": 5.0,
+            "title": "Instant Dispatch Minutes"
+          },
+          "advance_dispatch_start_hours": {
+            "type": "integer",
+            "maximum": 48.0,
+            "minimum": 1.0,
+            "title": "Advance Dispatch Start Hours"
+          },
+          "advance_dispatch_fail_hours": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Advance Dispatch Fail Hours"
+          },
+          "reoffer_cooldown_minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 0.0,
+            "title": "Reoffer Cooldown Minutes"
+          },
+          "dispatch_buffer_minutes": {
+            "type": "integer",
+            "maximum": 180.0,
+            "minimum": 0.0,
+            "title": "Dispatch Buffer Minutes"
+          },
+          "immediate_dispatch_on_payment": {
+            "type": "boolean",
+            "title": "Immediate Dispatch On Payment"
+          },
+          "instant_offer_ttl_seconds": {
+            "type": "integer",
+            "maximum": 900.0,
+            "minimum": 30.0,
+            "title": "Instant Offer Ttl Seconds"
+          },
+          "advance_offer_ttl_hours": {
+            "type": "integer",
+            "maximum": 72.0,
+            "minimum": 1.0,
+            "title": "Advance Offer Ttl Hours"
+          },
+          "max_live_advance_offers_per_pujari": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Live Advance Offers Per Pujari"
+          },
+          "rm_escalation_hours_no_accept": {
+            "type": "integer",
+            "maximum": 72.0,
+            "minimum": 1.0,
+            "title": "Rm Escalation Hours No Accept"
+          },
+          "rm_escalation_t24_hours": {
+            "type": "integer",
+            "maximum": 72.0,
+            "minimum": 1.0,
+            "title": "Rm Escalation T24 Hours"
+          },
+          "max_offer_rounds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Offer Rounds"
+          },
+          "urgency_escalation_lead_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 48.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Urgency Escalation Lead Hours"
+          },
+          "escalated_offer_ttl_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 7200.0,
+                "minimum": 60.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalated Offer Ttl Seconds"
+          },
+          "rebroadcast_on_urgency_flip": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rebroadcast On Urgency Flip"
+          },
+          "night_bookings_enabled": {
+            "type": "boolean",
+            "title": "Night Bookings Enabled"
+          },
+          "reconfirm_quiet_hours_start": {
+            "type": "string",
+            "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+            "title": "Reconfirm Quiet Hours Start"
+          },
+          "reconfirm_quiet_hours_end": {
+            "type": "string",
+            "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+            "title": "Reconfirm Quiet Hours End"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instant_lead_hours",
+          "instant_dispatch_minutes",
+          "advance_dispatch_start_hours",
+          "advance_dispatch_fail_hours",
+          "reoffer_cooldown_minutes",
+          "dispatch_buffer_minutes",
+          "immediate_dispatch_on_payment",
+          "instant_offer_ttl_seconds",
+          "advance_offer_ttl_hours",
+          "max_live_advance_offers_per_pujari",
+          "rm_escalation_hours_no_accept",
+          "rm_escalation_t24_hours",
+          "night_bookings_enabled",
+          "reconfirm_quiet_hours_start",
+          "reconfirm_quiet_hours_end"
+        ],
+        "title": "DispatchPolicyUpdate"
+      },
       "GateWarning": {
         "properties": {
           "code": {
@@ -9606,8 +10938,7 @@
                 "type": "null"
               }
             ],
-            "title": "Presence Mode",
-            "description": "foreground (default): short Redis TTL for 30s heartbeat loop; background: extended TTL while app paused but still on duty."
+            "title": "Presence Mode"
           }
         },
         "type": "object",
@@ -9822,6 +11153,13 @@
               }
             ],
             "title": "View Url Expires In"
+          },
+          "review_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Review Flags"
           }
         },
         "type": "object",
@@ -10155,6 +11493,131 @@
           "all_required_verified"
         ],
         "title": "KycReviewResponse"
+      },
+      "KycVendorOption": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "configured"
+        ],
+        "title": "KycVendorOption"
+      },
+      "KycVendorResponse": {
+        "properties": {
+          "active_vendor": {
+            "type": "string",
+            "title": "Active Vendor"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "console",
+              "env"
+            ],
+            "title": "Source"
+          },
+          "env_default": {
+            "type": "string",
+            "title": "Env Default"
+          },
+          "vendors": {
+            "items": {
+              "$ref": "#/components/schemas/KycVendorOption"
+            },
+            "type": "array",
+            "title": "Vendors"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active_vendor",
+          "source",
+          "env_default",
+          "vendors"
+        ],
+        "title": "KycVendorResponse"
+      },
+      "KycVendorUpdate": {
+        "properties": {
+          "vendor": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Vendor"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vendor"
+        ],
+        "title": "KycVendorUpdate"
+      },
+      "MeResponse": {
+        "properties": {
+          "app_context": {
+            "type": "string",
+            "title": "App Context"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "partner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerMeBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "app_context",
+          "user_id"
+        ],
+        "title": "MeResponse"
       },
       "MediaListResponse": {
         "properties": {
@@ -10750,6 +12213,67 @@
         ],
         "title": "PanchangamTimeWindow"
       },
+      "PartnerBookingSelfStrip": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "identity_verified": {
+            "type": "boolean",
+            "title": "Identity Verified"
+          },
+          "verification_status": {
+            "type": "string",
+            "title": "Verification Status"
+          },
+          "assignment_version": {
+            "type": "integer",
+            "title": "Assignment Version"
+          },
+          "public_name_ops_approved": {
+            "type": "boolean",
+            "title": "Public Name Ops Approved",
+            "default": false
+          },
+          "trusted_on_platform": {
+            "type": "boolean",
+            "title": "Trusted On Platform",
+            "default": false
+          },
+          "profile_photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Photo Url"
+          },
+          "profile_photo_url_expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Photo Url Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name",
+          "identity_verified",
+          "verification_status",
+          "assignment_version"
+        ],
+        "title": "PartnerBookingSelfStrip",
+        "description": "Same trust fields as customer `pujari` when feature_trust_card_enabled is on."
+      },
       "PartnerKycStatusResponse": {
         "properties": {
           "verification_status": {
@@ -10784,7 +12308,101 @@
           "verification_status",
           "required"
         ],
-        "title": "PartnerKycStatusResponse"
+        "title": "PartnerKycStatusResponse",
+        "description": "Partner-facing KYC queue snapshot.\n\n`photo_change_under_review`: new photo doc is pending/rejected while an older verified\nphoto exists, or pending while customers still see a published pointer (Slice C)."
+      },
+      "PartnerMeBlock": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "header_subtitle": {
+            "type": "string",
+            "title": "Header Subtitle",
+            "default": ""
+          },
+          "public_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Name"
+          },
+          "public_name_pending": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Name Pending"
+          },
+          "identity_verified": {
+            "type": "boolean",
+            "title": "Identity Verified"
+          },
+          "verification_status": {
+            "type": "string",
+            "title": "Verification Status"
+          },
+          "trust_card_enabled": {
+            "type": "boolean",
+            "title": "Trust Card Enabled",
+            "default": false
+          },
+          "profile_photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Photo Url"
+          },
+          "profile_photo_url_expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Photo Url Expires In"
+          },
+          "public_name_ops_approved": {
+            "type": "boolean",
+            "title": "Public Name Ops Approved",
+            "default": false
+          },
+          "trusted_on_platform": {
+            "type": "boolean",
+            "title": "Trusted On Platform",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "display_name",
+          "identity_verified",
+          "verification_status"
+        ],
+        "title": "PartnerMeBlock"
       },
       "PartnerRegisterRequest": {
         "properties": {
@@ -10840,6 +12458,150 @@
           "created"
         ],
         "title": "PartnerRegisterResponse"
+      },
+      "PaymentVerifyRequest": {
+        "properties": {
+          "razorpay_payment_id": {
+            "type": "string",
+            "title": "Razorpay Payment Id"
+          },
+          "razorpay_order_id": {
+            "type": "string",
+            "title": "Razorpay Order Id"
+          },
+          "razorpay_signature": {
+            "type": "string",
+            "title": "Razorpay Signature"
+          }
+        },
+        "type": "object",
+        "required": [
+          "razorpay_payment_id",
+          "razorpay_order_id",
+          "razorpay_signature"
+        ],
+        "title": "PaymentVerifyRequest"
+      },
+      "PublicNameApproveRequest": {
+        "properties": {
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "title": "PublicNameApproveRequest"
+      },
+      "PublicNameApproveResponse": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "public_name": {
+            "type": "string",
+            "title": "Public Name"
+          },
+          "approved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Approved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "public_name",
+          "approved_at"
+        ],
+        "title": "PublicNameApproveResponse"
+      },
+      "PublicNameQueueItem": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "partner_name": {
+            "type": "string",
+            "title": "Partner Name"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verification_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified",
+              "rejected"
+            ],
+            "title": "Verification Status"
+          },
+          "public_name_pending": {
+            "type": "string",
+            "title": "Public Name Pending"
+          },
+          "public_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Name"
+          },
+          "proposed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "partner_name",
+          "phone",
+          "verification_status",
+          "public_name_pending"
+        ],
+        "title": "PublicNameQueueItem"
+      },
+      "PublicNameQueueResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicNameQueueItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PublicNameQueueResponse"
       },
       "PujaAddonCreate": {
         "properties": {
@@ -11280,7 +13042,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "minimum": 0.0
+                "exclusiveMinimum": 0.0
               },
               {
                 "type": "string"
@@ -11439,17 +13201,48 @@
             "type": "integer",
             "title": "Active Holds Unscoped"
           },
+          "default_price": {
+            "type": "string",
+            "title": "Default Price"
+          },
+          "customer_price_from": {
+            "type": "string",
+            "title": "Customer Price From"
+          },
+          "customer_price_to": {
+            "type": "string",
+            "title": "Customer Price To"
+          },
+          "verified_pujari_pricing_count": {
+            "type": "integer",
+            "title": "Verified Pujari Pricing Count"
+          },
+          "lowest_pujari_base_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lowest Pujari Base Price"
+          },
           "note": {
             "type": "string",
             "title": "Note",
-            "default": "Holds are not puja-scoped until booking; counts are future non-cancelled bookings. Price/duration changes may affect live quote window (§20.4)."
+            "default": "Launch: customer app price_from/to follow catalog default_price and price_max (same as checkout). verified pujari_pricing is for dispatch offers only. Holds are not puja-scoped until booking."
           }
         },
         "type": "object",
         "required": [
           "puja_id",
           "active_future_bookings",
-          "active_holds_unscoped"
+          "active_holds_unscoped",
+          "default_price",
+          "customer_price_from",
+          "customer_price_to",
+          "verified_pujari_pricing_count"
         ],
         "title": "PujaImpactResponse"
       },
@@ -11670,7 +13463,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "minimum": 0.0
+                "exclusiveMinimum": 0.0
               },
               {
                 "type": "string"
@@ -11799,66 +13592,6 @@
           "longitude"
         ],
         "title": "PujariBookingAddress"
-      },
-      "PartnerBookingSelfStrip": {
-        "properties": {
-          "display_name": {
-            "type": "string",
-            "title": "Display Name"
-          },
-          "identity_verified": {
-            "type": "boolean",
-            "title": "Identity Verified"
-          },
-          "verification_status": {
-            "type": "string",
-            "title": "Verification Status"
-          },
-          "assignment_version": {
-            "type": "integer",
-            "title": "Assignment Version"
-          },
-          "public_name_ops_approved": {
-            "type": "boolean",
-            "title": "Public Name Ops Approved",
-            "default": false
-          },
-          "trusted_on_platform": {
-            "type": "boolean",
-            "title": "Trusted On Platform",
-            "default": false
-          },
-          "profile_photo_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Photo Url"
-          },
-          "profile_photo_url_expires_in": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Photo Url Expires In"
-          }
-        },
-        "type": "object",
-        "required": [
-          "display_name",
-          "identity_verified",
-          "verification_status",
-          "assignment_version"
-        ],
-        "title": "PartnerBookingSelfStrip"
       },
       "PujariBookingDetail": {
         "properties": {
@@ -12015,8 +13748,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Partner Self"
+            ]
           }
         },
         "type": "object",
@@ -13261,30 +14993,6 @@
         ],
         "title": "ServiceAreaOut"
       },
-      "ServiceabilityResponse": {
-        "properties": {
-          "serviceable": {
-            "type": "boolean",
-            "title": "Serviceable"
-          },
-          "code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Code"
-          }
-        },
-        "type": "object",
-        "required": [
-          "serviceable"
-        ],
-        "title": "ServiceabilityResponse"
-      },
       "ServiceAreaPublic": {
         "properties": {
           "id": {
@@ -13396,6 +15104,201 @@
         },
         "type": "object",
         "title": "ServiceAreaUpdate"
+      },
+      "ServiceBoundaryProbeResponse": {
+        "properties": {
+          "serviceable": {
+            "type": "boolean",
+            "title": "Serviceable"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "serviceable"
+        ],
+        "title": "ServiceBoundaryProbeResponse"
+      },
+      "ServiceBoundarySettingsResponse": {
+        "properties": {
+          "service_boundary_enabled": {
+            "type": "boolean",
+            "title": "Service Boundary Enabled"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_boundary_enabled"
+        ],
+        "title": "ServiceBoundarySettingsResponse"
+      },
+      "ServiceBoundarySettingsUpdate": {
+        "properties": {
+          "service_boundary_enabled": {
+            "type": "boolean",
+            "title": "Service Boundary Enabled"
+          },
+          "change_reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_boundary_enabled",
+          "change_reason"
+        ],
+        "title": "ServiceBoundarySettingsUpdate"
+      },
+      "ServiceBoundaryStatusResponse": {
+        "properties": {
+          "loaded": {
+            "type": "boolean",
+            "title": "Loaded"
+          },
+          "service_boundary_enabled": {
+            "type": "boolean",
+            "title": "Service Boundary Enabled"
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etag"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "vertex_count": {
+            "type": "integer",
+            "title": "Vertex Count",
+            "default": 0
+          },
+          "bbox": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Path"
+          },
+          "load_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loaded",
+          "service_boundary_enabled"
+        ],
+        "title": "ServiceBoundaryStatusResponse"
+      },
+      "ServiceabilityProbeRequest": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Lat"
+          },
+          "lng": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Lng"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lng"
+        ],
+        "title": "ServiceabilityProbeRequest"
+      },
+      "ServiceabilityResponse": {
+        "properties": {
+          "serviceable": {
+            "type": "boolean",
+            "title": "Serviceable"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "serviceable"
+        ],
+        "title": "ServiceabilityResponse"
       },
       "SlotHoldRequest": {
         "properties": {
@@ -13687,6 +15590,68 @@
           "created_at"
         ],
         "title": "TdsAccrualIntentRow"
+      },
+      "TdsBookingFindingRow": {
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Booking Id"
+          },
+          "issue_code": {
+            "type": "string",
+            "title": "Issue Code"
+          },
+          "total_amount_inr": {
+            "type": "string",
+            "title": "Total Amount Inr"
+          },
+          "tds_liability_inr": {
+            "type": "string",
+            "title": "Tds Liability Inr"
+          },
+          "intent_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intent Status"
+          },
+          "park_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Park Reason"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "booking_id",
+          "issue_code",
+          "total_amount_inr",
+          "tds_liability_inr"
+        ],
+        "title": "TdsBookingFindingRow"
       },
       "TdsComplianceBacklogResponse": {
         "properties": {
@@ -14004,6 +15969,15 @@
             "type": "string",
             "title": "Fy Start"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "gross_facilitation",
+              "tds_accrued"
+            ],
+            "title": "Kind",
+            "default": "gross_facilitation"
+          },
           "accumulator_gross": {
             "type": "string",
             "title": "Accumulator Gross"
@@ -14026,6 +16000,231 @@
           "drift"
         ],
         "title": "TdsFyReconcileRow"
+      },
+      "TdsFyTroubleshootFixRequest": {
+        "properties": {
+          "change_reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Change Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "change_reason"
+        ],
+        "title": "TdsFyTroubleshootFixRequest"
+      },
+      "TdsFyTroubleshootFixResponse": {
+        "properties": {
+          "change_reason": {
+            "type": "string",
+            "title": "Change Reason"
+          },
+          "reconciled_intents": {
+            "type": "integer",
+            "title": "Reconciled Intents",
+            "default": 0
+          },
+          "requeued_booking_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requeued Booking Ids"
+          },
+          "skipped": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "worker_stats": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Worker Stats"
+          },
+          "troubleshoot_after": {
+            "$ref": "#/components/schemas/TdsFyTroubleshootResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "change_reason",
+          "requeued_booking_ids",
+          "skipped",
+          "worker_stats",
+          "troubleshoot_after"
+        ],
+        "title": "TdsFyTroubleshootFixResponse"
+      },
+      "TdsFyTroubleshootGrossSection": {
+        "properties": {
+          "card_gross_facilitation_inr": {
+            "type": "string",
+            "title": "Card Gross Facilitation Inr"
+          },
+          "ledger_taxable_base_net_inr": {
+            "type": "string",
+            "title": "Ledger Taxable Base Net Inr"
+          },
+          "drift_inr": {
+            "type": "string",
+            "title": "Drift Inr"
+          },
+          "turnover_at_accept_from_bookings_inr": {
+            "type": "string",
+            "title": "Turnover At Accept From Bookings Inr"
+          },
+          "collected_gross_inr": {
+            "type": "string",
+            "title": "Collected Gross Inr"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "match",
+              "expected_v3",
+              "investigate",
+              "no_tax_year_row"
+            ],
+            "title": "Status"
+          },
+          "informational_only": {
+            "type": "boolean",
+            "title": "Informational Only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "card_gross_facilitation_inr",
+          "ledger_taxable_base_net_inr",
+          "drift_inr",
+          "turnover_at_accept_from_bookings_inr",
+          "collected_gross_inr",
+          "status",
+          "informational_only"
+        ],
+        "title": "TdsFyTroubleshootGrossSection"
+      },
+      "TdsFyTroubleshootResponse": {
+        "properties": {
+          "pujari_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pujari Id"
+          },
+          "fy_start": {
+            "type": "string",
+            "title": "Fy Start"
+          },
+          "fy_end_exclusive": {
+            "type": "string",
+            "title": "Fy End Exclusive"
+          },
+          "accrual_enabled": {
+            "type": "boolean",
+            "title": "Accrual Enabled"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/TdsFyTroubleshootTaxSection"
+          },
+          "gross": {
+            "$ref": "#/components/schemas/TdsFyTroubleshootGrossSection"
+          },
+          "booking_findings": {
+            "items": {
+              "$ref": "#/components/schemas/TdsBookingFindingRow"
+            },
+            "type": "array",
+            "title": "Booking Findings"
+          },
+          "messages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "action_required": {
+            "type": "boolean",
+            "title": "Action Required"
+          },
+          "safe_fix_available": {
+            "type": "boolean",
+            "title": "Safe Fix Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pujari_id",
+          "fy_start",
+          "fy_end_exclusive",
+          "accrual_enabled",
+          "tax",
+          "gross",
+          "booking_findings",
+          "messages",
+          "action_required",
+          "safe_fix_available"
+        ],
+        "title": "TdsFyTroubleshootResponse"
+      },
+      "TdsFyTroubleshootTaxSection": {
+        "properties": {
+          "card_tds_accrued_inr": {
+            "type": "string",
+            "title": "Card Tds Accrued Inr"
+          },
+          "ledger_tds_net_inr": {
+            "type": "string",
+            "title": "Ledger Tds Net Inr"
+          },
+          "drift_inr": {
+            "type": "string",
+            "title": "Drift Inr"
+          },
+          "tds_at_accept_from_bookings_inr": {
+            "type": "string",
+            "title": "Tds At Accept From Bookings Inr"
+          },
+          "tds_on_collected_with_ledger_inr": {
+            "type": "string",
+            "title": "Tds On Collected With Ledger Inr"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "match",
+              "fixable",
+              "manual",
+              "accrual_disabled"
+            ],
+            "title": "Status"
+          },
+          "green": {
+            "type": "boolean",
+            "title": "Green"
+          }
+        },
+        "type": "object",
+        "required": [
+          "card_tds_accrued_inr",
+          "ledger_tds_net_inr",
+          "drift_inr",
+          "tds_at_accept_from_bookings_inr",
+          "tds_on_collected_with_ledger_inr",
+          "status",
+          "green"
+        ],
+        "title": "TdsFyTroubleshootTaxSection"
       },
       "TdsPujariReadinessRow": {
         "properties": {
