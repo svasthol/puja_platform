@@ -1,7 +1,8 @@
 {
-  "inside_gachibowli": { "lat": 17.4401, "lng": 78.3489, "expect": true },
+  "inside_charminar": { "lat": 17.3616, "lng": 78.4747, "expect": true },
   "inside_conftest_seed": { "lat": 17.4, "lng": 78.4, "expect": true },
   "inside_secunderabad": { "lat": 17.4399, "lng": 78.4983, "expect": true },
+  "inside_hitec_city": { "lat": 17.4484, "lng": 78.3762, "expect": true },
   "outside_mumbai": { "lat": 19.076, "lng": 72.8777, "expect": false },
   "outside_chennai": { "lat": 13.0827, "lng": 80.2707, "expect": false }
 }
