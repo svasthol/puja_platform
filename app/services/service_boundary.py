@@ -80,11 +80,20 @@ def _build_snapshot(path: Path, data: bytes) -> BoundarySnapshot:
     if payload.get("type") == "Feature":
         geometry = payload.get("geometry") or {}
         properties = payload.get("properties") or {}
+    elif payload.get("type") == "FeatureCollection":
+        features = payload.get("features") or []
+        if not features or not isinstance(features[0], dict):
+            raise ValueError("FeatureCollection has no features")
+        first = features[0]
+        geometry = first.get("geometry") or {}
+        properties = first.get("properties") or {}
     elif payload.get("type") in ("Polygon", "MultiPolygon"):
         geometry = payload
         properties = {}
     else:
-        raise ValueError("GeoJSON must be a Feature or Polygon/MultiPolygon")
+        raise ValueError(
+            "GeoJSON must be a Feature, FeatureCollection, or Polygon/MultiPolygon"
+        )
 
     rings_raw = _parse_rings(geometry)
     if not rings_raw:
