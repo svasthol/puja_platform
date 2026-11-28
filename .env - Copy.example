@@ -1,103 +1,111 @@
 # Copy this to .env and fill in real values. Never commit .env to git.
+# Validate: python scripts/validate_api_env.py .env
 
 # ---- App ----------------------------------------------------------------
 APP_ENV=development
 DEBUG=true
 SECRET_KEY=change-me-to-at-least-32-random-chars-openssl-rand-hex-32
 
-# CORS — include the Next.js admin UI origin (Sprint 4A, default :3000)
-# JSON list format for pydantic-settings:
-# localhost and 127.0.0.1 are different browser origins — include both for local dev.
+# JSON list — no outer single quotes
 ALLOWED_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
 
 # ---- Database (your local Postgres) ------------------------------------
-# Format: postgresql+psycopg://USER:PASSWORD@HOST:PORT/DBNAME
-# psycopg3 driver — do NOT use postgresql+psycopg2://
+# Format: postgresql+psycopg://USER:PASSWORD@HOST:PORT/DBNAME — use postgresql+psycopg://
 DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/Mana_Guruji
+# Optional for migrate scripts only:
+# DATABASE_MIGRATE_URL=postgresql://postgres:postgres@localhost:5432/Mana_Guruji
+# DATABASE_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/Mana_Guruji
 DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=5
 
 # ---- Redis --------------------------------------------------------------
+# If sharing a remote Redis with staging, use distinct logical DB indexes (see dev .env comments).
 REDIS_URL=redis://localhost:6379/0
+REDIS_DB_CACHE=0
+REDIS_DB_CELERY=1
+REDIS_DB_PRESENCE=2
+
+PLATFORM_TIMEZONE=Asia/Kolkata
 
 # ---- Auth ---------------------------------------------------------------
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=30
+OTP_RESEND_COOLDOWN_SECONDS=20
 
 # ---- Admin auth (Phase 4 — TOTP, no SMS) --------------------------------
-# Short-lived admin tokens (an account that overrides refunds must not carry
-# a 30-day refresh). customer/pujari keep the values above.
 ADMIN_ACCESS_TOKEN_EXPIRE_MINUTES=30
 ADMIN_REFRESH_TOKEN_EXPIRE_DAYS=1
 TOTP_ISSUER=Mana Guruji
-# Fernet key(s) that encrypt admin TOTP secrets at rest. REQUIRED before any
-# admin can be provisioned. Generate one with:
-#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Comma-separate for rotation (first key encrypts; all keys decrypt).
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 TOTP_ENC_KEYS=
 
-# ---- Payments (get from Razorpay dashboard) ----------------------------
+# ---- Payments -----------------------------------------------------------
+FULL_ONLINE_ENABLED=false
 RAZORPAY_KEY_ID=rzp_test_xxxx
 RAZORPAY_KEY_SECRET=your_secret
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
 
-# ---- SMS (MSG91) --------------------------------------------------------
-# Our API uses SendOTP (server-driven): POST /v1/auth/otp/request + /verify
-#
-# MSG91_AUTH_KEY  = API authkey from dashboard → OTP → Server-Side Integration
-#                   (same key used in verifyAccessToken curl — NOT widget tokenAuth)
-# MSG91_TEMPLATE_ID = OTP → Templates → template with ##OTP## (NOT widgetId)
-#
-# OTP Widget embed (widgetId + tokenAuth) is browser-only; server uses verifyAccessToken
-# with authkey + JWT — we do not use that flow yet (Flutter will use SendOTP API).
+# ---- TDS / PAN (flags only — slabs in Admin → TDS & compliance) --------
+TDS_ACCRUAL_ENABLED=false
+TDS_ACCEPT_STUB_COLLECT=false
+PAN_ACCEPT_GATE_ENABLED=false
+PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT=false
+PUJARI_FY_PAN_GATE_ENABLED=false
+
+# ---- SMS ----------------------------------------------------------------
+SMS_PROVIDER_ORDER=fast2sms,msg91
+MSG91_ENABLED=false
+FAST2SMS_API_KEY=
+FAST2SMS_OTP_ROUTE=otp
+FAST2SMS_QUICK_ROUTE=q
 MSG91_AUTH_KEY=
 MSG91_TEMPLATE_ID=
 MSG91_SENDER_ID=PUJAPL
 
-# ---- Firebase (FCM) -----------------------------------------------------
-# HTTP v1: download service-account JSON from Firebase Console → Project settings
-# → Service accounts → Generate new private key. No FCM_SERVER_KEY required.
+# ---- Firebase (FCM HTTP v1) ---------------------------------------------
 FCM_SERVICE_ACCOUNT_PATH=secrets/firebase-service-account.json
-# FCM_SERVER_KEY=   # optional legacy fallback only; leave unset for manapujari
 
-# ---- Storage ------------------------------------------------------------
-S3_ENDPOINT_URL=https://your-r2-or-minio-endpoint
+# ---- Storage (one S3_* block — do not duplicate keys) ---------------------
+S3_ENDPOINT_URL=
+S3_REGION=ap-south-1
 S3_BUCKET_KYC=puja-kyc-docs
 S3_BUCKET_CATALOG=puja-catalog
-S3_CATALOG_PUBLIC_URL=https://cdn.example.com
-S3_CATALOG_URL_EXPIRE_SECONDS=600
-S3_CATALOG_MAX_BYTES=5242880
 S3_ACCESS_KEY=
 S3_SECRET_KEY=
-S3_REGION=ap-south-1
+S3_CATALOG_PUBLIC_URL=
+S3_CATALOG_URL_EXPIRE_SECONDS=600
+S3_CATALOG_MAX_BYTES=5242880
 S3_KYC_MAX_BYTES=5242880
 
-# ---- Partner KYC (Setu DigiLocker — swap via KYC_VENDOR) ----------------
-KYC_VENDOR=setu_digilocker
-KYC_REDIRECT_URL=https://api.example.com/v1/pujari/kyc/callback
+# ---- Partner KYC --------------------------------------------------------
+# Active default; Admin UI can override via platform_settings.kyc_vendor.
+# Keep credentials for BOTH vendors if you test switching locally.
+KYC_VENDOR=apisathi
+KYC_REDIRECT_URL=https://YOUR_TUNNEL_OR_HOST/v1/pujari/kyc/callback
 KYC_APP_RETURN_URL=managuruji://kyc/complete
 KYC_REQUEST_TTL_MINUTES=30
 KYC_RETENTION_DAYS=365
 KYC_IDENTITY_PEPPER=
+
+# API Sathi — test_… key = mock data
+KYC_APISATHI_BASE_URL=https://apisathi.in/gw/v1
+KYC_APISATHI_API_KEY=
+KYC_APISATHI_READ_TIMEOUT=25
+KYC_VENDOR_STATUS_POLL_MIN_SECONDS=15
+
+# Setu sandbox — for KYC_VENDOR=setu_digilocker or in-flight Setu rows
 KYC_SETU_BASE_URL=https://dg-sandbox.setu.co
 KYC_SETU_CLIENT_ID=
 KYC_SETU_CLIENT_SECRET=
 KYC_SETU_DIGILOCKER_PRODUCT_ID=
-# Setu PAN verification product instance (POST /api/verify/pan). Sandbox test PAN: ABCDE1234A
 KYC_SETU_PAN_PRODUCT_ID=
 KYC_SETU_READ_TIMEOUT=25
 
-# ---- TDS / Sprint 2 (same code prod + staging — flip flags per environment) ----
-# Accrual worker (§0.S shadow). Does NOT withhold from payouts (Phase 3).
-TDS_ACCRUAL_ENABLED=false
-# Block all offer accept without PAN on file.
-PAN_ACCEPT_GATE_ENABLED=false
-# Block accept without PAN + entity_type.
-PUJARI_TAX_PROFILE_REQUIRED_FOR_ACCEPT=false
-# Block accept / go-online / record-balance at ₹5L FY gross without PAN (warn at ₹4.5L in API).
-PUJARI_FY_PAN_GATE_ENABLED=false
-# Slabs (₹4.5L warn, ₹5L block, rates): Admin UI → TDS & compliance (platform_settings.tds_facilitation)
-# Statutory rates: tax_statutory_config (DB). See spec/plans/TDS_RUNTIME_CONFIG.md
+# ---- Panchangam (optional) ----------------------------------------------
+PANCHANGAM_VENDOR_URL=http://127.0.0.1:3001/api/panchangam
+PANCHANGAM_DEFAULT_CITIES=["Hyderabad"]
 
-# ---- Maps ---------------------------------------------------------------
+# ---- Maps / monitoring (optional) ---------------------------------------
 GOOGLE_MAPS_API_KEY=
+METRICS_ENABLED=true
+SENTRY_DSN=
