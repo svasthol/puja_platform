@@ -7,15 +7,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+VENV_DIR="${VENV_DIR:-${REPO_ROOT}/.venv}"
+export REPO_ROOT VENV_DIR
+
 ENV_FILE="${ENV_FILE:-/etc/mana-guruji/api.env}"
 if [[ -f "$ENV_FILE" ]]; then
-  set -a
   # shellcheck source=/dev/null
-  source "$ENV_FILE"
-  set +a
+  source "$SCRIPT_DIR/linux/source_api_env.sh" "$ENV_FILE"
 fi
-
-VENV_DIR="${VENV_DIR:-${REPO_ROOT}/.venv}"
 if [[ -f "${VENV_DIR}/bin/activate" ]]; then
   # shellcheck source=/dev/null
   source "${VENV_DIR}/bin/activate"

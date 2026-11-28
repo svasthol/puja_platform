@@ -4,7 +4,7 @@ After editing `/etc/mana-guruji/api.env` on **stg-aio-1**:
 
 ```bash
 sudo nano /etc/mana-guruji/api.env
-set -a && source /etc/mana-guruji/api.env && set +a
+source /opt/mana-guruji/src/puja_platform/scripts/linux/source_api_env.sh /etc/mana-guruji/api.env
 /opt/mana-guruji/venv/bin/python scripts/validate_api_env.py /etc/mana-guruji/api.env --strict-staging
 /opt/mana-guruji/venv/bin/python scripts/deploy_preflight_live.py
 /opt/mana-guruji/venv/bin/python scripts/verify_staging_storage.py --strict
@@ -29,7 +29,7 @@ Keep **both** Setu and API Sathi credential blocks so Admin → KYC vendor can s
 ### Reset staging users (clean slate before prod-like data)
 
 ```bash
-set -a && source /etc/mana-guruji/api.env && set +a
+source /opt/mana-guruji/src/puja_platform/scripts/linux/source_api_env.sh /etc/mana-guruji/api.env
 /opt/mana-guruji/venv/bin/python scripts/staging_wipe_users.py --dry-run
 /opt/mana-guruji/venv/bin/python scripts/staging_wipe_users.py --confirm-wipe-staging-users
 ```
