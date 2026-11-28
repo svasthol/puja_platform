@@ -34,7 +34,7 @@ _CONFIRM = "--confirm-wipe-staging-users"
 
 _STAFF_ROLE_FILTER = """
   SELECT ur.user_id FROM user_roles ur
-  JOIN roles r ON r.id = ur.role_id WHERE r.code IN ('admin', 'support')
+  JOIN roles r ON r.id = ur.role_id WHERE r.name IN ('admin', 'support')
 """
 
 _DELETE_ALL_NON_ADMIN = f"""
@@ -101,7 +101,7 @@ def _preview(cur: psycopg.Cursor, scope: str) -> dict[str, int]:
     admins = _count(
         cur,
         "SELECT count(DISTINCT ur.user_id) FROM user_roles ur "
-        "JOIN roles r ON r.id = ur.role_id WHERE r.code = 'admin'",
+        "JOIN roles r ON r.id = ur.role_id WHERE r.name = 'admin'",
     )
     total_users = _count(cur, "SELECT count(*) FROM users")
     verified_partners = _count(
@@ -118,7 +118,7 @@ def _preview(cur: psycopg.Cursor, scope: str) -> dict[str, int]:
             WHERE p.verification_status = 'verified'
               AND u.id NOT IN (
                 SELECT ur.user_id FROM user_roles ur
-                JOIN roles r ON r.id = ur.role_id WHERE r.code IN ('admin', 'support')
+                JOIN roles r ON r.id = ur.role_id WHERE r.name IN ('admin', 'support')
               )
             """,
         )
@@ -129,7 +129,7 @@ def _preview(cur: psycopg.Cursor, scope: str) -> dict[str, int]:
             SELECT count(*) FROM users u
             WHERE u.id NOT IN (
               SELECT ur.user_id FROM user_roles ur
-              JOIN roles r ON r.id = ur.role_id WHERE r.code IN ('admin', 'support')
+              JOIN roles r ON r.id = ur.role_id WHERE r.name IN ('admin', 'support')
             )
             """,
         )
