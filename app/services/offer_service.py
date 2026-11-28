@@ -181,11 +181,18 @@ async def accept_offer(
             {"bid": str(assignment.booking_id)},
         )
     ).scalar_one_or_none()
-    if booking_class == "advance":
-        from app.workers.celery_app import celery_app
+    from app.db import post_commit
 
-        celery_app.send_task(
-            "app.workers.notifications.notify_accept_ack",
+    post_commit.enqueue_celery_task(
+        db,
+        task_name="app.workers.notifications.notify_customer_booking_confirmed",
+        args=[str(assignment.booking_id)],
+        kwargs={"countdown": 2},
+    )
+    if booking_class == "advance":
+        post_commit.enqueue_celery_task(
+            db,
+            task_name="app.workers.notifications.notify_accept_ack",
             args=[str(assignment.booking_id), str(user_id)],
         )
     log.info("offer_accepted", assignment_id=str(assignment_id), booking_id=str(assignment.booking_id))

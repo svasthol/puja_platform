@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # ---- Auth ----------------------------------------------------------------
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
-    OTP_EXPIRE_MINUTES: int = 10
+    OTP_EXPIRE_MINUTES: int = 5
     OTP_MAX_ATTEMPTS: int = 5
     OTP_RATE_LIMIT_PER_HOUR: int = 3         # max OTP send+resend per phone per hour
     OTP_RESEND_COOLDOWN_SECONDS: int = 20    # min gap between OTP sends per phone
@@ -76,8 +76,15 @@ class Settings(BaseSettings):
     SMS_PROVIDER_ORDER: str = "fast2sms,msg91"
     MSG91_ENABLED: bool = False                 # set true after DLT + SendOTP template ready
     FAST2SMS_API_KEY: str = ""
-    FAST2SMS_OTP_ROUTE: str = "otp"            # bulkV2 route for OTP
-    FAST2SMS_QUICK_ROUTE: str = "q"            # Quick SMS — no DLT header (txn fallback)
+    FAST2SMS_SENDER_ID: str = "MNGURU"         # TRAI header — exact case
+    FAST2SMS_OTP_ROUTE: str = "otp"            # legacy OTP when DLT env not set
+    FAST2SMS_QUICK_ROUTE: str = "q"            # Quick SMS — worker fallbacks only (non-DLT)
+    # DLT — Jio Content Template IDs (19-digit) + Fast2SMS DLT Manager Message IDs (short)
+    FAST2SMS_DLT_ENTITY_ID: str = ""           # Principal Entity (PE) ID
+    FAST2SMS_DLT_OTP_TEMPLATE_ID: str = ""     # default: sms_dlt.DLT_OTP_CONTENT_TEMPLATE_ID
+    FAST2SMS_DLT_BOOKING_TEMPLATE_ID: str = ""   # default: sms_dlt.DLT_BOOKING_CONTENT_TEMPLATE_ID
+    FAST2SMS_DLT_OTP_MESSAGE_ID: str = ""      # Fast2SMS panel Message ID → route=dlt (preferred)
+    FAST2SMS_DLT_BOOKING_MESSAGE_ID: str = ""
     # MSG91 SendOTP REST (NOT OTP Widget tokenAuth / widgetId):
     #   MSG91_AUTH_KEY     = dashboard API authkey
     #   MSG91_TEMPLATE_ID  = OTP → Templates id with ##OTP## (not widgetId)

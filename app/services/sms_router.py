@@ -78,6 +78,37 @@ async def send_otp_sms(phone: str, otp: str) -> SmsSendResult:
     return send_otp_sms_sync(phone, otp)
 
 
+def send_booking_confirmed_sms_sync(
+    phone: str,
+    *,
+    puja_name: str,
+    scheduled_date,
+    scheduled_time,
+    booking_id: str,
+) -> bool:
+    """DLT booking-confirm SMS — Fast2SMS only (MNGURU template)."""
+    try:
+        for provider in _provider_chain():
+            if provider != "fast2sms":
+                continue
+            if fast2sms_client.send_booking_confirmed_sms_sync(
+                phone,
+                puja_name=puja_name,
+                scheduled_date=scheduled_date,
+                scheduled_time=scheduled_time,
+                booking_id=booking_id,
+            ):
+                log.info("sms_booking_confirm_sent", provider="fast2sms", booking_id=booking_id[:8])
+                return True
+            log.warning("sms_booking_confirm_failed", provider="fast2sms")
+            break
+    except InvalidIndiaPhoneError as exc:
+        tail = (phone or "")[-4:] if len(phone or "") >= 4 else ""
+        log.warning("sms_booking_confirm_invalid_phone", error=str(exc), phone_tail=tail)
+        return False
+    return False
+
+
 def send_transactional_sms_sync(phone: str, message: str) -> bool:
     """Best-effort txn SMS. Invalid RM/placeholder phones log and return False (no task crash)."""
     try:

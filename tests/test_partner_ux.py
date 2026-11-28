@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy import text
 
+from app.db import post_commit
 from app.services import offer_service
 from app.services.fcm_client import FcmOutcome, FcmResult, SOUND_OFFER_ADVANCE_PUJA
 from app.workers.notifications import _notify_accept_ack_impl, _notify_offers_impl
@@ -269,7 +270,12 @@ async def test_accept_offer_enqueues_accept_ack_for_advance(session, seed, uniq,
         session, user_id=PUJARI_USER, assignment_id=uuid.UUID(aid)
     )
     await session.commit()
+    await post_commit.flush_post_commit(session)
 
+    assert (
+        "app.workers.notifications.notify_customer_booking_confirmed",
+        [bid],
+    ) in sent
     assert (
         "app.workers.notifications.notify_accept_ack",
         [bid, str(PUJARI_USER)],
@@ -299,6 +305,11 @@ async def test_accept_offer_skips_accept_ack_for_instant(session, seed, uniq, mo
         session, user_id=PUJARI_USER, assignment_id=uuid.UUID(aid)
     )
     await session.commit()
+    await post_commit.flush_post_commit(session)
 
+    confirm_calls = [
+        c for c in sent if c[0] == "app.workers.notifications.notify_customer_booking_confirmed"
+    ]
+    assert len(confirm_calls) == 1
     ack_calls = [c for c in sent if c[0] == "app.workers.notifications.notify_accept_ack"]
     assert ack_calls == []
