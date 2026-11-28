@@ -26,6 +26,7 @@ Execute **one phase at a time**. Mark the CSV row **Completed** only after its *
 | **Different values** per environment | Secrets, URLs, buckets |
 | **One line per key** in `api.env` | Duplicates (`S3_*` twice) silently break KYC vs catalog |
 | Never commit secrets | Use `deploy/env/staging.api.env.example` as template only |
+| Validate before restart | `python scripts/validate_api_env.py /etc/mana-guruji/api.env --strict-staging` |
 | Restart after `api.env` change | `sudo systemctl restart mana-guruji-api mana-guruji-celery-worker mana-guruji-celery-beat` |
 | Admin UI separate | `NEXT_PUBLIC_API_URL` only in `admin.env`; rebuild via `install_admin.sh` if URL changes |
 
