@@ -22,13 +22,13 @@ def test_staging_template_parses_with_placeholder_vendor():
     assert "single quotes" not in combined.lower()
 
 
-def test_rejects_allowed_origins_single_quotes(tmp_path):
+def test_rejects_malformed_allowed_origins(tmp_path):
     bad = tmp_path / "bad.env"
     bad.write_text(
         'APP_ENV=development\n'
         'SECRET_KEY=change-me-to-at-least-32-random-chars-openssl-rand-hex-32\n'
         'DATABASE_URL=postgresql+psycopg://postgres:postgres@127.0.0.1:5432/Mana_Guruji\n'
-        'ALLOWED_ORIGINS=\'["http://localhost:3000"]\'\n',
+        "ALLOWED_ORIGINS='broken-not-json'\n",
         encoding="utf-8",
     )
     proc = subprocess.run(
@@ -38,4 +38,4 @@ def test_rejects_allowed_origins_single_quotes(tmp_path):
         text=True,
     )
     assert proc.returncode == 1
-    assert "single quotes" in (proc.stderr or "").lower()
+    assert "allowed_origins" in (proc.stderr or "").lower()

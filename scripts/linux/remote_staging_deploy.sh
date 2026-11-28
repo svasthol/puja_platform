@@ -89,10 +89,9 @@ if [[ "$RUN_DB_BOOTSTRAP" == "1" ]]; then
     log "ERROR: /etc/mana-guruji/api.env missing — copy deploy/env/staging.api.env.example"
     exit 1
   fi
-  set -a
   # shellcheck source=/dev/null
-  source /etc/mana-guruji/api.env
-  set +a
+  export REPO_ROOT VENV_DIR
+  source "${REPO_ROOT}/scripts/linux/source_api_env.sh" /etc/mana-guruji/api.env
   export DATABASE_URL="${DATABASE_ADMIN_URL}"
   ./scripts/bootstrap.sh
 fi
@@ -124,10 +123,9 @@ fi
 
 if [[ "${RUN_REDIS_ENSURE:-0}" == "1" ]]; then
   if [[ -f /etc/mana-guruji/api.env ]]; then
-    set -a
     # shellcheck source=/dev/null
-    source /etc/mana-guruji/api.env
-    set +a
+    export REPO_ROOT VENV_DIR
+  source "${REPO_ROOT}/scripts/linux/source_api_env.sh" /etc/mana-guruji/api.env
     export VENV_DIR
     "${VENV_DIR}/bin/python" scripts/ensure_redis_logical_dbs.py --strict || log "WARN: redis ensure failed"
   fi

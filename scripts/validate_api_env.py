@@ -62,13 +62,6 @@ def main() -> int:
     for key, lines in _duplicates(rows):
         errors.append(f"duplicate key {key} at lines {', '.join(map(str, lines))}")
 
-    raw = path.read_text(encoding="utf-8")
-    if re.search(r"ALLOWED_ORIGINS\s*=\s*'", raw):
-        errors.append(
-            "ALLOWED_ORIGINS must not use outer single quotes — use "
-            'ALLOWED_ORIGINS=["http://..."]'
-        )
-
     import os
 
     from dotenv import load_dotenv
@@ -87,6 +80,13 @@ def main() -> int:
 
     if not settings.ALLOWED_ORIGINS:
         errors.append("ALLOWED_ORIGINS is empty")
+    raw = path.read_text(encoding="utf-8")
+    if re.search(r"ALLOWED_ORIGINS\s*=\s*'", raw) and len(settings.ALLOWED_ORIGINS) == 1:
+        if "[" not in (settings.ALLOWED_ORIGINS[0] or ""):
+            errors.append(
+                "ALLOWED_ORIGINS looks mis-quoted for dotenv - use "
+                'ALLOWED_ORIGINS=["http://..."]'
+            )
     if len(settings.SECRET_KEY) < 32:
         errors.append("SECRET_KEY shorter than 32 characters")
     if settings.SECRET_KEY == _PLACEHOLDER_SECRET_KEY:
