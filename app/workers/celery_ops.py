@@ -28,6 +28,7 @@ def sweep_task_time_limits() -> dict[str, int]:
 
 # Push tasks: early ack — sweep/dispatch backstops; avoids duplicate FCM on redelivery (REL-021).
 NOTIFICATION_TASK_NAMES = (
+    "notify_customer_booking_confirmed",
     "notify_accept_ack",
     "notify_offers",
     "notify_offer_instant",

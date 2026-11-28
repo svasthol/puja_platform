@@ -20,7 +20,7 @@ from app.services.fcm_client import (
     SOUND_OFFER_ADVANCE_PUJA,
     send_push_sync,
 )
-from app.services.sms_router import send_transactional_sms_sync
+from app.services.sms_router import send_booking_confirmed_sms_sync, send_transactional_sms_sync
 from app.workers.celery_app import celery_app
 from app.workers.sweep import get_connection
 
@@ -603,6 +603,52 @@ def _notify_reconfirm_escalation_impl(booking_id: str) -> dict:
         conn.close()
 
 
+_CUSTOMER_BOOKING_CONFIRM_SQL = """
+SELECT u.phone, pu.name AS puja_name, b.scheduled_date, b.scheduled_time,
+       st.code AS booking_status
+FROM bookings b
+JOIN users u ON u.id = b.user_id
+JOIN pujas pu ON pu.id = b.puja_id
+JOIN status_types st ON st.id = b.status_id
+WHERE b.id = %s
+"""
+
+
+def _notify_customer_booking_confirmed_impl(booking_id: str) -> dict:
+    """Customer DLT SMS when booking becomes confirmed (pujari accept)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_CUSTOMER_BOOKING_CONFIRM_SQL, (booking_id,))
+            row = cur.fetchone()
+            if row is None:
+                return {"booking_id": booking_id, "skipped": "booking_missing"}
+            phone, puja_name, sched_date, sched_time, status_code = row
+            if status_code != "confirmed":
+                return {
+                    "booking_id": booking_id,
+                    "skipped": "not_confirmed",
+                    "status": status_code,
+                }
+            if not phone:
+                return {"booking_id": booking_id, "skipped": "no_phone"}
+            sms_ok = send_booking_confirmed_sms_sync(
+                phone,
+                puja_name=puja_name,
+                scheduled_date=sched_date,
+                scheduled_time=sched_time,
+                booking_id=booking_id,
+            )
+            log.info(
+                "customer_booking_confirm_sms",
+                booking_id=booking_id,
+                sms=sms_ok,
+            )
+            return {"booking_id": booking_id, "sms": sms_ok}
+    finally:
+        conn.close()
+
+
 def _notify_accept_ack_impl(booking_id: str, pujari_user_id: str) -> dict:
     """Advance-class accept acknowledgement push (§21.6.H)."""
     conn = get_connection()
@@ -728,6 +774,11 @@ def _notify_offer_escalated_impl(booking_id: str) -> dict:
 def _notify_offer_instant_impl(booking_id: str) -> dict:
     """Legacy entry — delegates to escalated-aware notify."""
     return _notify_offer_escalated_impl(booking_id)
+
+
+@celery_app.task(name="app.workers.notifications.notify_customer_booking_confirmed")
+def notify_customer_booking_confirmed(booking_id: str) -> dict:
+    return _notify_customer_booking_confirmed_impl(booking_id)
 
 
 @celery_app.task(name="app.workers.notifications.notify_accept_ack")
